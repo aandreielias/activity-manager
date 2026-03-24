@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/activity-manager.iml" afterDir="false" />
-    </list>
+    <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -35,11 +29,20 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "git-widget-placeholder": "master",
     "kotlin-language-version-configured": "true",
-    "settings.editor.selected.configurable": "configurable.group.appearance"
+    "settings.editor.selected.configurable": "Settings.JavaScript",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.32098.37" />
+      </set>
+    </attachedChunks>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="" />
@@ -47,8 +50,12 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1774345285246</updated>
+      <workItem from="1774347050158" duration="362000" />
     </task>
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

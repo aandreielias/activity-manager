@@ -1,8 +1,7 @@
 name: Deploy via Github Pages
 on:
   push:
-    branches:
-      - main
+    branches: [master]
 permissions:
   contents: write
   pages: write
@@ -20,7 +19,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependecies
+      - name: Install dependencies
         run: npm install
 
       - name: Build

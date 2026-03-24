@@ -29,5 +29,11 @@ jobs:
           VITE_REPO_OWNER: ${{ github.repository_owner }}
           VITE_REPO_NAME: activity_manager
 
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: dist
+
       - name: Deploy
-        uses: actions/deploy_pages@v4
+        id: deployment
+        uses: actions/deploy-pages@v4

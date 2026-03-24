@@ -30,7 +30,7 @@ jobs:
           VITE_REPO_NAME: activity_manager
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 

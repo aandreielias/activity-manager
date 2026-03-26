@@ -27,7 +27,8 @@ jobs:
         env:
           VITE_GITHUB_TOKEN: ${{ secrets.VITE_GITHUB_TOKEN }}
           VITE_REPO_OWNER: ${{ github.repository_owner }}
-          VITE_REPO_NAME: activity_manager
+          VITE_REPO_NAME: ${{ github.event.repository.name }}
+          VITE_GITHUB_BRANCH: master
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

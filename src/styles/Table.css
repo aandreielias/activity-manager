@@ -1,0 +1,475 @@
+/* ── Table Wrapper ──────────────────────────────────── */
+.table-wrapper {
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.table-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+}
+
+.table-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.table-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Table Structure ────────────────────────────────── */
+.table-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 4px;
+  transition: background var(--transition);
+}
+
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--border);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: auto;
+  min-width: fit-content;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+.data-table thead {
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border-light);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition), color var(--transition);
+}
+
+.data-table th:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.data-table th[data-sort="asc"]::after {
+  content: ' ↑';
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.data-table th[data-sort="desc"]::after {
+  content: ' ↓';
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ── Rows ───────────────────────────────────────────── */
+.data-table tbody tr {
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition);
+}
+
+.data-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+  background: var(--bg-secondary);
+}
+
+.data-table tbody tr.add-row-tr:hover {
+  background: transparent;
+}
+
+.empty-row {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 48px 20px;
+  font-size: 14px;
+}
+
+/* ── Cells ──────────────────────────────────────────── */
+.data-table td {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  vertical-align: top;
+  border-right: 1px solid var(--border-light);
+}
+
+.data-cell {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  min-height: 40px;
+  vertical-align: top;
+}
+
+.cell-content {
+  width: 100%;
+  max-height: 2.4em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  color: var(--text-primary);
+  word-wrap: break-word;
+}
+
+.data-cell.expanded .cell-content {
+  max-height: 320px;
+  -webkit-line-clamp: unset;
+  display: block;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 4px 0;
+}
+
+/* ── Cell Editing ───────────────────────────────────– */
+.data-cell.editing {
+  padding: 8px 12px;
+  background: var(--accent-light);
+  border-radius: var(--radius-sm);
+}
+
+.cell-editor {
+  width: 100%;
+  min-height: 80px;
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  pointer-events: all;
+}
+
+.cell-editor:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.cell-editor.select-editor {
+  min-height: auto;
+  height: auto;
+  padding: 8px 10px;
+  resize: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%230084ff' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+.data-table th[class*="handle"] {
+  width: 28px;
+  padding: 12px 6px;
+  text-align: center;
+}
+
+.handle-column-header {
+  width: 28px;
+  padding: 12px 6px;
+  text-align: center;
+}
+
+/* ── Row Handle ─────────────────────────────────────── */
+.row-handle-cell {
+  width: 28px;
+  padding: 0 6px;
+  text-align: center;
+  color: var(--text-muted);
+  cursor: grab;
+  user-select: none;
+  opacity: 0;
+  transition: opacity var(--transition), color var(--transition);
+}
+
+.data-table tbody tr:hover .row-handle-cell {
+  opacity: 1;
+}
+
+.row-handle-cell:active {
+  cursor: grabbing;
+}
+
+.row-handle-icon {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Drag and Drop States ───────────────────────────── */
+.dragging {
+  opacity: 0.5;
+}
+
+.row-drop-target {
+  opacity: 0.65;
+  background: var(--bg-secondary);
+}
+
+.row-drop-over {
+  background: var(--accent-light);
+  border-left: 3px solid var(--accent);
+}
+
+.drop-compatible {
+  background: var(--success-light);
+}
+
+.drop-incompatible {
+  opacity: 0.35;
+}
+
+.drop-over {
+  background: var(--accent-light);
+  border: 2px solid var(--accent);
+}
+
+/* ── Status Colors ──────────────────────────────────– */
+.status-aktiv {
+  background: var(--success-light);
+  color: var(--success);
+  font-weight: 600;
+  padding: 6px 12px !important;
+  border-radius: 4px;
+}
+
+.status-inaktiv {
+  background: var(--error-light);
+  color: var(--error);
+  font-weight: 600;
+  padding: 6px 12px !important;
+  border-radius: 4px;
+}
+
+/* ── Add Row Button ─────────────────────────────────– */
+.add-row-cell {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-light);
+  text-align: left;
+}
+
+.add-row-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 0;
+  font-family: inherit;
+  transition: color var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.add-row-btn:hover {
+  color: var(--accent);
+}
+
+.add-row-btn::before {
+  content: '+';
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* ── Save Bar ───────────────────────────────────────– */
+.save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--accent-light);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.save-bar-msg {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.save-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+  white-space: nowrap;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.save-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.discard-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  white-space: nowrap;
+}
+
+.discard-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+/* ── Context Menu ───────────────────────────────────– */
+.row-context-menu {
+  animation: fadeInPopover 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeInPopover {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  transition: background var(--transition);
+  white-space: nowrap;
+}
+
+.context-menu-item:first-child {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.context-menu-item:last-child {
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.context-menu-item:hover {
+  background: var(--bg-secondary);
+}
+
+.context-menu-delete {
+  color: var(--error);
+  font-weight: 500;
+}
+
+.context-menu-delete:hover {
+  background: var(--error-light);
+}
+
+/* ── Accessibility ──────────────────────────────────– */
+.data-cell:focus,
+.cell-editor:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Animations ─────────────────────────────────────– */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

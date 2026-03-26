@@ -1,36 +1,91 @@
 import './styles/main.css';
-import { Header } from './ui/Header.js';
-import { TableView } from './ui/TableView.js';
+import { Header }      from './ui/Header.js';
+import { FieldType }   from './core/Field.js';
+import { TableLoader } from './core/TableLoader.js';
+import tablesConfig    from './data/tables.json';
+import peopleData      from './data/rows/people.json';
 
-const app = document.getElementById('app');
+document.addEventListener('dragover', (e) => e.preventDefault());
 
-const header = new Header({
-
-    appName: 'Activity Manager',
-    onThemeToggle: (isDark) => console.log('theme:', isDark ? 'dark' : 'light'),
-});
-app.appendChild(header.render());
-
-
-const main = document.createElement('main');
-main.style.cssText = 'padding: 28px; display: flex; flex-direction: column; gap: 20px;';
-app.appendChild(main);
-
-const activitiesTable = new TableView({
-
-    tableId: 'tbl_activities',
-    title: 'Activities',
-    columns: [
-        { id: 'title',      label: 'Title' },
-        { id: 'sport_type', label: 'Sport' },
-        { id: 'place',      label: 'Place' },
-        { id: 'date',       label: 'Date' },
-        { id: 'status',     label: 'Status' },
-    ],
-    rows: [
-        { id: 'r1', title: 'Friday Volleyball', sport_type: 'Volleyball', place: 'Parish Hall', date: '2025-04-04', status: 'Planned' },
-        { id: 'r2', title: 'Sunday Soccer',     sport_type: 'Soccer',     place: 'City Park',   date: '2025-04-06', status: 'Done' },
-    ],
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.data-cell')) {
+        document.querySelectorAll('.data-cell.expanded')
+            .forEach(el => el.classList.remove('expanded'));
+    }
 });
 
-main.appendChild(activitiesTable.render());
+// ── Data Saving Configuration ──────────────────────────
+// Data is saved via Express.js backend API at /api/save-table
+// No GitHub configuration needed
+
+// ── Initialize App ─────────────────────────────────────
+async function initializeApp() {
+    const app = document.getElementById('app');
+
+    // Create header with table configs
+    const headerInstance = new Header({
+        appName: 'Activity Manager',
+        tableConfigs: tablesConfig,
+        onThemeToggle: (isDark) => console.log('theme:', isDark ? 'dark' : 'light'),
+    });
+    const headerEl = headerInstance.render();
+    app.appendChild(headerEl);
+
+    const main = document.createElement('main');
+    main.className = 'main-container';
+    main.style.cssText = 'padding: 28px; display: flex; flex-direction: column; gap: 20px; flex: 1; overflow-y: auto;';
+    app.appendChild(main);
+
+    // Create a container for tables - vertical stacking
+    const tablesContainer = document.createElement('div');
+    tablesContainer.className = 'tables-container';
+    tablesContainer.style.cssText = 'display: flex; flex-direction: column; gap: 20px; flex: 1;';
+    main.appendChild(tablesContainer);
+
+    // Load all tables dynamically
+    const tables = await TableLoader.loadAllTables(peopleData);
+    
+    // Render all tables
+    const tableElements = {};
+    let currentTableId = null; // null means show all
+    
+    Object.entries(tables).forEach(([tableId, { instance, config }]) => {
+        const tableWrapper = document.createElement('div');
+        tableWrapper.className = 'table-view';
+        tableWrapper.dataset.tableId = tableId;
+        tableWrapper.style.cssText = 'overflow-y: auto;';
+        
+        const el = instance.render();
+        tableWrapper.appendChild(el);
+        tableElements[tableId] = tableWrapper;
+        tablesContainer.appendChild(tableWrapper);
+    });
+
+    // Function to show/hide tables
+    const showTable = (tableId) => {
+        if (tableId === 'all-spiele') {
+            // Show all spiele tables
+            Object.entries(tableElements).forEach(([id, element]) => {
+                const config = tablesConfig.find(t => t.id === id);
+                element.style.display = config?.category === 'spiele' ? 'block' : 'none';
+            });
+        } else {
+            // Show only selected table
+            Object.values(tableElements).forEach(element => {
+                element.style.display = element.dataset.tableId === tableId ? 'block' : 'none';
+            });
+        }
+    };
+
+    // Initially show all spiele tables
+    showTable('all-spiele');
+
+    // Handle table switching
+    headerInstance.onTableSwitch = (tableId) => {
+        currentTableId = tableId;
+        showTable(tableId);
+    };
+}
+
+// Initialize when DOM is ready
+initializeApp().catch(err => console.error('Failed to initialize app:', err));

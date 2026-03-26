@@ -2,11 +2,46 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/ui/Header.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/server/api.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/server/index.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/TableDataManager.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/TableEditor.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/TableLoader.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/TableSorter.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/services/DataService.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/styles/Table.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/deploy.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/deploy.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Auth.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Database.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Field.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Field.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Relations.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Stats.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Table.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Table.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/rows/activities.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/rows/activities.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/rows/activity_inventory.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/rows/activity_responsible.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/rows/inventory.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/rows/people.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/rows/people.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/rows/places.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/rows/sport_types.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/tables.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/tables.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/style.css" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/styles/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/main.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/TableView.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/TableView.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/App.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/DragDrop.js" beforeDir="false" afterPath="$PROJECT_DIR$/setup-github.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/Header.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Header.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/LoginModal.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Row.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/RelationsOverlay.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableRenderer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/Slot.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/TableSelector.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/TableView.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/ViewModeToggle.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/vite.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/vite.config.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -18,6 +53,15 @@
       <entry key="_/home/andrei/IdeaProjects/activity-manager" value="3BO1Pvr6qJ6bi5o7OaZ0zHdyUYy" />
     </persistenceIdMap>
   </component>
+  <component name="CopilotUserSelectedChatMode">
+    <option name="chatModeId" value="Agent" />
+  </component>
+  <component name="CopilotUserSelectedModel">
+    <selectedModels>
+      <entry key="chat-panel" value="Auto" />
+      <entry key="agent-panel" value="Auto" />
+    </selectedModels>
+  </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
@@ -28,18 +72,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "aandreielias"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;aandreielias&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/aandreielias/activity-manager.git",
-    "accountId": "bded61e4-6530-41d4-a81f-149a035fa664"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;git@github.com:aandreielias/activity-manager.git&quot;,
+    &quot;accountId&quot;: &quot;bded61e4-6530-41d4-a81f-149a035fa664&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 0
 }</component>
@@ -58,7 +102,7 @@
     "git-widget-placeholder": "master",
     "kotlin-language-version-configured": "true",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "Settings.JavaScript",
+    "settings.editor.selected.configurable": "preferences.general",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -66,6 +110,7 @@
     <attachedChunks>
       <set>
         <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.32098.37" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.32098.37" />
       </set>
     </attachedChunks>
   </component>
@@ -76,7 +121,14 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1774345285246</updated>
-      <workItem from="1774347050158" duration="5605000" />
+      <workItem from="1774347050158" duration="5971000" />
+      <workItem from="1774382597124" duration="5055000" />
+      <workItem from="1774431634600" duration="14051000" />
+      <workItem from="1774455886200" duration="57000" />
+      <workItem from="1774464634519" duration="2511000" />
+      <workItem from="1774472436922" duration="706000" />
+      <workItem from="1774516463562" duration="270000" />
+      <workItem from="1774516764254" duration="9822000" />
     </task>
     <servers />
   </component>

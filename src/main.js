@@ -2,8 +2,8 @@ import './styles/main.css';
 import { Header }      from './ui/Header.js';
 import { FieldType }   from './core/Field.js';
 import { TableLoader } from './core/TableLoader.js';
-import tablesConfig    from './data/tables.json';
-import peopleData      from './data/rows/people.json';
+import tablesConfig    from './data/tables.json' assert { type: 'json' };
+import peopleData      from './data/rows/people.json' assert { type: 'json' };
 
 document.addEventListener('dragover', (e) => e.preventDefault());
 

@@ -1,48 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/server/api.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/server/index.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/core/TableDataManager.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/core/TableEditor.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/core/TableLoader.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/core/TableSorter.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/services/DataService.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/styles/Table.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.github/workflows/deploy.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/deploy.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/Auth.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/Database.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/Field.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Field.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/Relations.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/Stats.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/Table.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Table.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/rows/activities.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/rows/activities.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/rows/activity_inventory.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/rows/activity_responsible.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/rows/inventory.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/rows/people.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/rows/people.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/rows/places.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/rows/sport_types.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/tables.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/tables.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/style.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/main.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/App.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/DragDrop.js" beforeDir="false" afterPath="$PROJECT_DIR$/setup-github.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/Header.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Header.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/LoginModal.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Row.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/RelationsOverlay.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableRenderer.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/Slot.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/TableSelector.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/TableView.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/ViewModeToggle.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/vite.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/vite.config.js" afterDir="false" />
-    </list>
+    <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -128,7 +87,7 @@
       <workItem from="1774464634519" duration="2511000" />
       <workItem from="1774472436922" duration="706000" />
       <workItem from="1774516463562" duration="270000" />
-      <workItem from="1774516764254" duration="9822000" />
+      <workItem from="1774516764254" duration="10141000" />
     </task>
     <servers />
   </component>

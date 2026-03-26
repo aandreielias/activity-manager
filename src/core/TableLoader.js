@@ -1,8 +1,10 @@
 import { Table } from './Table.js';
-import tablesConfig from '../data/tables.json';
 
 export class TableLoader {
     static async loadAllTables(peopleData = null) {
+        // Dynamically import tables configuration
+        const { default: tablesConfig } = await import('../data/tables.json', { assert: { type: 'json' } });
+        
         const tables = {};
         
         for (const tableConfig of tablesConfig) {

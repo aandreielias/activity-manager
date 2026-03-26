@@ -2,8 +2,6 @@ import './styles/main.css';
 import { Header }      from './ui/Header.js';
 import { FieldType }   from './core/Field.js';
 import { TableLoader } from './core/TableLoader.js';
-import tablesConfig    from './data/tables.json' assert { type: 'json' };
-import peopleData      from './data/rows/people.json' assert { type: 'json' };
 
 document.addEventListener('dragover', (e) => e.preventDefault());
 
@@ -20,6 +18,10 @@ document.addEventListener('click', (e) => {
 
 // ── Initialize App ─────────────────────────────────────
 async function initializeApp() {
+    // Dynamically import JSON data
+    const { default: tablesConfig } = await import('./data/tables.json', { assert: { type: 'json' } });
+    const { default: peopleData } = await import('./data/rows/people.json', { assert: { type: 'json' } });
+    
     const app = document.getElementById('app');
 
     // Create header with table configs

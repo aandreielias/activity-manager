@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="" />
+    <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/public/.nojekyll" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/deploy.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/deploy.yml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -87,7 +90,7 @@
       <workItem from="1774464634519" duration="2511000" />
       <workItem from="1774472436922" duration="706000" />
       <workItem from="1774516463562" duration="270000" />
-      <workItem from="1774516764254" duration="10141000" />
+      <workItem from="1774516764254" duration="10445000" />
     </task>
     <servers />
   </component>

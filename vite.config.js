@@ -10,6 +10,7 @@ let app = null;
 
 export default {
     base: '/activity_manager/',
+    publicDir: 'public',
     build: {
         outDir: 'dist'
     },

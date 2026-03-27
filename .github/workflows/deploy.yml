@@ -35,6 +35,9 @@ jobs:
           VITE_REPO_NAME: ${{ github.event.repository.name }}
           VITE_GITHUB_BRANCH: master
 
+      - name: Debug dist
+        run: find ./dist -type f
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

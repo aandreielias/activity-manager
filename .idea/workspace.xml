@@ -1,7 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
-    <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="" />
+    <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/public/data/auth.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/data/rows/activities.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/data/rows/activities_gruppen.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/data/rows/activities_icebreaker.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/data/rows/activities_sonstige.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/data/rows/activities_sport.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/data/rows/activities_zwischendurch.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/data/rows/people.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/data/tables.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/copilotDiffState.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index-CwL3KoRG.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/dist/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/TableLoader.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableLoader.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vite.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/vite.config.js" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -43,6 +65,10 @@
     &quot;accountId&quot;: &quot;bded61e4-6530-41d4-a81f-149a035fa664&quot;
   }
 }</component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 0
 }</component>
@@ -54,17 +80,42 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "git-widget-placeholder": "master",
     "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/home/andrei/IdeaProjects/activity-manager/public",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
+    "prettierjs.PrettierConfiguration.Package": "/home/andrei/IdeaProjects/activity-manager/node_modules/prettier",
     "settings.editor.selected.configurable": "preferences.general",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/public" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="activity-manager" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="activity-manager" />
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -88,6 +139,9 @@
       <workItem from="1774472436922" duration="706000" />
       <workItem from="1774516463562" duration="270000" />
       <workItem from="1774516764254" duration="11079000" />
+      <workItem from="1774561597043" duration="849000" />
+      <workItem from="1774611264272" duration="619000" />
+      <workItem from="1774618243209" duration="2247000" />
     </task>
     <servers />
   </component>

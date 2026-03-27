@@ -1,0 +1,19 @@
+[
+  {
+    "id": "game_001",
+    "name": "Sesseltanz",
+    "required_items": "Sessel, Musikbox, Lied",
+    "short_description": "Spiel beginnt mit einem Sessel weniger als Spieler. Sessel sind im Kreis aufgestellt, Spieler bewegen sich im Kreis um die Sessel. Wenn die Musik aufhört müssen sich alle hinsetzen und 1 Spieler fliegt raus.",
+    "rules": "Jede Runde werden weitere Sessel rausgenommen, bis 1 Spieler übrig bleibt und gewinnt. Wichtig: Kein Stoßen, sonst fliegen die Spieler aus dem Spiel. Bei vielen Spielern können auch 2 oder 3 Sessel gleichzeitig weggenommen werden.",
+    "duration_minutes": 15,
+    "preparation_minutes": 5,
+    "location": "überall",
+    "location_notes": "Groß genug, dass ein Sesselkreis hineinpasst",
+    "min_players": 3,
+    "max_players": null,
+    "cost": "Keine",
+    "link": "https://www.youtube.com/watch?v=sjrji-9CfJc",
+    "team_tasks": "Musik steuern (an/aus), Sessel wegnehmen, Kontrolle der Regeln, Moderieren",
+    "responsible": "Emi B."
+  }
+]

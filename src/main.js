@@ -18,10 +18,12 @@ document.addEventListener('click', (e) => {
 
 // ── Initialize App ─────────────────────────────────────
 async function initializeApp() {
+    const base = import.meta.env.BASE_URL;
     // Dynamically import JSON data
-    const { default: tablesConfig } = await import('./data/tables.json', { assert: { type: 'json' } });
-    const { default: peopleData } = await import('./data/rows/people.json', { assert: { type: 'json' } });
-    
+    const tablesConfig = await fetch(`${base}data/tables.json`).then(r => r.json());
+    const peopleData = await fetch(`${base}data/rows/people.json`).then(r => r.json());
+
+
     const app = document.getElementById('app');
 
     // Create header with table configs

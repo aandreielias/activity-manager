@@ -13,7 +13,7 @@ export default {
     plugins: [
         {
             name: 'api-server',
-            apply: 'serve', // ← only active during dev, skipped on build
+            apply: 'serve',
             async configureServer(server) {
                 const { default: express } = await import('express');
                 const { setupSaveAPI } = await import('./server/api.js');

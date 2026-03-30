@@ -176,3 +176,67 @@ html, body {
     }
 }
 
+/* ── Extracted Layout Classes from main.js ──────────── */
+.layout-row {
+    padding: 28px;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.tables-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex: 1;
+    overflow-y: auto;
+    min-width: 400px;
+}
+
+.split-resizer {
+    width: 8px;
+    background: var(--border-light);
+    cursor: col-resize;
+    flex-shrink: 0;
+    display: none;
+    position: relative;
+}
+
+.split-resizer-handle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 40px;
+    background: var(--accent);
+    border-radius: 1px;
+}
+
+.persons-split-container {
+    flex: 0 0 33.333%;
+    border-left: 1px solid var(--border-light);
+    padding-left: 20px;
+    overflow-y: auto;
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 300px;
+}
+
+.persons-split-container.full-view {
+    flex: 1;
+    border-left: none;
+    padding-left: 0;
+}
+
+.table-view-wrapper {
+    overflow-y: auto;
+}
+
+.persons-table-full {
+    flex: 1;
+}
+

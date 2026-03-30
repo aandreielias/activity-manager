@@ -19,7 +19,7 @@ export class Table {
         this.title   = json.title;
         this.schema  = json.schema;
         this.peopleData = json.peopleData;
-        
+
         this.rows    = json.rows.map(r => new Row({
             id:     r.id,
             data:   r,

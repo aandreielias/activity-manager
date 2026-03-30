@@ -15,7 +15,6 @@ export class TableDataManager {
             onEditStart: () => this.table.editor.showSaveBar(),
             onEditChange: () => this.table.editor.showSaveBar(),
             onDelete: (rowId) => this.removeRow(rowId),
-            onReorder: (fromId, toId) => this.reorderRows(fromId, toId),
         });
         this.table.rows.push(row);
 
@@ -32,7 +31,6 @@ export class TableDataManager {
             onEditStart: () => this.table.editor.showSaveBar(),
             onEditChange: () => this.table.editor.showSaveBar(),
             onDelete: (rowId) => this.removeRow(rowId),
-            onReorder: (fromId, toId) => this.reorderRows(fromId, toId),
         });
 
         this.table.rows.push(row);
@@ -44,24 +42,6 @@ export class TableDataManager {
         this.table.rows = this.table.rows.filter(r => r.id !== id);
         this.table.renderer.element?.querySelector(`[data-row-id="${id}"]`)?.remove();
         this.table.renderer.updateMeta();
-        this.table.editor.showSaveBar();
-    }
-
-    reorderRows(fromId, toId) {
-        const fromIndex = this.table.rows.findIndex(r => r.id === fromId);
-        const toIndex = this.table.rows.findIndex(r => r.id === toId);
-        
-        if (fromIndex === -1 || toIndex === -1) return;
-        
-        // Remove from source position
-        const [row] = this.table.rows.splice(fromIndex, 1);
-        
-        // Insert at target position
-        const newIndex = fromIndex < toIndex ? toIndex - 1 : toIndex;
-        this.table.rows.splice(newIndex, 0, row);
-        
-        // Re-render the tbody to reflect the new order
-        this.table.renderer.reRenderBody();
         this.table.editor.showSaveBar();
     }
 }

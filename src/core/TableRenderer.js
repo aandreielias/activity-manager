@@ -1,5 +1,4 @@
 import '../styles/Table.css';
-import { Row } from './Row.js';
 
 /**
  * TableRenderer - Handles rendering and updating the table UI
@@ -23,14 +22,14 @@ export class TableRenderer {
     _renderHeader() {
         const header = document.createElement('div');
         header.className = 'table-top';
-        
+
         const title = document.createElement('span');
         title.className = 'table-title';
         title.textContent = this.table.title;
-        
+
         const meta = document.createElement('span');
         meta.className = 'table-meta';
-        meta.textContent = `${this.table.rows.length} rows`;
+        meta.textContent = `${this.table.rows.length} Zeilen`;
         meta.dataset.role = 'row-count';
 
         header.appendChild(title);
@@ -44,7 +43,7 @@ export class TableRenderer {
 
         const table = document.createElement('table');
         table.className = 'data-table';
-        
+
         table.appendChild(this._renderTableHead());
         table.appendChild(this._renderTableBody());
 
@@ -55,11 +54,6 @@ export class TableRenderer {
     _renderTableHead() {
         const thead = document.createElement('thead');
         const tr = document.createElement('tr');
-
-        // Empty cell for drag handle column
-        const emptyTh = document.createElement('th');
-        emptyTh.className = 'handle-column-header';
-        tr.appendChild(emptyTh);
 
         // Column headers
         this.table.schema.forEach(col => {
@@ -94,13 +88,13 @@ export class TableRenderer {
     _renderEmptyState(tbody) {
         const tr = document.createElement('tr');
         tr.setAttribute('role', 'row');
-        
+
         const td = document.createElement('td');
         td.colSpan = this.table.schema.length + 1;
         td.className = 'empty-row';
         td.setAttribute('role', 'cell');
-        td.textContent = 'No entries yet. Click "+ Add row" to create one.';
-        
+        td.textContent = 'Keine Einträge vorhanden. Klicke auf "+ Zeile hinzufügen", um eine zu erstellen.';
+
         tr.appendChild(td);
         tbody.appendChild(tr);
     }
@@ -111,9 +105,8 @@ export class TableRenderer {
                 onEditStart:  () => this.table.editor.showSaveBar(),
                 onEditChange: () => this.table.editor.showSaveBar(),
                 onDelete:     (rowId) => this.table.dataManager.removeRow(rowId),
-                onReorder:    (fromId, toId) => this.table.dataManager.reorderRows(fromId, toId),
             });
-            
+
             const rowEl = row.render();
             rowEl.setAttribute('role', 'row');
             tbody.appendChild(rowEl);
@@ -124,17 +117,17 @@ export class TableRenderer {
         const tr = document.createElement('tr');
         tr.className = 'add-row-tr';
         tr.setAttribute('role', 'row');
-        
+
         const td = document.createElement('td');
         td.colSpan = this.table.schema.length + 1;
         td.className = 'add-row-cell';
         td.setAttribute('role', 'cell');
-        
+
         const btn = document.createElement('button');
         btn.className = 'add-row-btn';
-        btn.textContent = 'Add row';
+        btn.textContent = 'Zeile hinzufügen';
         btn.addEventListener('click', () => this.table.dataManager.addEmptyRow());
-        
+
         td.appendChild(btn);
         tr.appendChild(td);
         tbody.appendChild(tr);
@@ -143,7 +136,7 @@ export class TableRenderer {
     updateMeta() {
         const meta = this.element?.querySelector('[data-role="row-count"]');
         if (meta) {
-            meta.textContent = `${this.table.rows.length} rows`;
+            meta.textContent = `${this.table.rows.length} Zeilen`;
         }
     }
 
@@ -152,13 +145,13 @@ export class TableRenderer {
         if (!tbody) return;
 
         tbody.innerHTML = '';
-        
+
         if (this.table.rows.length === 0) {
             this._renderEmptyState(tbody);
         } else {
             this._renderRows(tbody);
         }
-        
+
         this._renderAddRowButton(tbody);
     }
 }

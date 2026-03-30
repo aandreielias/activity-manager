@@ -29,12 +29,13 @@ export class TableLoader {
                 }));
 
                 // Generate enum options for "responsible" field from people data
-                if (tableConfig.id === 'tbl_activities' && peopleData && Array.isArray(peopleData)) {
+                if (tableConfig.category === 'spiele' && peopleData && Array.isArray(peopleData)) {
                     const responsibleCol = schema.find(col => col.id === 'responsible');
                     if (responsibleCol) {
-                        responsibleCol.options = peopleData.map(person =>
-                          `${person.vorname} ${person.nachname.charAt(0)}.`
-                        );
+                        responsibleCol.options = peopleData.map(person => ({
+                            label: `${person.vorname} ${person.nachname.charAt(0)}.`,
+                            value: person.id
+                        }));
                     }
                 }
 
@@ -54,7 +55,7 @@ export class TableLoader {
                 };
 
             } catch (error) {
-                console.error(`Failed to load table ${tableConfig.id}:`, error);
+                console.error(`Fehler beim Laden der Tabelle ${tableConfig.id}:`, error);
             }
         }
 

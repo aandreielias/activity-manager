@@ -16,6 +16,15 @@ export class LoginDialog {
             const select = document.createElement('select');
             select.className = 'login-select input-field';
             
+            // Add placeholder
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Nutzer Auswählen';
+            placeholder.disabled = true;
+            placeholder.selected = true;
+            placeholder.hidden = true;
+            select.appendChild(placeholder);
+
             // Add people
             if (peopleData && Array.isArray(peopleData)) {
                 peopleData.forEach(p => {
@@ -49,13 +58,14 @@ export class LoginDialog {
             overlay.appendChild(dialog);
             document.body.appendChild(overlay);
 
-            // Pre-fill from localStorage if available? 
-            // The prompt says "the chosen user gets saved so you dont have to login everytime"
-            // We'll handle this generically in main.js, this dialog is ONLY shown if we need to login
-
             const doLogin = async () => {
                 const user = select.value;
                 const pass = password.value;
+
+                if (!user) {
+                    errorMsg.textContent = 'Bitte Nutzer auswählen';
+                    return;
+                }
                 if (!pass) {
                     errorMsg.textContent = 'Bitte Passwort eingeben';
                     return;

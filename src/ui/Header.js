@@ -101,13 +101,11 @@ export class Header {
                         ${globalState.getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
                     </button>
                     <div class="dropdown-menu user-dropdown-menu">
+                        <button class="dropdown-item favorites-toggle-btn">Favoriten</button>
                         <button class="dropdown-item change-password-btn">Passwort ändern</button>
                         <button class="dropdown-item logout-btn">Abmelden</button>
                     </div>
                 </div>
-                <button class="nav-btn favorites-toggle-btn" title="Favoriten anzeigen">
-                    Favoriten
-                </button>
                 <button class="theme-toggle" aria-label="Design umschalten" title="Dunkelmodus umschalten">
                     <span class="theme-icon">Dark Mode</span>
                 </button>

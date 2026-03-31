@@ -101,7 +101,7 @@ export class TableRenderer {
         td.colSpan = this.table.schema.length + 1;
         td.className = 'empty-row';
         td.setAttribute('role', 'cell');
-        td.textContent = 'Keine Einträge vorhanden. Klicke auf "+ Zeile hinzufügen", um eine zu erstellen.';
+        td.textContent = 'Keine Einträge vorhanden';
 
         tr.appendChild(td);
         tbody.appendChild(tr);

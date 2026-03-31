@@ -321,6 +321,7 @@ async function initializeApp() {
     };
 
     // Initially show all spiele tables
+    headerInstance.switchTo('all-spiele');
     showTable('all-spiele');
 
     let currentTableId = 'all-spiele';

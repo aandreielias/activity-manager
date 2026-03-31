@@ -100,8 +100,7 @@
     background: var(--warning-light);
 }
 
-.persons-toggle-btn,
-.favorites-toggle-btn {
+.persons-toggle-btn {
     font-size: 13px;
     font-weight: 500;
     padding: 6px 12px;
@@ -110,17 +109,20 @@
     border-radius: var(--radius-sm);
 }
 
-.persons-toggle-btn:hover,
-.favorites-toggle-btn:hover {
+.persons-toggle-btn:hover {
     background: var(--bg-hover);
     color: var(--accent);
 }
 
-.persons-toggle-btn.active,
-.favorites-toggle-btn.active {
+.persons-toggle-btn.active {
     background: var(--accent-light);
     color: var(--accent);
     border-color: var(--accent);
+}
+
+.favorites-toggle-btn.active {
+    color: var(--accent);
+    font-weight: 700;
 }
 
 .nav-btn {

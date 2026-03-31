@@ -103,11 +103,27 @@ export class InventoryField extends Field {
                     row.style.background = 'var(--bg-secondary)';
 
                     const isAvailable = inventoryNames.includes(item.name.toLowerCase());
+
+                    const nameCol = document.createElement('div');
+                    nameCol.style.display = 'flex';
+                    nameCol.style.flexDirection = 'column';
+                    nameCol.style.gap = '2px';
+
                     const tag = document.createElement('span');
                     tag.className = `inventory-tag ${isAvailable ? 'available' : 'unavailable'}`;
                     tag.textContent = item.name;
-                    tag.style.justifySelf = 'start';
-                    row.appendChild(tag);
+                    tag.style.alignSelf = 'start';
+                    nameCol.appendChild(tag);
+
+                    if (!isAvailable) {
+                        const errorMsg = document.createElement('div');
+                        errorMsg.textContent = '! Gegenstand nicht in Inventarliste';
+                        errorMsg.style.color = 'var(--error)';
+                        errorMsg.style.fontSize = '9px';
+                        errorMsg.style.fontWeight = '500';
+                        nameCol.appendChild(errorMsg);
+                    }
+                    row.appendChild(nameCol);
 
                     const qInput = document.createElement('input');
                     qInput.type = 'text';

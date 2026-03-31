@@ -1,0 +1,74 @@
+[
+  {
+    "id": "p_001",
+    "vorname": "Giuli",
+    "nachname": "Braun",
+    "Tel.": "+43 670 5095161",
+    "Status": "aktiv",
+    "role": "",
+    "Spez. Zuständigkeit": ""
+  },
+  {
+    "id": "p_002",
+    "vorname": "Paul",
+    "nachname": "Turc",
+    "Tel.": "+43 660 4447007",
+    "Status": "inaktiv",
+    "role": "",
+    "Spez. Zuständigkeit": ""
+  },
+  {
+    "id": "p_003",
+    "vorname": "David",
+    "nachname": "Crupinschi",
+    "Tel.": "+43 699 11087551",
+    "Status": "aktiv",
+    "role": "",
+    "Spez. Zuständigkeit": ""
+  },
+  {
+    "id": "p_004",
+    "vorname": "Emi",
+    "nachname": "Buda",
+    "Tel.": "+43 699 11191065",
+    "Status": "aktiv",
+    "role": "",
+    "Spez. Zuständigkeit": ""
+  },
+  {
+    "id": "p_005",
+    "vorname": "Iosif",
+    "nachname": "Semovin",
+    "Tel.": "+43 660 6550713",
+    "Status": "aktiv",
+    "role": "",
+    "Spez. Zuständigkeit": ""
+  },
+  {
+    "id": "p_006",
+    "vorname": "Rafi",
+    "nachname": "Stanciu",
+    "Tel.": "+43 660 574368",
+    "Status": "aktiv",
+    "role": "",
+    "Spez. Zuständigkeit": ""
+  },
+  {
+    "id": "p_007",
+    "vorname": "Patruz",
+    "nachname": "Ardelean",
+    "Tel.": "+43 677 62954551",
+    "Status": "aktiv",
+    "role": "",
+    "Spez. Zuständigkeit": ""
+  },
+  {
+    "id": "p_008",
+    "vorname": "Elias",
+    "nachname": "Andrei",
+    "Tel.": "+43 660 7344022",
+    "Status": "aktiv",
+    "role": "",
+    "Spez. Zuständigkeit": ""
+  }
+]

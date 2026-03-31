@@ -15,7 +15,7 @@ export class InventoryField extends Field {
         // Parse items like "Sessel (3), Tisch (Spieler -1)"
         const items = this._parseItems(rawValue);
         const inventory = GlobalStateManager.getInstance().getInventory();
-        const inventoryNames = inventory.map(item => (item.name || '').toLowerCase());
+        const inventoryNames = inventory.map(row => (row.data?.name || '').toLowerCase());
 
         items.forEach(item => {
             const tag = document.createElement('span');
@@ -88,7 +88,7 @@ export class InventoryField extends Field {
                 list.style.flexDirection = 'column';
                 list.style.gap = '8px';
 
-                const inventoryNames = inventory.map(item => (item.name || '').toLowerCase());
+                const inventoryNames = inventory.map(row => (row.data?.name || '').toLowerCase());
 
                 internalSelected.forEach((item, idx) => {
                     const row = document.createElement('div');
@@ -210,32 +210,59 @@ export class InventoryField extends Field {
             invList.style.flexDirection = 'column';
             invList.style.maxHeight = '200px';
             invList.style.overflowY = 'auto';
-
-            inventory.forEach(item => {
-                const btn = document.createElement('button');
-                btn.className = 'suggestion-item';
-                btn.style.textAlign = 'left';
-                btn.style.border = 'none';
-                btn.style.background = 'transparent';
-                btn.style.padding = '8px 12px';
-                btn.style.borderRadius = 'var(--radius-sm)';
-                btn.style.fontSize = '13px';
-                btn.style.display = 'flex';
-                btn.style.justifyContent = 'space-between';
-                btn.innerHTML = `<span>${item.name}</span> <span style="color:var(--text-muted)">(${item.quantity || 0})</span>`;
-
-                btn.onclick = () => {
-                    if (!internalSelected.find(i => i.name === item.name)) {
-                        internalSelected.push({ name: item.name, quantity: '' });
-                        refreshSelected();
-                    }
-                };
-                invList.appendChild(btn);
-            });
             invSection.appendChild(invList);
+
+            const refreshInventorySuggestions = (query = '') => {
+                invList.innerHTML = '';
+                const filtered = inventory.filter(row => {
+                    const name = (row.data?.name || '').toLowerCase();
+                    return name.includes(query.toLowerCase());
+                });
+
+                if (filtered.length === 0) {
+                    const noResults = document.createElement('div');
+                    noResults.textContent = 'Keine Treffer im Inventar';
+                    noResults.style.padding = '8px 12px';
+                    noResults.style.color = 'var(--text-muted)';
+                    noResults.style.fontSize = '13px';
+                    invList.appendChild(noResults);
+                    return;
+                }
+
+                filtered.forEach(row => {
+                    const name = row.data?.name || 'Unbekannt';
+                    const quantity = row.data?.quantity || 0;
+                    
+                    const btn = document.createElement('button');
+                    btn.className = 'suggestion-item';
+                    btn.style.textAlign = 'left';
+                    btn.style.border = 'none';
+                    btn.style.background = 'transparent';
+                    btn.style.padding = '8px 12px';
+                    btn.style.borderRadius = 'var(--radius-sm)';
+                    btn.style.fontSize = '13px';
+                    btn.style.display = 'flex';
+                    btn.style.justifyContent = 'space-between';
+                    btn.innerHTML = `<span>${name}</span> <span style="color:var(--text-muted)">(${quantity})</span>`;
+
+                    btn.onclick = () => {
+                        if (!internalSelected.find(i => i.name === name)) {
+                            internalSelected.push({ name: name, quantity: '' });
+                            refreshSelected();
+                        }
+                    };
+                    invList.appendChild(btn);
+                });
+            };
+
             scrollContainer.appendChild(invSection);
 
+            input.oninput = () => {
+                refreshInventorySuggestions(input.value.trim());
+            };
+
             refreshSelected();
+            refreshInventorySuggestions();
 
             const addItem = () => {
                 const val = input.value.trim();
@@ -243,6 +270,7 @@ export class InventoryField extends Field {
                     internalSelected.push({ name: val, quantity: '' });
                     input.value = '';
                     refreshSelected();
+                    refreshInventorySuggestions();
                 }
             };
 

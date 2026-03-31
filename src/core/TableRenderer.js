@@ -1,4 +1,5 @@
 import '../styles/Table.css';
+import { GlobalStateManager } from './GlobalStateManager.js';
 
 /**
  * TableRenderer - Handles rendering and updating the table UI
@@ -54,6 +55,13 @@ export class TableRenderer {
     _renderTableHead() {
         const thead = document.createElement('thead');
         const tr = document.createElement('tr');
+
+        // Favorite column header
+        const favTh = document.createElement('th');
+        favTh.className = 'favorite-col-header';
+        favTh.textContent = '★';
+        favTh.title = 'Favoriten';
+        tr.appendChild(favTh);
 
         // Column headers
         this.table.schema.forEach(col => {
@@ -114,12 +122,16 @@ export class TableRenderer {
     }
 
     _renderAddRowButton(tbody) {
+        if (!GlobalStateManager.getInstance().canEdit(this.table.id)) {
+            return;
+        }
+
         const tr = document.createElement('tr');
         tr.className = 'add-row-tr';
         tr.setAttribute('role', 'row');
 
         const td = document.createElement('td');
-        td.colSpan = this.table.schema.length + 1;
+        td.colSpan = this.table.schema.length + 2;
         td.className = 'add-row-cell';
         td.setAttribute('role', 'cell');
 

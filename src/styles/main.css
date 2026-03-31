@@ -240,3 +240,10 @@ html, body {
     flex: 1;
 }
 
+/* ── View Transitions ───────────────────────────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+

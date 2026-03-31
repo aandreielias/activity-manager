@@ -177,6 +177,28 @@
   padding: 4px 0;
 }
 
+.favorite-col-header {
+  width: 32px;
+  text-align: center !important;
+  padding: 12px 8px !important;
+}
+
+.favorite-cell {
+  width: 32px;
+  text-align: center !important;
+  padding: 8px !important;
+  vertical-align: middle !important;
+}
+
+.favorite-heart-icon {
+  display: inline-block;
+  font-size: 14px;
+}
+
+body.favorites-active .data-table tbody tr:not([data-favorite="true"]):not(.add-row-tr) {
+  display: none;
+}
+
 /* ── Cell Editing ───────────────────────────────────– */
 .data-cell.editing {
   padding: 8px 12px;
@@ -386,6 +408,12 @@
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
 
+.context-menu-separator {
+  height: 1px;
+  background: var(--border-light);
+  margin: 4px 0;
+}
+
 .context-menu-item:hover {
   background: var(--bg-secondary);
 }
@@ -471,7 +499,7 @@ button:focus-visible {
     position: absolute;
     top: 100%;
     left: 0;
-    right: 0;
+    width: max-content;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -508,4 +536,89 @@ button:focus-visible {
 
 .enum-dropdown-item:active {
     background: var(--accent-light);
+}
+
+/* ── Inventory Field Tags ─────────────────────────── */
+.cell-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.inventory-tag {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.inventory-tag.available {
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1px solid rgba(0, 132, 255, 0.1);
+}
+
+.inventory-tag.unavailable {
+    background: var(--error-light);
+    color: var(--error);
+    border: 1px solid rgba(210, 15, 15, 0.1);
+}
+
+/* ── Inventory Suggestions ─────────────────────────── */
+.inventory-field-editor {
+    position: relative;
+    width: 100%;
+}
+
+.inventory-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: var(--shadow-md);
+    display: none;
+}
+
+.suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background var(--transition);
+}
+
+.suggestion-item:hover {
+    background: var(--bg-hover);
+}
+
+[data-theme="dark"] .inventory-suggestions {
+    background: var(--bg-secondary);
+}
+
+/* ── Row Expansion ──────────────────────────────────– */
+.expanded-row td .cell-content {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  display: block;
+  overflow-y: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 8px 0;
+}
+
+.favorite-cell {
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.favorite-cell:hover {
+  background: var(--bg-hover);
 }

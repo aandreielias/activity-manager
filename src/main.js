@@ -3,6 +3,9 @@ import { Header }      from './ui/Header.js';
 import { TableLoader } from './core/TableLoader.js';
 import { GlobalStateManager } from './core/GlobalStateManager.js';
 import { Table } from './core/Table.js';
+import { Dialog } from './ui/Dialog.js';
+import { LoginDialog } from './ui/LoginDialog.js';
+import { PermissionDialog } from './ui/PermissionDialog.js';
 
 
 document.addEventListener('click', (e) => {
@@ -19,8 +22,66 @@ async function initializeApp() {
     const tablesConfig = await fetch(`${base}data/tables.json`).then(r => r.json());
     const peopleData = await fetch(`${base}data/rows/people.json`).then(r => r.json());
 
-    const app = document.getElementById('app');
+    // --- Authentication Flow ---
+    let authUser = localStorage.getItem('auth_user');
+    let authPass = localStorage.getItem('auth_pass');
+    let authRole = null;
+
+    if (authUser && authPass) {
+        try {
+            const res = await fetch(`${base}api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: authUser, password: authPass })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                authRole = data.role;
+            } else {
+                authUser = null;
+                authPass = null;
+            }
+        } catch(e) {
+            authUser = null;
+            authPass = null;
+        }
+    }
+
+    if (!authUser) {
+        const creds = await LoginDialog.show(peopleData);
+        authUser = creds.username;
+        authPass = creds.password;
+        localStorage.setItem('auth_user', authUser);
+        localStorage.setItem('auth_pass', authPass);
+    }
+
     const globalState = GlobalStateManager.getInstance();
+
+    if (authUser) {
+        const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === authUser);
+        
+        if (!person) {
+            // Found no such person in the database -> Lock everything down
+            globalState.setCurrentUser(authUser, 'user', { type: 'readonly', tables: [] });
+        } else {
+            authRole = person.role || 'user';
+            const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
+            const userPerms = permissionsMap[authUser] || null;
+            globalState.setCurrentUser(authUser, authRole, userPerms);
+        }
+
+        // Load private favorites
+        try {
+            const favsMap = await fetch(`${base}api/favorites`).then(r => r.json());
+            const userFavs = favsMap[authUser] || [];
+            globalState.setInitialFavorites(userFavs);
+        } catch (e) {
+            console.error('Failed to load favorites:', e);
+        }
+    }
+    // --- End Auth ---
+
+    const app = document.getElementById('app');
 
     // Create header with table configs
     const headerInstance = new Header({
@@ -47,19 +108,30 @@ async function initializeApp() {
     resizer.innerHTML = '<div class="split-resizer-handle"></div>';
     main.appendChild(resizer);
 
-    // Create persons split-screen container (hidden by default)
-    const personsSplitContainer = document.createElement('div');
-    personsSplitContainer.className = 'persons-split-container';
-    main.appendChild(personsSplitContainer);
+    // Create global split-screen container (hidden by default)
+    const splitSideContainer = document.createElement('div');
+    splitSideContainer.className = 'persons-split-container'; // Reuse styling
+    main.appendChild(splitSideContainer);
 
     // Load all tables dynamically
     const tables = await TableLoader.loadAllTables(peopleData);
     headerInstance.tables = tables;
+    
+    // Provide inventory data globally for field cross-referencing
+    if (tables['tbl_inventory']) {
+        globalState.setInventory(tables['tbl_inventory'].instance.rows);
+    }
 
-    // Render all tables
+    // Render viewable tables only
     const tableElements = {};
+    let renderedCount = 0;
 
     Object.entries(tables).forEach(([tableId, { instance }]) => {
+        // Strict view check
+        if (!globalState.canView(tableId)) {
+            return; 
+        }
+
         const tableWrapper = document.createElement('div');
         tableWrapper.className = 'table-view-wrapper';
         tableWrapper.dataset.tableId = tableId;
@@ -68,11 +140,38 @@ async function initializeApp() {
         tableWrapper.appendChild(el);
         tableElements[tableId] = tableWrapper;
         tablesContainer.appendChild(tableWrapper);
+        renderedCount++;
 
         // Connect table editor to global state
         instance.editor.showSaveBar = function() {
             this.showUnsavedChange();
         };
+    });
+
+    // Handle initial switch/empty state
+    if (renderedCount === 0) {
+        tablesContainer.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); gap:16px; padding:40px; text-align:center;">
+                <h2 style="color:var(--text-primary); margin:0;">Kein Zugriff</h2>
+                <p style="margin:0; opacity:0.8;">Sie haben keine Berechtigung, Tabellen in diesem Bereich anzuzeigen.<br>Bitte wenden Sie sich an die Administration.</p>
+            </div>
+        `;
+    }
+
+    // Global ESC key handler for intuitive navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            // Close any open dialogs/overlays (Inventory Picker, Permissions, etc.)
+            document.querySelectorAll('.custom-dialog-overlay, .permission-overlay').forEach(el => el.remove());
+
+            // Reset side split views if open
+            if (headerInstance.personsSplitOpen) headerInstance.onPersonsToggle?.();
+            if (headerInstance.inventorySplitOpen) headerInstance.onInventoryToggle?.();
+            
+            // Collapse any expanded rows and cells
+            document.querySelectorAll('.expanded-row').forEach(tr => tr.classList.remove('expanded-row'));
+            document.querySelectorAll('.data-cell.expanded').forEach(td => td.classList.remove('expanded'));
+        }
     });
 
     // Create persons table for split view
@@ -98,27 +197,39 @@ async function initializeApp() {
             peopleData: [],
             tableConfig: personsConfig
         });
-
-        const personsEl = personsTable.render();
-        personsEl.className = 'persons-table-full';
-        personsSplitContainer.appendChild(personsEl);
-
-        // Connect persons table editor to global state
-        personsTable.editor.showSaveBar = function() {
-            this.showUnsavedChange();
-        };
     }
+    
+    const personsEl = personsTable?.render();
+    if (personsEl) personsEl.className = 'persons-table-full';
+
+    // Get inventory table instance
+    const inventoryTable = tables['tbl_inventory']?.instance;
+    const inventoryEl = inventoryTable?.render();
+    if (inventoryEl) inventoryEl.className = 'persons-table-full'; // Reuse styling
+    
+    // Function to populate split view
+    const setSplitContent = (type) => {
+        splitSideContainer.innerHTML = '';
+        if (type === 'people' && personsEl) {
+            splitSideContainer.appendChild(personsEl);
+        } else if (type === 'inventory' && inventoryEl) {
+            splitSideContainer.appendChild(inventoryEl);
+        }
+    };
+    
+    // Initial content
+    setSplitContent('people');
 
     // Function to show/hide tables
     const showTable = (tableId) => {
         // Ensure tables container is visible when showing regular tables
         tablesContainer.style.display = 'flex';
         
-        // Disable persons full-view if active
-        if (personsSplitContainer.classList.contains('full-view')) {
-            personsSplitContainer.classList.remove('full-view');
-            personsSplitContainer.style.display = headerInstance.personsSplitOpen ? 'flex' : 'none';
-            resizer.style.display = headerInstance.personsSplitOpen ? 'block' : 'none';
+        // Disable right split full-view if active
+        if (splitSideContainer.classList.contains('full-view')) {
+            splitSideContainer.classList.remove('full-view');
+            splitSideContainer.style.display = (headerInstance.personsSplitOpen || headerInstance.inventorySplitOpen) ? 'flex' : 'none';
+            resizer.style.display = (headerInstance.personsSplitOpen || headerInstance.inventorySplitOpen) ? 'block' : 'none';
         }
 
         if (tableId === 'all-spiele') {
@@ -126,6 +237,12 @@ async function initializeApp() {
             Object.entries(tableElements).forEach(([id, element]) => {
                 const config = tablesConfig.find(t => t.id === id);
                 element.style.display = config?.category === 'spiele' ? 'block' : 'none';
+            });
+        } else if (tableId === 'all-sportarten') {
+            // Show all sportarten tables
+            Object.entries(tableElements).forEach(([id, element]) => {
+                const config = tablesConfig.find(t => t.id === id);
+                element.style.display = config?.category === 'sportarten' ? 'block' : 'none';
             });
         } else {
             // Show only selected table
@@ -149,43 +266,117 @@ async function initializeApp() {
     // Handle persons toggle
     headerInstance.onPersonsToggle = () => {
         const personsBtn = headerInstance.element.querySelector('.persons-toggle-btn');
+        const inventoryBtn = headerInstance.element.querySelector('.inventory-toggle-btn');
         
-        if (personsSplitContainer.classList.contains('full-view')) {
-            // Escaping full view
-            personsSplitContainer.classList.remove('full-view');
+        if (splitSideContainer.classList.contains('full-view')) {
+            splitSideContainer.classList.remove('full-view');
             tablesContainer.style.display = 'flex';
-            
-            // Restore previous split state
-            personsSplitContainer.style.display = headerInstance.personsSplitOpen ? 'flex' : 'none';
+            splitSideContainer.style.display = headerInstance.personsSplitOpen ? 'flex' : 'none';
             resizer.style.display = headerInstance.personsSplitOpen ? 'block' : 'none';
-            
-            if (personsBtn && !headerInstance.personsSplitOpen) {
-                 personsBtn.classList.remove('active');
-            }
         } else {
-            // Normal toggle
             headerInstance.personsSplitOpen = !headerInstance.personsSplitOpen;
-            personsSplitContainer.style.display = headerInstance.personsSplitOpen ? 'flex' : 'none';
+            if (headerInstance.personsSplitOpen) {
+                headerInstance.inventorySplitOpen = false;
+                setSplitContent('people');
+            }
+            
+            splitSideContainer.style.display = headerInstance.personsSplitOpen ? 'flex' : 'none';
             resizer.style.display = headerInstance.personsSplitOpen ? 'block' : 'none';
             
-            if (personsBtn) {
-                personsBtn.classList.toggle('active', headerInstance.personsSplitOpen);
+            if (personsBtn) personsBtn.classList.toggle('active', headerInstance.personsSplitOpen);
+            if (inventoryBtn) inventoryBtn.classList.remove('active');
+        }
+    };
+
+    // Handle inventory toggle
+    headerInstance.onInventoryToggle = () => {
+        const personsBtn = headerInstance.element.querySelector('.persons-toggle-btn');
+        const inventoryBtn = headerInstance.element.querySelector('.inventory-toggle-btn');
+        
+        if (splitSideContainer.classList.contains('full-view')) {
+            splitSideContainer.classList.remove('full-view');
+            tablesContainer.style.display = 'flex';
+            splitSideContainer.style.display = headerInstance.inventorySplitOpen ? 'flex' : 'none';
+            resizer.style.display = headerInstance.inventorySplitOpen ? 'block' : 'none';
+        } else {
+            headerInstance.inventorySplitOpen = !headerInstance.inventorySplitOpen;
+            if (headerInstance.inventorySplitOpen) {
+                headerInstance.personsSplitOpen = false;
+                setSplitContent('inventory');
             }
+            
+            splitSideContainer.style.display = headerInstance.inventorySplitOpen ? 'flex' : 'none';
+            resizer.style.display = headerInstance.inventorySplitOpen ? 'block' : 'none';
+            
+            if (inventoryBtn) inventoryBtn.classList.toggle('active', headerInstance.inventorySplitOpen);
+            if (personsBtn) personsBtn.classList.remove('active');
         }
     };
 
     // Handle persons full view (double-click)
     headerInstance.onPersonsFullView = () => {
-        // Hide tables container entirely
         tablesContainer.style.display = 'none';
-        
-        personsSplitContainer.style.display = 'flex';
+        setSplitContent('people');
+        splitSideContainer.style.display = 'flex';
         resizer.style.display = 'none';
-        personsSplitContainer.classList.add('full-view');
+        splitSideContainer.classList.add('full-view');
+        headerInstance.personsSplitOpen = true;
+        headerInstance.inventorySplitOpen = false;
+        headerInstance.element.querySelector('.persons-toggle-btn')?.classList.add('active');
+        headerInstance.element.querySelector('.inventory-toggle-btn')?.classList.remove('active');
+    };
 
-        const personsBtn = headerInstance.element.querySelector('.persons-toggle-btn');
-        if (personsBtn) {
-            personsBtn.classList.add('active');
+    // Handle inventory full view (double-click)
+    headerInstance.onInventoryFullView = () => {
+        tablesContainer.style.display = 'none';
+        setSplitContent('inventory');
+        splitSideContainer.style.display = 'flex';
+        resizer.style.display = 'none';
+        splitSideContainer.classList.add('full-view');
+        headerInstance.inventorySplitOpen = true;
+        headerInstance.personsSplitOpen = false;
+        headerInstance.element.querySelector('.inventory-toggle-btn')?.classList.add('active');
+        headerInstance.element.querySelector('.persons-toggle-btn')?.classList.remove('active');
+    };
+
+    // Handle manage permissions
+    headerInstance.onManagePermissions = async () => {
+        await PermissionDialog.show(peopleData, tablesConfig);
+        // Reload page to apply changes properly throughout the app (reactive permissions)
+        window.location.reload();
+    };
+
+    // Handle logout
+    headerInstance.onLogout = () => {
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_pass');
+        window.location.reload();
+    };
+
+    // Handle change password
+    headerInstance.onChangePassword = async () => {
+        const newPass = await Dialog.prompt({
+            message: 'Neues Passwort eingeben:',
+            confirmText: 'Ändern',
+            type: 'password',
+            placeholder: 'Neues Passwort'
+        });
+
+        if (!newPass) return;
+
+        try {
+            const res = await fetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: authUser, newPassword: newPass })
+            });
+
+            if (!res.ok) throw new Error('Fehler beim Ändern des Passworts');
+
+            localStorage.removeItem('auth_pass'); // Clear only password to force fresh login
+            window.location.reload();
+        } catch (e) {
+            alert(e.message);
         }
     };
 
@@ -197,7 +388,7 @@ async function initializeApp() {
     resizer.addEventListener('mousedown', (e) => {
         isResizing = true;
         startX = e.clientX;
-        startWidth = personsSplitContainer.offsetWidth;
+        startWidth = splitSideContainer.offsetWidth;
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
     });
@@ -208,7 +399,7 @@ async function initializeApp() {
         const deltaX = e.clientX - startX;
         const newWidth = Math.max(300, Math.min(window.innerWidth - 400, startWidth - deltaX));
 
-        personsSplitContainer.style.flex = `0 0 ${newWidth}px`;
+        splitSideContainer.style.flex = `0 0 ${newWidth}px`;
     });
 
     document.addEventListener('mouseup', () => {
@@ -245,8 +436,13 @@ async function initializeApp() {
     };
 
     // Handle discard all
-    headerInstance.onDiscardAll = () => {
-        if (confirm('Alle ungespeicherten Änderungen verwerfen?')) {
+    headerInstance.onDiscardAll = async () => {
+        const confirmed = await Dialog.confirm({
+            message: 'Alle ungespeicherten Änderungen verwerfen?',
+            confirmText: 'Verwerfen',
+            confirmStyle: 'warning'
+        });
+        if (confirmed) {
             globalState.clearAllUnsaved();
             headerInstance.hideUnsavedBanner();
             // Reload to revert changes
@@ -262,6 +458,16 @@ async function initializeApp() {
             headerInstance.hideUnsavedBanner();
         }
     });
+
+    // Handle favorites toggle
+    headerInstance.onFavoritesToggle = (isActive) => {
+        globalState.setFavoritesFilterActive(isActive);
+        if (isActive) {
+            document.body.classList.add('favorites-active');
+        } else {
+            document.body.classList.remove('favorites-active');
+        }
+    };
 }
 
 // Initialize when DOM is ready

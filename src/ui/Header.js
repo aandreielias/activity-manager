@@ -1,18 +1,25 @@
 import '../styles/Header.css';
+import { GlobalStateManager } from '../core/GlobalStateManager.js';
 
 /**
  * Header - Main application header with navigation and theme toggle
  */
 export class Header {
     constructor({ appName = 'Activity Manager', onThemeToggle, onTableSwitch, tableConfigs = [], tables = {} }) {
-        this.appName       = appName;
+        this.appName = appName;
         this.onThemeToggle = onThemeToggle;
         this.onTableSwitch = onTableSwitch;
-        this.tableConfigs  = tableConfigs;
-        this.tables        = tables;
-        this.currentTable  = tableConfigs[0]?.id || 'games';
-        this.element       = null;
+        this.tableConfigs = tableConfigs;
+        this.tables = tables;
+        this.currentTable = tableConfigs[0]?.id || 'games';
+        this.element = null;
         this.personsSplitOpen = false;
+        this.inventorySplitOpen = false;
+        this.onManagePermissions = null;
+        this.onLogout = null;
+        this.onChangePassword = null;
+        this.onFavoritesToggle = null;
+        this.favoritesActive = false;
     }
 
     render() {
@@ -26,9 +33,19 @@ export class Header {
     }
 
     _getHeaderHTML() {
-        // Separate Spiele (games) tables and other tables
-        const spieleTables = this.tableConfigs.filter(t => t.category === 'spiele');
-        const otherTables = this.tableConfigs.filter(t => !t.category && t.id !== 'tbl_people');
+        const globalState = GlobalStateManager.getInstance();
+        
+        // Filter configurations based on current view permissions
+        const viewableConfigs = this.tableConfigs.filter(t => globalState.canView(t.id));
+        
+        // Categories
+        const spieleTables = viewableConfigs.filter(t => t.category === 'spiele');
+        const sportTables = viewableConfigs.filter(t => t.category === 'sportarten');
+        const otherTables = viewableConfigs.filter(t => !t.category && t.id !== 'tbl_people' && t.id !== 'tbl_inventory');
+
+        // Permissions for split-views
+        const canViewPeople = globalState.canView('people_table') || globalState.canView('tbl_people');
+        const canViewInventory = globalState.canView('tbl_inventory');
 
         return `
             <div class="header-left">
@@ -36,13 +53,21 @@ export class Header {
                 <span class="header-title">${this.appName}</span>
             </div>
             <nav class="header-nav">
-                ${this._renderDropdownButton(spieleTables)}
+                ${this._renderCategoryButton(spieleTables, 'spiele', 'Spiele')}
+                ${this._renderCategoryButton(sportTables, 'sportarten', 'Sportarten')}
                 ${otherTables.map((config, idx) =>
-        `<button class="nav-btn ${idx === 0 && spieleTables.length === 0 ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`
-    ).join('')}
+            `<button class="nav-btn ${idx === 0 && spieleTables.length === 0 ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`
+        ).join('')}
+                
+                ${canViewPeople ? `
                 <button class="nav-btn persons-toggle-btn" title="Personen-Ansicht umschalten">
                     Personen
-                </button>
+                </button>` : ''}
+                
+                ${canViewInventory ? `
+                <button class="nav-btn inventory-toggle-btn" title="Inventar-Ansicht umschalten">
+                    Inventar
+                </button>` : ''}
             </nav>
             <div class="header-center">
                 <div class="unsaved-banner" style="display: none;">
@@ -52,6 +77,23 @@ export class Header {
                 </div>
             </div>
             <div class="header-right">
+                ${globalState.getUserRole() === 'Admin' ? `
+                    <button class="nav-btn manage-permissions-btn" title="Berechtigungen verwalten">
+                        Berechtigungen
+                    </button>
+                ` : ''}
+                <div class="dropdown-container user-dropdown-container">
+                    <button class="header-user user-menu-btn">
+                        ${globalState.getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
+                    </button>
+                    <div class="dropdown-menu user-dropdown-menu">
+                        <button class="dropdown-item change-password-btn">Passwort ändern</button>
+                        <button class="dropdown-item logout-btn">Abmelden</button>
+                    </div>
+                </div>
+                <button class="nav-btn favorites-toggle-btn" title="Favoriten anzeigen">
+                    Favoriten
+                </button>
                 <button class="theme-toggle" aria-label="Design umschalten" title="Dunkelmodus umschalten">
                     <span class="theme-icon">☀</span>
                 </button>
@@ -59,137 +101,135 @@ export class Header {
         `;
     }
 
-    _renderDropdownButton(spieleTables) {
-        if (spieleTables.length === 0) return '';
+    _renderCategoryButton(categoryTables, categoryId, categoryLabel) {
+        if (categoryTables.length === 0) return '';
 
+        // If only ONE table is allowed in this category, show it as a simple button
+        if (categoryTables.length === 1) {
+            const table = categoryTables[0];
+            return `<button class="nav-btn ${this.currentTable === table.id ? 'active' : ''}" data-table="${table.id}">${table.title}</button>`;
+        }
+
+        // Multiple tables allowed -> Show split-button dropdown
         return `
             <div class="dropdown-container split-btn-group">
-                <button class="nav-btn split-main-btn active" data-table="all-spiele">
-                    Spiele
+                <button class="nav-btn split-main-btn" data-table="all-${categoryId}">
+                    ${categoryLabel}
                 </button>
                 <div class="split-divider"></div>
-                <button class="nav-btn split-arrow-btn dropdown-btn" aria-label="Spiele Menü öffnen">
+                <button class="nav-btn split-arrow-btn dropdown-btn" aria-label="${categoryLabel} Menü öffnen">
                     <span class="dropdown-arrow">▼</span>
                 </button>
                 <div class="dropdown-menu">
-                    ${spieleTables.map(config =>
-        `<button class="dropdown-item" data-table="${config.id}">${config.title}</button>`
-    ).join('')}
+                    ${categoryTables.map(t => `<button class="dropdown-item" data-table="${t.id}">${t.title}</button>`).join('')}
                 </div>
             </div>
         `;
     }
 
     _attachEventListeners() {
-        // Theme toggle
-        const themeBtn = this.element.querySelector('.theme-toggle');
-        themeBtn.addEventListener('click', () => this._toggleTheme(themeBtn));
+        if (!this.element) return;
 
-        // Persons toggle button
+        this.element.addEventListener('click', (e) => {
+            const btn = e.target.closest('.nav-btn, .dropdown-item');
+            if (btn && btn.dataset.table) {
+                const tableId = btn.dataset.table;
+                this.switchTo(tableId);
+                this.onTableSwitch?.(tableId);
+                this._closeAllDropdowns();
+            }
+
+            if (e.target.closest('.theme-toggle')) {
+                this.onThemeToggle?.();
+            }
+
+            if (e.target.closest('.persons-toggle-btn')) {
+                this.onPersonsToggle?.();
+            }
+
+            if (e.target.closest('.inventory-toggle-btn')) {
+                this.onInventoryToggle?.();
+            }
+
+            if (e.target.closest('.manage-permissions-btn')) {
+                this.onManagePermissions?.();
+            }
+
+            if (e.target.closest('.logout-btn')) {
+                this.onLogout?.();
+            }
+
+            if (e.target.closest('.change-password-btn')) {
+                this.onChangePassword?.();
+            }
+
+            if (e.target.closest('.favorites-toggle-btn')) {
+                this.favoritesActive = !this.favoritesActive;
+                e.target.closest('.favorites-toggle-btn').classList.toggle('active', this.favoritesActive);
+                this.onFavoritesToggle?.(this.favoritesActive);
+            }
+
+            // Dropdown toggles
+            const dropdownBtn = e.target.closest('.dropdown-btn, .user-menu-btn');
+            if (dropdownBtn) {
+                const container = dropdownBtn.closest('.dropdown-container');
+                const isShowing = container.classList.contains('show');
+                this._closeAllDropdowns();
+                if (!isShowing) container.classList.add('show');
+            } else if (!e.target.closest('.dropdown-menu')) {
+                this._closeAllDropdowns();
+            }
+        });
+
+        // Split view buttons double click for full screen
         const personsBtn = this.element.querySelector('.persons-toggle-btn');
         if (personsBtn) {
-            personsBtn.addEventListener('click', () => {
-                this.onPersonsToggle?.();
-            });
             personsBtn.addEventListener('dblclick', () => {
                 this.onPersonsFullView?.();
             });
         }
 
-        // Unsaved changes buttons
-        const saveBtn = this.element.querySelector('.save-btn-header');
-        const discardBtn = this.element.querySelector('.discard-btn-header');
-
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => {
-                this.onSaveAll?.(this.tables);
+        const inventoryBtn = this.element.querySelector('.inventory-toggle-btn');
+        if (inventoryBtn) {
+            inventoryBtn.addEventListener('dblclick', () => {
+                this.onInventoryFullView?.();
             });
         }
 
+        // Unsaved changes banner
+        const saveBtn = this.element.querySelector('.save-btn-header');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                this.onSaveAll?.();
+            });
+        }
+
+        const discardBtn = this.element.querySelector('.discard-btn-header');
         if (discardBtn) {
             discardBtn.addEventListener('click', () => {
                 this.onDiscardAll?.();
             });
         }
+    }
 
-        // Dropdown menu
-        const dropdownContainer = this.element.querySelector('.dropdown-container');
-        const dropdownBtn = this.element.querySelector('.dropdown-btn');
-        const splitMainBtn = this.element.querySelector('.split-main-btn');
-        const dropdownMenu = this.element.querySelector('.dropdown-menu');
+    _closeAllDropdowns() {
+        this.element.querySelectorAll('.dropdown-container').forEach(c => c.classList.remove('show'));
+    }
 
-        if (dropdownBtn && dropdownMenu && dropdownContainer) {
-            dropdownBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // We no longer trigger onTableSwitch here, this arrow just opens the menu
-                dropdownContainer.classList.toggle('show');
-                dropdownMenu.classList.toggle('show');
-            });
-            
-            if (splitMainBtn) {
-                splitMainBtn.addEventListener('click', () => {
-                    this.switchTo('all-spiele');
-                    this.onTableSwitch?.('all-spiele');
-                    dropdownContainer.classList.remove('show');
-                    dropdownMenu.classList.remove('show');
-                });
-            }
-
-            // Close dropdown when item clicked
-            this.element.querySelectorAll('.dropdown-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const tableId = item.dataset.table;
-                    this.switchTo(tableId);
-                    this.onTableSwitch?.(tableId);
-                    dropdownContainer.classList.remove('show');
-                    dropdownMenu.classList.remove('show');
-                });
-            });
-
-            // Close dropdown when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!dropdownContainer.contains(e.target)) {
-                    dropdownContainer.classList.remove('show');
-                    dropdownMenu.classList.remove('show');
-                }
-            });
-        }
-
-        // Table navigation (regular buttons)
-        this.element.querySelectorAll('.nav-btn:not(.dropdown-btn):not(.persons-toggle-btn)').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tableId = btn.dataset.table;
-                this.switchTo(tableId);
-                this.onTableSwitch?.(tableId);
-            });
+    switchTo(table) {
+        this.currentTable = table;
+        this.element.querySelectorAll('.nav-btn:not(.persons-toggle-btn):not(.inventory-toggle-btn)').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.table === table);
         });
     }
 
     showUnsavedBanner() {
         const banner = this.element.querySelector('.unsaved-banner');
-        if (banner) {
-            banner.style.display = 'flex';
-        }
+        if (banner) banner.style.display = 'flex';
     }
 
     hideUnsavedBanner() {
         const banner = this.element.querySelector('.unsaved-banner');
-        if (banner) {
-            banner.style.display = 'none';
-        }
-    }
-
-    _toggleTheme(themeBtn) {
-        const isDark = document.documentElement.dataset.theme === 'dark';
-        document.documentElement.dataset.theme = isDark ? '' : 'dark';
-        themeBtn.querySelector('.theme-icon').textContent = isDark ? '☀' : '☾';
-        this.onThemeToggle?.(!isDark);
-    }
-
-    switchTo(table) {
-        this.currentTable = table;
-        this.element.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.table === table);
-        });
+        if (banner) banner.style.display = 'none';
     }
 }

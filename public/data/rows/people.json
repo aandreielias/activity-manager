@@ -32,7 +32,7 @@
     "nachname": "Buda",
     "Tel.": "+43 699 11191065",
     "Status": "aktiv",
-    "role": "",
+    "role": "Chef",
     "Spez. Zuständigkeit": ""
   },
   {
@@ -68,7 +68,7 @@
     "nachname": "Andrei",
     "Tel.": "+43 660 7344022",
     "Status": "aktiv",
-    "role": "",
+    "role": "Admin",
     "Spez. Zuständigkeit": ""
   }
 ]

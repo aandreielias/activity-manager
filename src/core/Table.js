@@ -25,6 +25,7 @@ export class Table {
             data:   r,
             schema: json.schema,
             peopleData: json.peopleData,
+            tableId: json.id,
         }));
         this.element = null;
         this.tableConfig = json.tableConfig; // Store config for saving

@@ -4,7 +4,7 @@
     "vorname": "Giuli",
     "nachname": "Braun",
     "Tel.": "+43 670 5095161",
-    "Status": "inaktiv",
+    "Status": "aktiv",
     "role": "",
     "Spez. Zuständigkeit": ""
   },
@@ -32,7 +32,7 @@
     "nachname": "Buda",
     "Tel.": "+43 699 11191065",
     "Status": "aktiv",
-    "role": "Chef",
+    "role": "",
     "Spez. Zuständigkeit": ""
   },
   {
@@ -68,7 +68,7 @@
     "nachname": "Andrei",
     "Tel.": "+43 660 7344022",
     "Status": "aktiv",
-    "role": "Admin",
+    "role": "",
     "Spez. Zuständigkeit": ""
   }
 ]

@@ -4,6 +4,7 @@ import { EnumField } from './EnumField.js';
 import { PersonField } from './PersonField.js';
 import { StatusField } from './StatusField.js';
 import { LinkField } from './LinkField.js';
+import { InventoryField } from './InventoryField.js';
 
 export class FieldFactory {
     static createField(config) {
@@ -17,6 +18,8 @@ export class FieldFactory {
                 return new StatusField(config);
             case 'link':
                 return new LinkField(config);
+            case 'required_items':
+                return new InventoryField(config);
         }
 
         // Fallback to general data structures

@@ -151,15 +151,17 @@
     background: none;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    width: 36px;
+    padding: 6px 12px;
     height: 36px;
     cursor: pointer;
     color: var(--text-secondary);
-    font-size: 16px;
+    font-size: 13px;
+    font-weight: 500;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: background var(--transition), color var(--transition), border-color var(--transition);
+    white-space: nowrap;
 }
 
 .theme-toggle:hover {

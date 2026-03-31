@@ -28,8 +28,22 @@ export class Header {
         this.element.innerHTML = this._getHeaderHTML();
 
         this._attachEventListeners();
+        this._updateThemeUI();
 
         return this.element;
+    }
+
+    _updateThemeUI() {
+        if (!this.element) return;
+        const isDark = document.documentElement.dataset.theme === 'dark';
+        const icon = this.element.querySelector('.theme-icon');
+        if (icon) {
+            icon.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+        }
+        const btn = this.element.querySelector('.theme-toggle');
+        if (btn) {
+            btn.title = isDark ? 'Lichtmodus umschalten' : 'Dunkelmodus umschalten';
+        }
     }
 
     _getHeaderHTML() {
@@ -95,7 +109,7 @@ export class Header {
                     Favoriten
                 </button>
                 <button class="theme-toggle" aria-label="Design umschalten" title="Dunkelmodus umschalten">
-                    <span class="theme-icon">☀</span>
+                    <span class="theme-icon">Dark Mode</span>
                 </button>
             </div>
         `;
@@ -130,7 +144,7 @@ export class Header {
     _attachEventListeners() {
         if (!this.element) return;
 
-        this.element.addEventListener('click', (e) => {
+        this.element.addEventListener('click', async (e) => {
             const btn = e.target.closest('.nav-btn, .dropdown-item');
             if (btn && btn.dataset.table) {
                 const tableId = btn.dataset.table;
@@ -140,7 +154,11 @@ export class Header {
             }
 
             if (e.target.closest('.theme-toggle')) {
-                this.onThemeToggle?.();
+                const rect = e.target.closest('.theme-toggle').getBoundingClientRect();
+                const clickX = e.clientX || rect.left + rect.width / 2;
+                const clickY = e.clientY || rect.top + rect.height / 2;
+                await this.onThemeToggle?.(clickX, clickY);
+                this._updateThemeUI();
             }
 
             if (e.target.closest('.persons-toggle-btn')) {

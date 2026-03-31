@@ -16,6 +16,54 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// ── Theme Management ────────────────────────────────────
+const initialTheme = localStorage.getItem('theme') || 'light';
+document.documentElement.dataset.theme = initialTheme;
+
+async function toggleTheme(clickX, clickY) {
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const nextTheme = isDark ? 'light' : 'dark';
+    
+    const setThemeState = () => {
+        document.documentElement.dataset.theme = nextTheme;
+        localStorage.setItem('theme', nextTheme);
+    };
+
+    if (!document.startViewTransition) {
+        setThemeState();
+        return;
+    }
+
+    const x = clickX || window.innerWidth / 2;
+    const y = clickY || window.innerHeight / 2;
+    const endRadius = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = document.startViewTransition(() => {
+        setThemeState();
+    });
+
+    await transition.updateCallbackDone;
+
+    transition.ready.then(() => {
+        document.documentElement.animate(
+            {
+                clipPath: [
+                    `circle(0 at ${x}px ${y}px)`,
+                    `circle(${endRadius}px at ${x}px ${y}px)`,
+                ],
+            },
+            {
+                duration: 500,
+                easing: 'ease-in-out',
+                pseudoElement: '::view-transition-new(root)',
+            }
+        );
+    });
+}
+
 // ── Initialize App ─────────────────────────────────────
 async function initializeApp() {
     const base = import.meta.env.BASE_URL;
@@ -108,7 +156,7 @@ async function initializeApp() {
         appName: 'Activity Manager',
         tableConfigs: tablesConfig,
         tables: {},
-        onThemeToggle: () => {},
+        onThemeToggle: (x, y) => toggleTheme(x, y),
     });
     const headerEl = headerInstance.render();
     app.appendChild(headerEl);

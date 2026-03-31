@@ -247,3 +247,12 @@ html, body {
     mix-blend-mode: normal;
 }
 
+/* For circular reveal - we need the new view on top */
+::view-transition-new(root) {
+    z-index: 999;
+}
+
+::view-transition-old(root) {
+    z-index: 1;
+}
+

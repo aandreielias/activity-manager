@@ -31,14 +31,20 @@ export class GlobalStateManager {
             this.favorites.add(rowId);
         }
 
-        // Save immediately to server
+        // Save immediately to server (Supabase)
         try {
-            await fetch('/api/favorites', {
+            const { SUPABASE_CONFIG } = await import('../config.js');
+            await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_CONFIG.ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+                    'Prefer': 'resolution=merge-duplicates'
+                },
                 body: JSON.stringify({ 
-                    username: this.getCurrentUser(), 
-                    favoriteIds: Array.from(this.favorites) 
+                    id: `favs_${this.getCurrentUser()}`, 
+                    rows: Array.from(this.favorites) 
                 })
             });
         } catch (e) {

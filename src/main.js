@@ -1,5 +1,6 @@
 import './styles/main.css';
 import { Header }      from './ui/Header.js';
+import { SUPABASE_CONFIG } from './config.js';
 import { TableLoader } from './core/TableLoader.js';
 import { GlobalStateManager } from './core/GlobalStateManager.js';
 import { Table } from './core/Table.js';
@@ -29,19 +30,35 @@ async function initializeApp() {
 
     if (authUser && authPass) {
         try {
-            const res = await fetch(`${base}api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: authUser, password: authPass })
+            const supabaseAuthRes = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.app_auth&select=rows`, {
+                headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
             });
-            const data = await res.json();
-            if (res.ok && data.success) {
-                authRole = data.role;
+            const sbAuthData = await supabaseAuthRes.json();
+            let authData = sbAuthData && sbAuthData[0] ? sbAuthData[0].rows : null;
+
+            // Fallback to local auth if Supabase has nothing
+            if (!authData) {
+                const localAuthRes = await fetch(`${base}data/auth.json`);
+                authData = await localAuthRes.json();
+            }
+
+            if (!authData[authUser]) {
+                // First-time login: save to Supabase
+                authData[authUser] = authPass;
+                await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
+                    body: JSON.stringify({ id: 'app_auth', rows: authData })
+                });
+                authRole = authUser === 'root' ? 'admin' : 'user';
+            } else if (authData[authUser] === authPass) {
+                authRole = authUser === 'root' ? 'admin' : 'user';
             } else {
                 authUser = null;
                 authPass = null;
             }
         } catch(e) {
+            console.error('Auth error:', e);
             authUser = null;
             authPass = null;
         }
@@ -70,10 +87,13 @@ async function initializeApp() {
             globalState.setCurrentUser(authUser, authRole, userPerms);
         }
 
-        // Load private favorites
+        // Load private favorites from Supabase
         try {
-            const favsMap = await fetch(`${base}api/favorites`).then(r => r.json());
-            const userFavs = favsMap[authUser] || [];
+            const favRes = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.favs_${authUser}&select=rows`, {
+                headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
+            });
+            const favData = await favRes.json();
+            const userFavs = favData && favData[0] ? favData[0].rows : [];
             globalState.setInitialFavorites(userFavs);
         } catch (e) {
             console.error('Failed to load favorites:', e);
@@ -365,15 +385,21 @@ async function initializeApp() {
         if (!newPass) return;
 
         try {
-            const res = await fetch('/api/auth/change-password', {
+            const supabaseAuthRes = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.app_auth&select=rows`, {
+                headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
+            });
+            const sbAuthData = await supabaseAuthRes.json();
+            let authData = sbAuthData && sbAuthData[0] ? sbAuthData[0].rows : {};
+
+            authData[authUser] = newPass;
+
+            await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: authUser, newPassword: newPass })
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
+                body: JSON.stringify({ id: 'app_auth', rows: authData })
             });
 
-            if (!res.ok) throw new Error('Fehler beim Ändern des Passworts');
-
-            localStorage.removeItem('auth_pass'); // Clear only password to force fresh login
+            localStorage.removeItem('auth_pass'); 
             window.location.reload();
         } catch (e) {
             alert(e.message);

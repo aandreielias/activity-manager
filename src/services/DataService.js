@@ -1,3 +1,5 @@
+import { SUPABASE_CONFIG } from '../config.js';
+
 /**
  * DataService handles all API calls for saving and loading data
  */
@@ -5,46 +7,30 @@ export class DataService {
     static async saveTable(tableId, filename, rows) {
         try {
             const payload = {
-                tableId,
-                filename,
+                id: tableId,
                 rows: rows.map(row => row.toJSON ? row.toJSON() : row)
             };
 
-            const response = await fetch('/api/save-table', {
+            // Using Supabase REST API (PostgREST)
+            // 'Prefer: resolution=merge-duplicates' handles UPSERT based on the primary key 'id'
+            const response = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'apikey': SUPABASE_CONFIG.ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+                    'Prefer': 'resolution=merge-duplicates'
                 },
                 body: JSON.stringify(payload)
             });
 
-            const contentType = response.headers.get('content-type');
-
-            let responseText = '';
-            try {
-                responseText = await response.text();
-            } catch (e) {
-                console.error('[DataService] Fehler beim Lesen der Antwort', e);
-                throw new Error('Netzwerkfehler: Server-Antwort konnte nicht gelesen werden');
-            }
-
             if (!response.ok) {
-                let errorMsg = responseText.substring(0, 150) || response.statusText;
-                console.error(`[DataService] HTTP Fehler ${response.status}: ${errorMsg}`);
-                throw new Error(`Serverfehler (${response.status}): ${errorMsg}`);
+                const errorText = await response.text();
+                console.error(`[DataService] Supabase Fehler ${response.status}: ${errorText}`);
+                throw new Error(`Fehler beim Speichern in Supabase (${response.status})`);
             }
 
-            if (!contentType || !contentType.includes('application/json')) {
-                console.error(`[DataService] Unerwarteter Content-Type: ${contentType}`);
-                throw new Error('Server hat ein ungültiges Format zurückgegeben (JSON erwartet)');
-            }
-
-            try {
-                return JSON.parse(responseText);
-            } catch (parseError) {
-                console.error(`[DataService] JSON Parsing-Fehler:`, parseError);
-                throw new Error('Fehler beim Parsen der Server-Antwort als JSON');
-            }
+            return { success: true, message: `Table ${tableId} saved to Supabase` };
 
         } catch (error) {
             console.error(`[DataService] Fehler beim Speichern der Tabelle ${tableId}:`, error);

@@ -65,29 +65,41 @@ export class LoginDialog {
                 btn.textContent = 'Wird angemeldet...';
                 
                 try {
-                    const res = await fetch('/api/auth/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username: user, password: pass })
+                    const { SUPABASE_CONFIG } = await import('../config.js');
+                    const supabaseAuthRes = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.app_auth&select=rows`, {
+                        headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
                     });
                     
-                    let data;
-                    const responseText = await res.text();
-                    
-                    try {
-                        data = JSON.parse(responseText);
-                    } catch (parseError) {
-                        console.error('Server response is not valid JSON:', responseText);
-                        throw new Error(`Server antwortete ungültig (${res.status})`);
+                    if (!supabaseAuthRes.ok) {
+                        throw new Error('Verbindung zu Supabase fehlgeschlagen');
                     }
 
-                    if (!res.ok || !data.success) {
-                        throw new Error(data.error || 'Login fehlgeschlagen');
+                    const sbAuthData = await supabaseAuthRes.json();
+                    const authMap = sbAuthData && sbAuthData[0] ? sbAuthData[0].rows : {};
+
+                    // Check if password matches
+                    if (authMap[user] && authMap[user] !== pass) {
+                        throw new Error('Ungültiges Passwort');
                     }
 
-                    // Success
+                    // Success or Register (if user doesn't exist yet, we allow it for this simplified app)
+                    if (!authMap[user]) {
+                        authMap[user] = pass;
+                        await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'apikey': SUPABASE_CONFIG.ANON_KEY, 
+                                'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`, 
+                                'Prefer': 'resolution=merge-duplicates' 
+                            },
+                            body: JSON.stringify({ id: 'app_auth', rows: authMap })
+                        });
+                    }
+
+                    // Resolve
                     document.body.removeChild(overlay);
-                    resolve({ username: user, password: pass, role: data.role });
+                    resolve({ username: user, password: pass, role: user === 'root' ? 'admin' : 'user' });
 
                 } catch (e) {
                     errorMsg.textContent = e.message;

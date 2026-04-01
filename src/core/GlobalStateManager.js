@@ -75,60 +75,89 @@ export class GlobalStateManager {
     }
 
     canView(tableId) {
-        const perms = this.permissions;
         if (this.isSuperAdmin()) return true;
-        if (!perms) return true;
 
-        switch (perms.type) {
-            case 'all': return true;
-            case 'readonly':
-            case 'specific':
-                return Array.isArray(perms.tables) && perms.tables.includes(tableId);
-            case 'except_people':
-                return tableId !== 'people_table' && tableId !== 'tbl_people';
-            case 'except_people_inventory':
-                return !['people_table', 'tbl_people', 'tbl_inventory'].includes(tableId);
-            case 'except_inventory':
-                return tableId !== 'tbl_inventory';
-            default: return true;
+        // 1. Check if we have specific manual overrides
+        const perms = this.permissions;
+        if (perms && perms.type) {
+            switch (perms.type) {
+                case 'all': return true;
+                case 'readonly':
+                case 'specific':
+                    return Array.isArray(perms.tables) && perms.tables.includes(tableId);
+                case 'except_people':
+                    return tableId !== 'people_table' && tableId !== 'tbl_people';
+                case 'except_inventory':
+                    return tableId !== 'tbl_inventory';
+            }
+        }
+
+        // 2. Fallback to Role-Based Defaults
+        const r = this.userRole.toLowerCase();
+        switch (tableId) {
+            case 'tbl_people':
+            case 'people_table':
+                return r === 'admin' || r === 'supervisor';
+            default:
+                return true; 
         }
     }
 
     canEdit(tableId) {
-        const perms = this.permissions;
         if (this.isSuperAdmin()) return true;
-        if (this.userRole === 'Admin' && (!perms || perms.type === 'all')) return true;
-        if (!perms || perms.type === 'readonly') return false;
 
-        switch (perms.type) {
-            case 'all': return true;
-            case 'specific':
-                return Array.isArray(perms.tables) && perms.tables.includes(tableId);
-            case 'except_people':
-                return !['people_table', 'tbl_people'].includes(tableId);
-            case 'except_people_inventory':
-                return !['people_table', 'tbl_people', 'tbl_inventory'].includes(tableId);
-            case 'except_inventory':
-                return tableId !== 'tbl_inventory';
-            default: return false;
+        // 1. Check manual overrides
+        const perms = this.permissions;
+        if (perms && perms.type) {
+            if (perms.type === 'readonly') return false;
+            switch (perms.type) {
+                case 'all': return true;
+                case 'specific':
+                    return Array.isArray(perms.tables) && perms.tables.includes(tableId);
+                case 'except_people':
+                    return !['people_table', 'tbl_people'].includes(tableId);
+                case 'except_inventory':
+                    return tableId !== 'tbl_inventory';
+            }
+        }
+
+        // 2. Fallback to Role-Based Defaults
+        const r = this.userRole.toLowerCase();
+        switch (tableId) {
+            case 'tbl_people':
+            case 'people_table':
+                return r === 'admin';
+            case 'tbl_inventory':
+                return r === 'admin' || r === 'supervisor';
+            default:
+                return true;
         }
     }
 
+    canEditColumn(tableId, columnId) {
+        const r = this.userRole.toLowerCase();
+        if (r === 'superadmin') return true;
+
+        if ((tableId === 'tbl_people' || tableId === 'people_table') && r === 'admin') {
+            // Admin can edit everything except Role/Permissions
+            if (columnId === 'role' || columnId === 'rolle') return false;
+        }
+
+        return this.canEdit(tableId);
+    }
+
     isSuperAdmin() {
-        const user = this.getCurrentUser();
-        return ['Elias Andrei', 'Andrei Elias', 'root'].includes(user);
+        return this.userRole.toLowerCase() === 'superadmin';
     }
 
     canManageUsers() {
-        if (this.isSuperAdmin()) return true;
-        const p = this.permissions;
-        return p && (p.managementAccess === 'stats_perms' || p.managementAccess === 'stats_only' || p.canManageUsers === true);
+        const r = this.userRole.toLowerCase();
+        return r === 'superadmin' || r === 'admin';
     }
 
     canSeeStats() {
-        if (this.isSuperAdmin()) return true;
-        const p = this.permissions;
-        return p && (p.managementAccess === 'stats_only' || p.managementAccess === 'stats_perms' || p.canManageUsers === true);
+        const r = this.userRole.toLowerCase();
+        return r === 'superadmin' || r === 'admin' || r === 'supervisor';
     }
 
     canSeePermissions() {

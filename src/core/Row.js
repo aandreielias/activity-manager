@@ -30,6 +30,7 @@ export class Row {
                 colDef: col,
                 value: this.data[col.id],
                 peopleData: this.peopleData,
+                tableId: this.tableId,
                 onChange: (fieldId, newVal) => {
                     this.data[fieldId] = newVal;
                     this.callbacks.onEditChange?.();

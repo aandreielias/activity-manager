@@ -47,10 +47,12 @@ export class UserInfoPage {
                 <div class="user-info-selection">
                     <select class="user-select-dropdown">
                         <option value="" disabled selected>Nutzer auswählen...</option>
-                        ${peopleData.map(p => {
-                            const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
-                            return `<option value="${name}">${name}</option>`;
-                        }).join('')}
+                        ${peopleData
+                            .filter(p => isSuperAdmin || (p.role || '').toLowerCase() !== 'superadmin')
+                            .map(p => {
+                                const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
+                                return `<option value="${name}">${name}</option>`;
+                            }).join('')}
                     </select>
                 </div>
                 <button class="close-info-btn">Schließen</button>
@@ -86,6 +88,13 @@ export class UserInfoPage {
 
     static _renderUserProfile(container, person, userStat, permissionsMap, tableConfigs, isSuperAdmin, canSeeStats, canSeePermissions, peopleData) {
         const name = `${person.vorname || ''} ${person.nachname || ''}`.trim();
+        const targetIsSuperAdmin = (person.role || '').toLowerCase() === 'superadmin';
+
+        if (targetIsSuperAdmin && !isSuperAdmin) {
+            container.innerHTML = `<div class="empty-state"><p>Zugriff verweigert: Sie können keine Superadmins verwalten.</p></div>`;
+            return;
+        }
+
         const userPerm = permissionsMap[name] || { type: 'except_people', canManageUsers: false, managementAccess: 'none' };
 
         const winRate = (userStat.blackjackWins + userStat.blackjackLosses) > 0

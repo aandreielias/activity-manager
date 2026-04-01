@@ -1,9 +1,12 @@
+import { GlobalStateManager } from '../GlobalStateManager.js';
+
 export class Field {
-    constructor({ rowId, colDef, value, peopleData, onChange, onEditStart, onTab }) {
+    constructor({ rowId, colDef, value, peopleData, tableId, onChange, onEditStart, onTab }) {
         this.rowId = rowId;
         this.colDef = colDef;
         this.value = value;
         this.peopleData = peopleData;
+        this.tableId = tableId;
         this.onChange = onChange;
         this.onEditStart = onEditStart;
         this.onTab = onTab; 
@@ -62,6 +65,11 @@ export class Field {
     }
 
     startEditing() {
+        const globalState = GlobalStateManager.getInstance();
+        if (!globalState.canEditColumn(this.tableId, this.colDef.id)) {
+            return;
+        }
+
         this.td.classList.add('editing');
         this.td.classList.remove('expanded'); // Remove expanded state on double-click/editing
         this.contentWrap.style.display = 'none';

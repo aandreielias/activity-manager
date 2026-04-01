@@ -6,7 +6,7 @@ export class Field {
         this.peopleData = peopleData;
         this.onChange = onChange;
         this.onEditStart = onEditStart;
-        
+
         this.td = null;
         this.contentWrap = null;
     }
@@ -18,7 +18,7 @@ export class Field {
 
         this.contentWrap = document.createElement('div');
         this.contentWrap.className = 'cell-content';
-        
+
         this.updateDisplay();
 
         this.td.appendChild(this.contentWrap);
@@ -66,10 +66,10 @@ export class Field {
 
         const editor = this.createEditor();
         this.td.appendChild(editor);
-        
+
         editor.focus();
         if (editor.tagName === 'TEXTAREA') editor.select();
-        
+
         this.onEditStart?.();
 
         const finish = (save) => {

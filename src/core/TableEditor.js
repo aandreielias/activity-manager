@@ -1,4 +1,5 @@
 import { GlobalStateManager } from './GlobalStateManager.js';
+import { UserStatsService } from '../services/UserStatsService.js';
 
 /**
  * TableEditor - Manages save/discard functionality and persistence
@@ -39,6 +40,11 @@ export class TableEditor {
                 filename,
                 table.rows
             );
+
+            // Record user activity
+            const username = this.globalState.getCurrentUser();
+            const category = (table.tableConfig || {}).category || null;
+            await UserStatsService.recordEntry(username, category);
         } catch (error) {
             throw new Error(`Fehler beim Speichern der Tabelle: ${error.message}`);
         }

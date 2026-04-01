@@ -1,120 +1,25 @@
 import { FieldFactory } from './fields/FieldFactory.js';
 import { Dialog } from '../ui/Dialog.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
-
-/**
- * ContextMenu - Manages right-click context menu for rows
- */
-class ContextMenu {
-    constructor() {
-        this.element = null;
-    }
-
-    show(x, y, options) {
-        this.close();
-
-        this.element = document.createElement('div');
-        this.element.className = 'row-context-menu';
-        this.element.style.top = `${Math.min(y, window.innerHeight - 100)}px`;
-        this.element.style.left = `${Math.min(x, window.innerWidth - 160)}px`;
-
-        if (options.onToggleFavorite) {
-            const favItem = this._createMenuItem(
-                options.isFavorite ? 'Von Favoriten entfernen' : 'Zu Favoriten hinzufügen', 
-                () => {
-                    this.close();
-                    options.onToggleFavorite();
-                }
-            );
-            this.element.appendChild(favItem);
-        }
-
-
-
-        if (options.onEdit) {
-            const editItem = this._createMenuItem('Feld bearbeiten', () => {
-                this.close();
-                options.onEdit();
-            });
-            this.element.appendChild(editItem);
-            
-            const separator = document.createElement('div');
-            separator.className = 'context-menu-separator';
-            this.element.appendChild(separator);
-        }
-
-        if (options.onShowInfo) {
-            const infoItem = this._createMenuItem('Eintragsinfo', () => {
-                this.close();
-                options.onShowInfo();
-            });
-            this.element.appendChild(infoItem);
-        }
-
-        if (options.onDelete) {
-            const deleteItem = this._createMenuItem('Zeile löschen', async () => {
-                this.close();
-                const confirmed = await Dialog.confirm({
-                    message: 'Diese Zeile löschen?',
-                    confirmText: 'Löschen',
-                    confirmStyle: 'warning'
-                });
-                if (confirmed) {
-                    options.onDelete?.();
-                }
-            });
-            deleteItem.classList.add('context-menu-delete');
-            this.element.appendChild(deleteItem);
-        }
-
-        document.body.appendChild(this.element);
-
-        // Close on click outside
-        const handleClickOutside = (e) => {
-            if (!this.element?.contains(e.target)) {
-                this.close();
-            }
-        };
-
-        document.addEventListener('click', handleClickOutside, { once: true });
-    }
-
-    _createMenuItem(label, onClickCallback) {
-        const item = document.createElement('button');
-        item.className = 'context-menu-item';
-        item.textContent = label;
-        item.addEventListener('click', (e) => {
-            e.stopPropagation();
-            onClickCallback();
-        });
-        return item;
-    }
-
-    close() {
-        this.element?.remove();
-        this.element = null;
-    }
-}
-
-const contextMenu = new ContextMenu();
+import { contextMenu } from '../ui/ContextMenu.js';
 
 /**
  * Row - Represents a single table row serving as a container for Field variants
  */
 export class Row {
     constructor({ id, data, schema, peopleData, tableId }) {
-        this.id           = id;
-        this.data         = data;
-        this.schema       = schema;
-        this.peopleData   = peopleData;
-        this.tableId      = tableId;
-        this.element      = null;
-        this.callbacks    = {};
+        this.id = id;
+        this.data = data;
+        this.schema = schema;
+        this.peopleData = peopleData;
+        this.tableId = tableId;
+        this.element = null;
+        this.callbacks = {};
 
-        this.createdBy    = data.createdBy || 'Unbekannt';
-        this.createdAt    = data.createdAt || null;
+        this.createdBy = data.createdBy || 'Unbekannt';
+        this.createdAt = data.createdAt || null;
 
-        this.fields       = this._buildFields();
+        this.fields = this._buildFields();
     }
 
     _buildFields() {
@@ -144,7 +49,7 @@ export class Row {
     render() {
         this.element = document.createElement('tr');
         this.element.dataset.rowId = this.id;
-        
+
         const globalState = GlobalStateManager.getInstance();
         const isFav = globalState.isFavorite(this.id);
         if (isFav) {
@@ -153,13 +58,13 @@ export class Row {
 
         const favTd = document.createElement('td');
         favTd.className = 'favorite-cell';
-        
+
         const heartSpan = document.createElement('span');
         heartSpan.className = 'favorite-heart-icon';
         heartSpan.textContent = '❤️';
         if (!isFav) heartSpan.style.display = 'none';
-        
-        this.heartSpan = heartSpan; 
+
+        this.heartSpan = heartSpan;
         favTd.appendChild(heartSpan);
         favTd.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -181,7 +86,7 @@ export class Row {
         this.element.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            
+
             const cell = e.target.closest('.data-cell');
             const currentUser = GlobalStateManager.getInstance().getCurrentUser();
             const canEditTable = GlobalStateManager.getInstance().canEdit(this.tableId);
@@ -200,7 +105,7 @@ export class Row {
             if (canEditTable) {
                 onDelete = () => this.callbacks.onDelete?.(this.id);
             }
-            
+
             contextMenu.show(e.clientX, e.clientY, {
                 onDelete: onDelete,
                 onEdit: onEdit,
@@ -216,11 +121,11 @@ export class Row {
             });
         });
     }
-    
+
     toggleFavorite() {
         const globalState = GlobalStateManager.getInstance();
         globalState.toggleFavorite(this.id);
-        
+
         const isFav = globalState.isFavorite(this.id);
         if (this.element) {
             if (isFav) {
@@ -231,7 +136,7 @@ export class Row {
                 if (this.heartSpan) this.heartSpan.style.display = 'none';
             }
         }
-        
+
         this.callbacks.onEditChange?.();
     }
 
@@ -240,10 +145,10 @@ export class Row {
         this.schema.forEach(col => {
             result[col.id] = this.data[col.id] ?? null;
         });
-        
+
         if (this.createdBy) result.createdBy = this.createdBy;
         if (this.createdAt) result.createdAt = this.createdAt;
-        
+
         return result;
     }
 }

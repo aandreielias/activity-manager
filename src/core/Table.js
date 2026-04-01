@@ -15,14 +15,14 @@ export class Table {
      * @param {Object}   json.tableConfig - table configuration from tables.json
      */
     constructor(json) {
-        this.id      = json.id;
-        this.title   = json.title;
-        this.schema  = json.schema;
+        this.id = json.id;
+        this.title = json.title;
+        this.schema = json.schema;
         this.peopleData = json.peopleData;
 
-        this.rows    = json.rows.map(r => new Row({
-            id:     r.id,
-            data:   r,
+        this.rows = json.rows.map(r => new Row({
+            id: r.id,
+            data: r,
             schema: json.schema,
             peopleData: json.peopleData,
             tableId: json.id,
@@ -31,9 +31,9 @@ export class Table {
         this.tableConfig = json.tableConfig; // Store config for saving
 
         // Compose with smaller classes
-        this.renderer    = new TableRenderer(this);
-        this.sorter      = new TableSorter(this);
-        this.editor      = new TableEditor(this);
+        this.renderer = new TableRenderer(this);
+        this.sorter = new TableSorter(this);
+        this.editor = new TableEditor(this);
         this.dataManager = new TableDataManager(this);
 
         this._tbody = null; // Will be set by renderer
@@ -55,10 +55,10 @@ export class Table {
     toJSON() {
         return {
 
-            id:     this.id,
-            title:  this.title,
+            id: this.id,
+            title: this.title,
             schema: this.schema,
-            rows:   this.rows.map(r => r.toJSON()),
+            rows: this.rows.map(r => r.toJSON()),
         };
     }
 }

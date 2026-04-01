@@ -1,5 +1,9 @@
+import { UserStatsService } from '../services/UserStatsService.js';
+import { SUPABASE_CONFIG } from '../config.js';
+
 /**
- * GlobalStateManager - Manages global application state (unsaved changes, etc.)
+ * GlobalStateManager - Singleton managing application-wide state.
+ * Refactored to separate concerns while maintaining a central point of access.
  */
 export class GlobalStateManager {
     static #instance = null;
@@ -9,16 +13,117 @@ export class GlobalStateManager {
             return GlobalStateManager.#instance;
         }
 
+        // State properties
+        this.currentUser = 'user_1';
+        this.userRole = 'user';
+        this.permissions = { type: 'readonly', tables: [] };
+        
         this.unsavedTables = new Set();
         this.inventory = [];
-        this.favorites = new Set(); // Row IDs
+        this.favorites = new Set();
         this.favoritesFilterActive = false;
+        
         this.callbacks = {
             onUnsavedChange: new Set()
         };
 
         GlobalStateManager.#instance = this;
     }
+
+    static getInstance() {
+        if (!GlobalStateManager.#instance) {
+            new GlobalStateManager();
+        }
+        return GlobalStateManager.#instance;
+    }
+
+    // ── Authentication & Permissions ───────────────────────────
+
+    setCurrentUser(user, role, permissions = null) {
+        this.currentUser = user;
+        this.userRole = role;
+        this.permissions = permissions || this._getDefaultPermissions(role);
+    }
+
+    _getDefaultPermissions(role) {
+        if (role === 'Admin' || role === 'Chef') return { type: 'all' };
+        return { type: 'except_people' };
+    }
+
+    getCurrentUser() { return this.currentUser; }
+    getUserRole() { return this.userRole; }
+    getPermissions() { return this.permissions; }
+
+    updatePermissionsFromStorage() {
+        const authUser = localStorage.getItem('auth_user');
+        if (!authUser) return;
+        const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
+        this.permissions = permissionsMap[authUser] || { type: 'all' };
+    }
+
+    canView(tableId) {
+        const perms = this.permissions;
+        if (this.isSuperAdmin()) return true;
+        if (!perms) return true;
+
+        switch (perms.type) {
+            case 'all': return true;
+            case 'readonly':
+            case 'specific':
+                return Array.isArray(perms.tables) && perms.tables.includes(tableId);
+            case 'except_people':
+                return tableId !== 'people_table' && tableId !== 'tbl_people';
+            case 'except_people_inventory':
+                return !['people_table', 'tbl_people', 'tbl_inventory'].includes(tableId);
+            case 'except_inventory':
+                return tableId !== 'tbl_inventory';
+            default: return true;
+        }
+    }
+
+    canEdit(tableId) {
+        const perms = this.permissions;
+        if (this.isSuperAdmin()) return true;
+        if (this.userRole === 'Admin' && (!perms || perms.type === 'all')) return true;
+        if (!perms || perms.type === 'readonly') return false;
+
+        switch (perms.type) {
+            case 'all': return true;
+            case 'specific':
+                return Array.isArray(perms.tables) && perms.tables.includes(tableId);
+            case 'except_people':
+                return !['people_table', 'tbl_people'].includes(tableId);
+            case 'except_people_inventory':
+                return !['people_table', 'tbl_people', 'tbl_inventory'].includes(tableId);
+            case 'except_inventory':
+                return tableId !== 'tbl_inventory';
+            default: return false;
+        }
+    }
+
+    isSuperAdmin() {
+        const user = this.getCurrentUser();
+        return ['Elias Andrei', 'Andrei Elias', 'root'].includes(user);
+    }
+
+    canManageUsers() {
+        if (this.isSuperAdmin()) return true;
+        const p = this.permissions;
+        return p && (p.managementAccess === 'stats_perms' || p.managementAccess === 'stats_only' || p.canManageUsers === true);
+    }
+
+    canSeeStats() {
+        if (this.isSuperAdmin()) return true;
+        const p = this.permissions;
+        return p && (p.managementAccess === 'stats_only' || p.managementAccess === 'stats_perms' || p.canManageUsers === true);
+    }
+
+    canSeePermissions() {
+        if (this.isSuperAdmin()) return true;
+        return this.permissions?.managementAccess === 'stats_perms';
+    }
+
+    // ── Favorites Management ───────────────────────────────────
 
     setInitialFavorites(favoriteIds) {
         this.favorites = new Set(favoriteIds);
@@ -31,9 +136,7 @@ export class GlobalStateManager {
             this.favorites.add(rowId);
         }
 
-        // Save immediately to server (Supabase)
         try {
-            const { SUPABASE_CONFIG } = await import('../config.js');
             await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
                 method: 'POST',
                 headers: {
@@ -42,34 +145,22 @@ export class GlobalStateManager {
                     'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
                     'Prefer': 'resolution=merge-duplicates'
                 },
-                body: JSON.stringify({ 
-                    id: `favs_${this.getCurrentUser()}`, 
-                    rows: Array.from(this.favorites) 
+                body: JSON.stringify({
+                    id: `favs_${this.getCurrentUser()}`,
+                    rows: Array.from(this.favorites)
                 })
             });
+            await UserStatsService.recordFavoriteChange(this.getCurrentUser(), this.favorites.size);
         } catch (e) {
-            console.error('Failed to sync favorites:', e);
+            console.error('[GlobalState] Failed to sync favorites:', e);
         }
     }
 
-    isFavorite(rowId) {
-        return this.favorites.has(rowId);
-    }
+    isFavorite(rowId) { return this.favorites.has(rowId); }
+    setFavoritesFilterActive(active) { this.favoritesFilterActive = active; }
+    isFavoritesFilterActive() { return this.favoritesFilterActive; }
 
-    setFavoritesFilterActive(active) {
-        this.favoritesFilterActive = active;
-    }
-
-    isFavoritesFilterActive() {
-        return this.favoritesFilterActive;
-    }
-
-    static getInstance() {
-        if (!GlobalStateManager.#instance) {
-            GlobalStateManager.#instance = new GlobalStateManager();
-        }
-        return GlobalStateManager.#instance;
-    }
+    // ── Unsaved Changes State ──────────────────────────────────
 
     markTableAsUnsaved(tableId) {
         this.unsavedTables.add(tableId);
@@ -86,17 +177,11 @@ export class GlobalStateManager {
         this._notifyUnsavedChange();
     }
 
-    hasUnsavedChanges() {
-        return this.unsavedTables.size > 0;
-    }
-
-    getUnsavedTableIds() {
-        return Array.from(this.unsavedTables);
-    }
+    hasUnsavedChanges() { return this.unsavedTables.size > 0; }
+    getUnsavedTableIds() { return Array.from(this.unsavedTables); }
 
     onUnsavedChangeCallback(callback) {
         this.callbacks.onUnsavedChange.add(callback);
-        // Return an unregister function just in case
         return () => this.callbacks.onUnsavedChange.delete(callback);
     }
 
@@ -105,89 +190,8 @@ export class GlobalStateManager {
         this.callbacks.onUnsavedChange.forEach(cb => cb(hasUnsaved));
     }
 
-    setCurrentUser(user, role, permissions = null) {
-        this.currentUser = user;
-        this.userRole = role;
-        this.permissions = permissions || { type: role === 'Admin' ? 'all' : (role === 'Chef' ? 'all' : 'except_people') };
-    }
+    // ── Data Cache ─────────────────────────────────────────────
 
-    getCurrentUser() {
-        return this.currentUser || 'user_1';
-    }
-
-    getUserRole() {
-        return this.userRole || 'user';
-    }
-
-    canView(tableId) {
-        const perms = this.permissions;
-        if (perms && perms.type === 'all') return true;
-
-        const role = this.getUserRole();
-        // Admins can view everything unless they have explicit restricted permissions (for testing/specific roles)
-        if (role === 'Admin' && (!perms || perms.type === 'all')) return true;
-        
-        if (!perms) return true; // Default view all
-
-        if (perms.type === 'readonly' || perms.type === 'specific') {
-            if (!Array.isArray(perms.tables)) return false; 
-            return perms.tables.includes(tableId);
-        }
-
-        if (perms.type === 'except_people') {
-            return tableId !== 'people_table' && tableId !== 'tbl_people';
-        }
-        if (perms.type === 'except_people_inventory') {
-            return tableId !== 'people_table' && tableId !== 'tbl_people' && tableId !== 'tbl_inventory';
-        }
-        if (perms.type === 'except_inventory') {
-            return tableId !== 'tbl_inventory';
-        }
-
-        return true;
-    }
-
-    canEdit(tableId) {
-        const perms = this.permissions;
-        
-        // Admin role bypasses unless a specific restriction like 'readonly' or 'specific' is active
-        const role = this.getUserRole();
-        if (role === 'Admin' && (!perms || perms.type === 'all')) return true;
-
-        if (!perms) return false;
-        if (perms.type === 'all') return true;
-        if (perms.type === 'readonly') return false;
-        
-        if (perms.type === 'specific') {
-            return Array.isArray(perms.tables) && perms.tables.includes(tableId);
-        }
-
-        if (perms.type === 'except_people') {
-            return tableId !== 'people_table' && tableId !== 'tbl_people';
-        }
-        if (perms.type === 'except_people_inventory') {
-            return tableId !== 'people_table' && tableId !== 'tbl_people' && tableId !== 'tbl_inventory';
-        }
-        if (perms.type === 'except_inventory') {
-            return tableId !== 'tbl_inventory';
-        }
-
-        return false;
-    }
-
-    setPermissions(permissions) {
-        this.permissions = permissions;
-    }
-
-    getPermissions() {
-        return this.permissions;
-    }
-
-    setInventory(data) {
-        this.inventory = data;
-    }
-
-    getInventory() {
-        return this.inventory;
-    }
+    setInventory(data) { this.inventory = data; }
+    getInventory() { return this.inventory; }
 }

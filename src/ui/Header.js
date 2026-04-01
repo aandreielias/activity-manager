@@ -15,10 +15,11 @@ export class Header {
         this.element = null;
         this.personsSplitOpen = false;
         this.inventorySplitOpen = false;
-        this.onManagePermissions = null;
+        this.onUserInfo = null;
         this.onLogout = null;
         this.onChangePassword = null;
         this.onFavoritesToggle = null;
+        this.onLogoDoubleClick = null;
         this.favoritesActive = false;
     }
 
@@ -48,10 +49,10 @@ export class Header {
 
     _getHeaderHTML() {
         const globalState = GlobalStateManager.getInstance();
-        
+
         // Filter configurations based on current view permissions
         const viewableConfigs = this.tableConfigs.filter(t => globalState.canView(t.id));
-        
+
         // Categories
         const spieleTables = viewableConfigs.filter(t => t.category === 'spiele');
         const sportTables = viewableConfigs.filter(t => t.category === 'sportarten');
@@ -62,7 +63,7 @@ export class Header {
         const canViewInventory = globalState.canView('tbl_inventory');
 
         return `
-            <div class="header-left">
+            <div class="header-left" title="do NOT double click">
                 <span class="header-logo">⬡</span>
                 <span class="header-title">${this.appName}</span>
             </div>
@@ -91,9 +92,9 @@ export class Header {
                 </div>
             </div>
             <div class="header-right">
-                ${globalState.getUserRole() === 'Admin' ? `
-                    <button class="nav-btn manage-permissions-btn" title="Berechtigungen verwalten">
-                        Berechtigungen
+                ${globalState.canManageUsers() ? `
+                    <button class="nav-btn user-info-btn" title="Nutzer verwalten">
+                        Nutzer
                     </button>
                 ` : ''}
                 <div class="dropdown-container user-dropdown-container">
@@ -167,8 +168,8 @@ export class Header {
                 this.onInventoryToggle?.();
             }
 
-            if (e.target.closest('.manage-permissions-btn')) {
-                this.onManagePermissions?.();
+            if (e.target.closest('.user-info-btn')) {
+                this.onUserInfo?.();
             }
 
             if (e.target.closest('.logout-btn')) {
@@ -196,6 +197,20 @@ export class Header {
                 this._closeAllDropdowns();
             }
         });
+
+        // Logo double click for Blackjack
+        const logo = this.element.querySelector('.header-left');
+        if (logo) {
+            console.log('Attaching dblclick listener to logo area');
+            logo.addEventListener('dblclick', (e) => {
+                console.log('Logo area double-clicked!', e.target);
+                if (this.onLogoDoubleClick) {
+                    this.onLogoDoubleClick();
+                } else {
+                    console.warn('onLogoDoubleClick callback not set');
+                }
+            });
+        }
 
         // Split view buttons double click for full screen
         const personsBtn = this.element.querySelector('.persons-toggle-btn');

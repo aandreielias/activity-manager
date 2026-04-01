@@ -16,12 +16,25 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    cursor: pointer;
+    user-select: none;
 }
 
 .header-logo {
     font-size: 18px;
     color: var(--accent);
     font-weight: 700;
+    transition: all 0.3s var(--transition);
+}
+
+.header-left:hover .header-logo {
+    transform: rotate(30deg) scale(1.2);
+    color: #ffd700;
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
+}
+
+.header-left:hover .header-title {
+    color: var(--accent);
 }
 
 .header-title {

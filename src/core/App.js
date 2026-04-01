@@ -8,6 +8,8 @@ import { Blackjack } from '../games/blackjack/games/Blackjack.js';
 import { BlackjackUI } from '../games/blackjack/ui/BlackjackUI.js';
 import { SUPABASE_CONFIG } from '../config.js';
 import { Dialog } from '../ui/Dialog.js';
+import { UserStatsService } from '../services/UserStatsService.js';
+import { DataService } from '../services/DataService.js';
 
 /**
  * App - The main application class that orchestrates everything.
@@ -388,7 +390,6 @@ export class App {
                 headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
                 body: JSON.stringify({ id: 'app_auth', rows: authData })
             });
-            const { UserStatsService } = await import('../services/UserStatsService.js');
             await UserStatsService.recordPasswordChange(authUser);
             this._handleLogout();
         } catch (e) { alert(e.message); }
@@ -418,7 +419,6 @@ export class App {
 
     async _launchBlackjack() {
         const game = new Blackjack();
-        const { UserStatsService } = await import('../services/UserStatsService.js');
         game.onRoundUpdate = (res) => UserStatsService.recordBlackjackResult(this.globalState.getCurrentUser(), res);
         const ui = new BlackjackUI(game, () => overlay.remove());
         const overlay = ui.render();

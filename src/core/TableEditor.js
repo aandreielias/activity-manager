@@ -1,5 +1,6 @@
 import { GlobalStateManager } from './GlobalStateManager.js';
 import { UserStatsService } from '../services/UserStatsService.js';
+import { DataService } from '../services/DataService.js';
 
 /**
  * TableEditor - Manages save/discard functionality and persistence
@@ -34,7 +35,6 @@ export class TableEditor {
             const filename = tableConfig.file || `${table.id}.json`;
 
             // Save to Express.js backend API
-            const { DataService } = await import('../services/DataService.js');
             await DataService.saveTable(
                 table.id,
                 filename,

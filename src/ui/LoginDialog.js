@@ -1,9 +1,8 @@
 import '../styles/LoginDialog.css';
-import { UserStatsService } from '../services/UserStatsService.js';
-import { SUPABASE_CONFIG } from '../config.js';
+import { AuthService } from '../services/AuthService.js';
 
 /**
- * LoginDialog - Displays and handles the authentication dialog.
+ * LoginDialog — Login UI that authenticates against the relational `users` table.
  */
 export class LoginDialog {
     /**
@@ -52,13 +51,17 @@ export class LoginDialog {
 
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Wird angemeldet...';
-                
+
                 try {
-                    const authMap = await this._fetchAuthMap();
-                    await this._validateAndStoreAuth(user, pass, authMap);
-                    
+                    const result = await AuthService.authenticate(user, pass);
+
                     document.body.removeChild(overlay);
-                    resolve({ username: user, password: pass, role: user === 'root' ? 'admin' : 'user' });
+                    resolve({
+                        username: user,
+                        password: pass,
+                        role: result.role,
+                        userId: result.userId,
+                    });
                 } catch (e) {
                     errorMsg.textContent = e.message;
                     submitBtn.disabled = false;
@@ -70,43 +73,5 @@ export class LoginDialog {
             password.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
             setTimeout(() => password.focus(), 100);
         });
-    }
-
-    /**
-     * Fetch auth data from Supabase.
-     */
-    static async _fetchAuthMap() {
-        const res = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.app_auth&select=rows`, {
-            headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
-        });
-        
-        if (!res.ok) throw new Error('Verbindung zu Supabase fehlgeschlagen');
-        const data = await res.json();
-        return data?.[0]?.rows || {};
-    }
-
-    /**
-     * Validate password and update auth map if necessary.
-     */
-    static async _validateAndStoreAuth(user, pass, authMap) {
-        if (authMap[user] && authMap[user] !== pass) {
-            throw new Error('Ungültiges Passwort');
-        }
-
-        if (!authMap[user]) {
-            authMap[user] = pass;
-            await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'apikey': SUPABASE_CONFIG.ANON_KEY, 
-                    'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`, 
-                    'Prefer': 'resolution=merge-duplicates' 
-                },
-                body: JSON.stringify({ id: 'app_auth', rows: authMap })
-            });
-        }
-        
-        await UserStatsService.recordLogin(user);
     }
 }

@@ -90,12 +90,6 @@ export class Dialog {
             input.style.display = 'block';
             input.style.width = '100%';
             input.style.marginBottom = '16px';
-            input.style.padding = '8px 12px';
-            input.style.border = '1px solid var(--border)';
-            input.style.borderRadius = 'var(--radius-sm)';
-            input.style.background = 'var(--bg)';
-            input.style.color = 'var(--text-primary)';
-            input.style.outline = 'none';
 
             const confirmBtn = document.createElement('button');
             confirmBtn.className = 'save-btn-header';

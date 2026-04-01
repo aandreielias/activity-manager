@@ -598,12 +598,42 @@
     "title": "Inventar",
     "file": "inventory.json",
     "schema": [
-      { "id": "name", "label": "Gegenstand", "type": "text" },
-      { "id": "quantity", "label": "Menge / Anzahl", "type": "number" },
-      { "id": "storage_location", "label": "Lagerort", "type": "text" },
-      { "id": "condition", "label": "Zustand", "type": "enum", "options": ["neu", "gut", "gebraucht", "defekt"] },
-      { "id": "last_checked", "label": "Letzte Prüfung", "type": "text" },
-      { "id": "notes", "label": "Anmerkungen", "type": "text" }
+      {
+        "id": "name",
+        "label": "Gegenstand",
+        "type": "text"
+      },
+      {
+        "id": "quantity",
+        "label": "Menge / Anzahl",
+        "type": "number"
+      },
+      {
+        "id": "storage_location",
+        "label": "Lagerort",
+        "type": "text"
+      },
+      {
+        "id": "condition",
+        "label": "Zustand",
+        "type": "enum",
+        "options": [
+          "neu",
+          "gut",
+          "gebraucht",
+          "defekt"
+        ]
+      },
+      {
+        "id": "last_checked",
+        "label": "Letzte Prüfung",
+        "type": "text"
+      },
+      {
+        "id": "notes",
+        "label": "Anmerkungen",
+        "type": "text"
+      }
     ]
   },
   {
@@ -649,6 +679,12 @@
         "id": "Spez. Zuständigkeit",
         "label": "Spez. Zuständigkeit",
         "type": "text",
+        "accepts": []
+      },
+      {
+        "id": "Team",
+        "label": "Team",
+        "type": "tag",
         "accepts": []
       }
     ]

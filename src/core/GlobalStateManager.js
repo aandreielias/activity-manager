@@ -3,7 +3,7 @@ import { SUPABASE_CONFIG } from '../config.js';
 
 /**
  * GlobalStateManager - Singleton managing application-wide state.
- * Refactored to separate concerns while maintaining a central point of access.
+ * Favorites now use the relational `user_favorites` table.
  */
 export class GlobalStateManager {
     static #instance = null;
@@ -15,14 +15,15 @@ export class GlobalStateManager {
 
         // State properties
         this.currentUser = 'user_1';
+        this.currentUserId = null; // UUID from the users table
         this.userRole = 'user';
         this.permissions = { type: 'readonly', tables: [] };
-        
+
         this.unsavedTables = new Set();
         this.inventory = [];
         this.favorites = new Set();
         this.favoritesFilterActive = false;
-        
+
         this.callbacks = {
             onUnsavedChange: new Set()
         };
@@ -43,6 +44,18 @@ export class GlobalStateManager {
         this.currentUser = user;
         this.userRole = role;
         this.permissions = permissions || this._getDefaultPermissions(role);
+    }
+
+    setCurrentUserId(userId) {
+        this.currentUserId = userId;
+    }
+
+    getCurrentUserId() {
+        return this.currentUserId;
+    }
+
+    setPermissions(perms) {
+        this.permissions = perms;
     }
 
     _getDefaultPermissions(role) {
@@ -123,37 +136,85 @@ export class GlobalStateManager {
         return this.permissions?.managementAccess === 'stats_perms';
     }
 
-    // ── Favorites Management ───────────────────────────────────
+    // ── Favorites Management (relational user_favorites table) ─
 
     setInitialFavorites(favoriteIds) {
         this.favorites = new Set(favoriteIds);
     }
 
+    /**
+     * Load favorites from the `user_favorites` table for the current user.
+     */
+    async loadFavorites() {
+        if (!this.currentUserId) return;
+        try {
+            const res = await fetch(
+                `${SUPABASE_CONFIG.URL}/rest/v1/user_favorites?user_id=eq.${this.currentUserId}&select=activity_id`,
+                {
+                    headers: {
+                        'apikey': SUPABASE_CONFIG.ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+                    },
+                }
+            );
+            if (res.ok) {
+                const rows = await res.json();
+                this.favorites = new Set(rows.map(r => r.activity_id));
+            }
+        } catch (e) {
+            console.error('[GlobalState] Failed to load favorites:', e);
+        }
+    }
+
     async toggleFavorite(rowId) {
-        if (this.favorites.has(rowId)) {
+        const isFav = this.favorites.has(rowId);
+
+        if (isFav) {
             this.favorites.delete(rowId);
+            // DELETE from user_favorites
+            try {
+                await fetch(
+                    `${SUPABASE_CONFIG.URL}/rest/v1/user_favorites?user_id=eq.${this.currentUserId}&activity_id=eq.${rowId}`,
+                    {
+                        method: 'DELETE',
+                        headers: {
+                            'apikey': SUPABASE_CONFIG.ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+                        },
+                    }
+                );
+            } catch (e) {
+                console.error('[GlobalState] Failed to remove favorite:', e);
+            }
         } else {
             this.favorites.add(rowId);
+            // INSERT into user_favorites
+            try {
+                await fetch(
+                    `${SUPABASE_CONFIG.URL}/rest/v1/user_favorites`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_CONFIG.ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+                            'Prefer': 'resolution=merge-duplicates',
+                        },
+                        body: JSON.stringify({
+                            user_id: this.currentUserId,
+                            activity_id: rowId,
+                        }),
+                    }
+                );
+            } catch (e) {
+                console.error('[GlobalState] Failed to add favorite:', e);
+            }
         }
 
+        // Update favorites count in user_stats
         try {
-            await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': SUPABASE_CONFIG.ANON_KEY,
-                    'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-                    'Prefer': 'resolution=merge-duplicates'
-                },
-                body: JSON.stringify({
-                    id: `favs_${this.getCurrentUser()}`,
-                    rows: Array.from(this.favorites)
-                })
-            });
-            await UserStatsService.recordFavoriteChange(this.getCurrentUser(), this.favorites.size);
-        } catch (e) {
-            console.error('[GlobalState] Failed to sync favorites:', e);
-        }
+            await UserStatsService.recordFavoriteChange(this.currentUserId, this.favorites.size);
+        } catch (_) { /* best effort */ }
     }
 
     isFavorite(rowId) { return this.favorites.has(rowId); }

@@ -130,19 +130,14 @@ export class EnumField extends Field {
     }
 
     attachEditorListeners(editor, finishCallback) {
-        let isFinishing = false;
-
         editor.setSelectionCallback(() => {
-            if (!isFinishing) {
-                isFinishing = true;
-                document.removeEventListener('click', handleOutsideClick);
-                document.removeEventListener('keydown', handleEscapeKey);
-                finishCallback(true);
-            }
+            document.removeEventListener('click', handleOutsideClick);
+            document.removeEventListener('keydown', handleKeyDown);
+            finishCallback(true);
         });
 
         const handleOutsideClick = (e) => {
-            if (!isFinishing && !editor.contains(e.target) && !this.td.contains(e.target)) {
+            if (!editor.contains(e.target) && !this.td.contains(e.target)) {
                 // Determine if we clicked inside the body-mounted menu
                 let clickedMenu = false;
                 if (e.target.closest('.enum-dropdown-menu')) {
@@ -151,25 +146,29 @@ export class EnumField extends Field {
                 
                 if (!clickedMenu) {
                     document.removeEventListener('click', handleOutsideClick);
-                    document.removeEventListener('keydown', handleEscapeKey);
-                    isFinishing = true;
+                    document.removeEventListener('keydown', handleKeyDown);
                     finishCallback(false);
                 }
             }
         };
 
-        const handleEscapeKey = (e) => {
-            if (e.key === 'Escape' && !isFinishing) {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
                 document.removeEventListener('click', handleOutsideClick);
-                document.removeEventListener('keydown', handleEscapeKey);
-                isFinishing = true;
+                document.removeEventListener('keydown', handleKeyDown);
                 editor.closeMenu();
                 finishCallback(false);
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                document.removeEventListener('click', handleOutsideClick);
+                document.removeEventListener('keydown', handleKeyDown);
+                editor.closeMenu();
+                finishCallback(true, true); // save=true, advance=true
             }
         };
 
         document.addEventListener('click', handleOutsideClick);
-        document.addEventListener('keydown', handleEscapeKey);
+        document.addEventListener('keydown', handleKeyDown);
     }
 
     extractValue(editor) {

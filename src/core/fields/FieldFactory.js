@@ -5,6 +5,7 @@ import { PersonField } from './PersonField.js';
 import { StatusField } from './StatusField.js';
 import { LinkField } from './LinkField.js';
 import { InventoryField } from './InventoryField.js';
+import { TagField } from './TagField.js';
 
 export class FieldFactory {
     static createField(config) {
@@ -20,6 +21,8 @@ export class FieldFactory {
                 return new LinkField(config);
             case 'required_items':
                 return new InventoryField(config);
+            case 'Team':
+                return new TagField(config);
         }
 
         // Fallback to general data structures
@@ -28,6 +31,8 @@ export class FieldFactory {
                 return new NumberField(config);
             case 'enum':
                 return new EnumField(config);
+            case 'tag':
+                return new TagField(config);
             default:
                 return new TextField(config);
         }

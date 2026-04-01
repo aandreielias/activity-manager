@@ -7,20 +7,23 @@ export class TableDataManager {
     }
 
     _generateId() {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        return Array.from(crypto.getRandomValues(new Uint8Array(20)))
-            .map(x => chars[x % chars.length])
-            .join('');
+        return crypto.randomUUID();
     }
 
     addEmptyRow() {
         const id = this._generateId();
-        const data = { 
+        const data = {
             id,
             createdBy: GlobalStateManager.getInstance().getCurrentUser(),
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            ...(this.table.tableConfig?.defaultRowData || {})
         };
-        this.table.schema.forEach(col => data[col.id] = '');
+
+        this.table.schema.forEach(col => {
+            if (data[col.id] === undefined) {
+                data[col.id] = '';
+            }
+        });
 
         const row = new Row({ id, data, schema: this.table.schema, peopleData: this.table.peopleData, tableId: this.table.id });
         row.setCallbacks({

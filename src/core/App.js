@@ -6,13 +6,14 @@ import { LoginDialog } from '../ui/LoginDialog.js';
 import { UserInfoPage } from '../ui/UserInfoPage.js';
 import { Blackjack } from '../games/blackjack/games/Blackjack.js';
 import { BlackjackUI } from '../games/blackjack/ui/BlackjackUI.js';
-import { SUPABASE_CONFIG } from '../config.js';
 import { Dialog } from '../ui/Dialog.js';
 import { UserStatsService } from '../services/UserStatsService.js';
 import { DataService } from '../services/DataService.js';
+import { AuthService } from '../services/AuthService.js';
 
 /**
  * App - The main application class that orchestrates everything.
+ * All data flows through the relational Supabase schema.
  */
 export class App {
     constructor() {
@@ -59,58 +60,27 @@ export class App {
         const base = import.meta.env.BASE_URL;
         this.tableConfigs = await fetch(`${base}data/tables.json`).then(r => r.json());
 
-        // Try to load people data from Supabase first
+        // Load people from relational DB
         try {
-            const sbPeopleRes = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.tbl_people&select=rows`, {
-                headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
-            });
-            if (sbPeopleRes.ok) {
-                const sbPeopleData = await sbPeopleRes.json();
-                if (sbPeopleData && sbPeopleData.length > 0) {
-                    this.peopleData = sbPeopleData[0].rows;
-                    console.log('[App] Loaded people data from Supabase');
-                }
-            }
+            this.peopleData = await DataService.loadPeople();
+            console.log(`[App] Loaded ${this.peopleData.length} people from Supabase`);
         } catch (e) {
-            console.warn('[App] Failed to load people from Supabase, using local fallback');
-        }
-
-        if (!this.peopleData || this.peopleData.length === 0) {
-            this.peopleData = await fetch(`${base}data/rows/people.json`).then(r => r.json());
+            console.error('[App] Failed to load people:', e);
+            this.peopleData = [];
         }
     }
 
     async _handleAuthentication() {
-        const base = import.meta.env.BASE_URL;
         let authUser = localStorage.getItem('auth_user');
         let authPass = localStorage.getItem('auth_pass');
         let authRole = null;
+        let userId = null;
 
         if (authUser && authPass) {
             try {
-                const supabaseAuthRes = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.app_auth&select=rows`, {
-                    headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
-                });
-                const sbAuthData = await supabaseAuthRes.json();
-                let authData = sbAuthData && sbAuthData[0] ? sbAuthData[0].rows : null;
-
-                if (!authData) {
-                    authData = await fetch(`${base}data/auth.json`).then(r => r.json());
-                }
-
-                if (!authData[authUser]) {
-                    authData[authUser] = authPass;
-                    await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
-                        body: JSON.stringify({ id: 'app_auth', rows: authData })
-                    });
-                    authRole = authUser === 'root' ? 'admin' : 'user';
-                } else if (authData[authUser] === authPass) {
-                    authRole = authUser === 'root' ? 'admin' : 'user';
-                } else {
-                    authUser = null;
-                }
+                const result = await AuthService.authenticate(authUser, authPass);
+                authRole = result.role;
+                userId = result.userId;
             } catch (e) {
                 console.error('Auth check error:', e);
                 authUser = null;
@@ -121,31 +91,35 @@ export class App {
             const creds = await LoginDialog.show(this.peopleData);
             authUser = creds.username;
             authPass = creds.password;
+            authRole = creds.role;
+            userId = creds.userId;
             localStorage.setItem('auth_user', authUser);
             localStorage.setItem('auth_pass', authPass);
         }
 
+        // Store the user's UUID for stats/favorites
+        if (userId) {
+            this.globalState.setCurrentUserId(userId);
+        } else {
+            // Try to look up the user ID
+            const userRecord = await AuthService.getUserByUsername(authUser);
+            if (userRecord) {
+                this.globalState.setCurrentUserId(userRecord.id);
+                authRole = userRecord.role || authRole;
+            }
+        }
+
         const person = this.peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === authUser);
         if (!person) {
-            this.globalState.setCurrentUser(authUser, 'user', { type: 'readonly', tables: [] });
+            this.globalState.setCurrentUser(authUser, authRole || 'user', { type: 'readonly', tables: [] });
         } else {
-            authRole = person.role || 'user';
+            authRole = person.role || authRole || 'user';
             const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
             this.globalState.setCurrentUser(authUser, authRole, permissionsMap[authUser]);
         }
 
-        // Load Favorites
-        try {
-            const favRes = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.favs_${authUser}&select=rows`, {
-                headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
-            });
-            const favData = await favRes.json();
-            if (favData?.[0]?.rows) {
-                this.globalState.setInitialFavorites(favData[0].rows);
-            }
-        } catch (e) {
-            console.error('Failed to load favorites:', e);
-        }
+        // Load Favorites from the relational table
+        await this.globalState.loadFavorites();
     }
 
     _setupLayout() {
@@ -192,7 +166,8 @@ export class App {
         this.mainElement.appendChild(this.splitSideContainer);
     }
 
-    async _loadTables() {
+    async _loadTables(targetContainer = null) {
+        const container = targetContainer || this.tablesContainer;
         this.tables = await TableLoader.loadAllTables(this.peopleData);
         this.header.tables = this.tables;
 
@@ -201,23 +176,48 @@ export class App {
         }
 
         let renderedCount = 0;
-        Object.entries(this.tables).forEach(([tableId, { instance }]) => {
+        Object.entries(this.tables).forEach(([tableId, { instance, config }]) => {
             if (!this.globalState.canView(tableId)) return;
 
             const wrapper = document.createElement('div');
             wrapper.className = 'table-view-wrapper';
             wrapper.dataset.tableId = tableId;
-            wrapper.appendChild(instance.render());
+
+            if (tableId === 'tbl_people') {
+                const activeRows = this.peopleData.filter(p => {
+                    const s = (p.Status || p['Status'] || '').toLowerCase();
+                    return s === 'aktiv' || s === ''; 
+                });
+                const inactiveRows = this.peopleData.filter(p => (p.Status || p['Status'] || '').toLowerCase() === 'inaktiv');
+
+                const activeTable = new Table({ ...config, title: 'Aktive Mitglieder', rows: activeRows, peopleData: this.peopleData, tableConfig: { ...config, defaultRowData: { Status: 'Aktiv' } } });
+                const inactiveTable = new Table({ ...config, title: 'Inaktive Mitglieder', rows: inactiveRows, peopleData: this.peopleData, tableConfig: { ...config, defaultRowData: { Status: 'Inaktiv' } } });
+                
+                const inactiveEl = inactiveTable.render();
+                inactiveEl.classList.add('inactive-members-table');
+                
+                wrapper.appendChild(activeTable.render());
+                wrapper.appendChild(inactiveEl);
+
+                // For saving, we'll keep both in an array if needed, but for now
+                // let's just make sure they both trigger the save bar.
+                activeTable.editor.showSaveBar = () => instance.editor.showUnsavedChange();
+                inactiveTable.editor.showSaveBar = () => instance.editor.showUnsavedChange();
+                
+                // Store BOTH in the entry so they can both be accessed
+                this.tables[tableId].instances = [activeTable, inactiveTable];
+            } else {
+                wrapper.appendChild(instance.render());
+                instance.editor.showSaveBar = () => instance.editor.showUnsavedChange();
+            }
 
             this.tableElements[tableId] = wrapper;
-            this.tablesContainer.appendChild(wrapper);
+            container.appendChild(wrapper);
             renderedCount++;
-
-            instance.editor.showSaveBar = () => instance.editor.showUnsavedChange();
         });
 
         if (renderedCount === 0) {
-            this.tablesContainer.innerHTML = `<div class="empty-state-container"><h2>Kein Zugriff</h2><p>Sie haben keine Berechtigung, Tabellen in diesem Bereich anzuzeigen.</p></div>`;
+            container.innerHTML = `<div class="empty-state-container"><h2>Kein Zugriff</h2><p>Sie haben keine Berechtigung, Tabellen in diesem Bereich anzuzeigen.</p></div>`;
         }
 
         this._initSplitViewTables();
@@ -229,9 +229,12 @@ export class App {
                 { id: 'vorname', label: 'Vorname', type: 'text' },
                 { id: 'nachname', label: 'Nachname', type: 'text' },
                 { id: 'Tel.', label: 'Telefon', type: 'text' },
-                { id: 'Status', label: 'Status', type: 'enum', options: ['aktiv', 'inaktiv'] },
-                { id: 'role', label: 'Rolle', type: 'text' },
-                { id: 'Spez. Zuständigkeit', label: 'Spez. Zuständigkeit', type: 'text' }
+                { id: 'Status', label: 'Status', type: 'enum', options: ['Aktiv', 'Inaktiv'] },
+                { id: 'role', label: 'Rolle', type: 'enum', options: ['Superadmin', 'Admin', 'Supervisor', 'User'] },
+                { id: 'responsibility_1', label: 'Verantwortlich 1', type: 'enum', options: ['Gruppenspiele', 'Zwischendurch', 'Icebreaker', 'Sport', 'Sonstige'] },
+                { id: 'responsibility_2', label: 'Verantwortlich 2', type: 'enum', options: ['Gruppenspiele', 'Zwischendurch', 'Icebreaker', 'Sport', 'Sonstige'] },
+                { id: 'Spez. Zuständigkeit', label: 'Spez. Zuständigkeit', type: 'text' },
+                { id: 'Team', label: 'Team', type: 'tag' }
             ];
             this.personsTable = new Table({ id: 'people_table', title: 'Personen', schema, rows: this.peopleData, tableConfig: { id: 'people_table', schema } });
         }
@@ -322,18 +325,55 @@ export class App {
         const open = this.header.personsSplitOpen || this.header.inventorySplitOpen;
         this.splitSideContainer.style.display = open ? 'flex' : 'none';
         this.resizer.style.display = open ? 'block' : 'none';
-        
+
         this.header.element.querySelector('.persons-toggle-btn')?.classList.toggle('active', this.header.personsSplitOpen);
         this.header.element.querySelector('.inventory-toggle-btn')?.classList.toggle('active', this.header.inventorySplitOpen);
     }
 
     _setSplitContent(type) {
         this.splitSideContainer.innerHTML = '';
-        const table = type === 'people' ? this.personsTable : this.inventoryTable;
-        if (table) {
-            const el = table.render();
-            el.className = 'persons-table-full';
-            this.splitSideContainer.appendChild(el);
+        if (type === 'people' && this.peopleData.length > 0) {
+            const config = { 
+                id: 'people_table', 
+                schema: [
+                    { id: 'vorname', label: 'Vorname', type: 'text' },
+                    { id: 'nachname', label: 'Nachname', type: 'text' },
+                    { id: 'Tel.', label: 'Telefon', type: 'text' },
+                    { id: 'Status', label: 'Status', type: 'enum', options: ['Aktiv', 'Inaktiv'] },
+                    { id: 'role', label: 'Rolle', type: 'enum', options: ['Superadmin', 'Admin', 'Supervisor', 'User'] },
+                    { id: 'responsibility_1', label: 'Verantwortlich 1', type: 'enum', options: ['Gruppenspiele', 'Zwischendurch', 'Icebreaker', 'Sport', 'Sonstige'] },
+                    { id: 'responsibility_2', label: 'Verantwortlich 2', type: 'enum', options: ['Gruppenspiele', 'Zwischendurch', 'Icebreaker', 'Sport', 'Sonstige'] },
+                    { id: 'Spez. Zuständigkeit', label: 'Spez. Zuständigkeit', type: 'text' },
+                    { id: 'Team', label: 'Team', type: 'tag' }
+                ]
+            };
+
+            const activeRows = this.peopleData.filter(p => {
+                const s = (p.Status || p['Status'] || '').toLowerCase();
+                return s === 'aktiv' || s === ''; 
+            });
+            const inactiveRows = this.peopleData.filter(p => (p.Status || p['Status'] || '').toLowerCase() === 'inaktiv');
+
+            const activeTable = new Table({ ...config, title: 'Personen (Aktiv)', rows: activeRows, peopleData: this.peopleData, tableConfig: { ...config, defaultRowData: { Status: 'Aktiv' } } });
+            const inactiveTable = new Table({ ...config, title: 'Personen (Inaktiv)', rows: inactiveRows, peopleData: this.peopleData, tableConfig: { ...config, defaultRowData: { Status: 'Inaktiv' } } });
+
+            const activeEl = activeTable.render();
+            activeEl.classList.add('persons-table-full');
+            this.splitSideContainer.appendChild(activeEl);
+
+            const inactiveEl = inactiveTable.render();
+            inactiveEl.classList.add('persons-table-full', 'inactive-members-table');
+            this.splitSideContainer.appendChild(inactiveEl);
+
+            this.personsTable = activeTable; // Store one for generic save access if needed
+            this.inactivePersonsTable = inactiveTable;
+        } else {
+            const table = type === 'inventory' ? this.inventoryTable : this.personsTable;
+            if (table) {
+                const el = table.render();
+                el.className = 'persons-table-full';
+                this.splitSideContainer.appendChild(el);
+            }
         }
     }
 
@@ -362,9 +402,19 @@ export class App {
     async _handleUserInfo() {
         await UserInfoPage.show(this.peopleData, this.tableConfigs);
         this.globalState.updatePermissionsFromStorage();
-        // Re-init tables to reflect changes
-        this.tablesContainer.innerHTML = '';
-        await this._loadTables();
+        
+        // Background refresh to avoid blank screen
+        const tempContainer = document.createElement('div');
+        tempContainer.className = 'tables-container';
+        tempContainer.style.display = 'none';
+        document.body.appendChild(tempContainer);
+        
+        await this._loadTables(tempContainer);
+        
+        // Swap
+        this.tablesContainer.innerHTML = tempContainer.innerHTML;
+        tempContainer.remove();
+        
         this._handleTableSwitch(this.currentTableId);
     }
 
@@ -379,18 +429,8 @@ export class App {
         if (!newPass) return;
         try {
             const authUser = this.globalState.getCurrentUser();
-            const res = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data?id=eq.app_auth&select=rows`, {
-                headers: { 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}` }
-            });
-            const data = await res.json();
-            const authData = data?.[0]?.rows || {};
-            authData[authUser] = newPass;
-            await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/table_data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_CONFIG.ANON_KEY, 'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
-                body: JSON.stringify({ id: 'app_auth', rows: authData })
-            });
-            await UserStatsService.recordPasswordChange(authUser);
+            await AuthService.changePassword(authUser, newPass);
+            localStorage.setItem('auth_pass', newPass);
             this._handleLogout();
         } catch (e) { alert(e.message); }
     }
@@ -399,10 +439,44 @@ export class App {
         const unsavedIds = this.globalState.getUnsavedTableIds();
         try {
             for (const id of unsavedIds) {
-                const table = this.tables[id]?.instance || this.personsTable;
-                if (table?.editor) await table.editor._saveTable(table);
+                const entry = this.tables[id];
+                if (entry) {
+                    if (entry.instances) {
+                        // Merge rows from all instances (e.g. split active/inactive people)
+                        const allRows = [];
+                        entry.instances.forEach(inst => allRows.push(...inst.rows));
+                        
+                        // Use the first instance's editor to perform the combined save
+                        const mainInst = entry.instances[0];
+                        if (mainInst.editor) {
+                            const originalRows = mainInst.rows;
+                            mainInst.rows = allRows; // Temporarily swap for save
+                            await mainInst.editor._saveTable(mainInst);
+                            mainInst.rows = originalRows; // Restore
+                        }
+                    } else if (entry.instance?.editor) {
+                        await entry.instance.editor._saveTable(entry.instance);
+                    }
+                } else if (id === 'people_table') {
+                    const allRows = [];
+                    if (this.personsTable) allRows.push(...this.personsTable.rows);
+                    if (this.inactivePersonsTable) allRows.push(...this.inactivePersonsTable.rows);
+
+                    if (this.personsTable?.editor) {
+                       const originalRows = this.personsTable.rows;
+                       this.personsTable.rows = allRows;
+                       await this.personsTable.editor._saveTable(this.personsTable);
+                       this.personsTable.rows = originalRows;
+                    }
+                }
             }
             this.globalState.clearAllUnsaved();
+            
+            // Refresh people data if any person-related table was changed
+            if (unsavedIds.includes('tbl_people') || unsavedIds.includes('people_table')) {
+                this.peopleData = await DataService.loadPeople();
+                console.log(`[App] Refreshed ${this.peopleData.length} people after save`);
+            }
         } catch (e) { alert(`Fehler beim Speichern: ${e.message}`); }
     }
 
@@ -419,7 +493,8 @@ export class App {
 
     async _launchBlackjack() {
         const game = new Blackjack();
-        game.onRoundUpdate = (res) => UserStatsService.recordBlackjackResult(this.globalState.getCurrentUser(), res);
+        const userId = this.globalState.getCurrentUserId();
+        game.onRoundUpdate = (res) => UserStatsService.recordBlackjackResult(userId, res);
         const ui = new BlackjackUI(game, () => overlay.remove());
         const overlay = ui.render();
         document.body.appendChild(overlay);

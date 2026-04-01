@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@import './Picker.css';
 
 /* ── Notion-inspired Color Tokens ──────────────────── */
 :root {
@@ -216,13 +217,13 @@ html, body {
 }
 
 .persons-split-container {
-    flex: 0 0 33.333%;
+    flex: 0 0 50%;
     border-left: 1px solid var(--border-light);
     padding-left: 20px;
     overflow-y: auto;
     display: none;
     flex-direction: column;
-    gap: 16px;
+    gap: 0;
     min-width: 300px;
 }
 
@@ -237,7 +238,7 @@ html, body {
 }
 
 .persons-table-full {
-    flex: 1;
+    flex: 0 0 auto;
 }
 
 /* ── View Transitions ───────────────────────────────── */
@@ -256,3 +257,21 @@ html, body {
     z-index: 1;
 }
 
+
+/* ── Shared UI Components ───────────────────────────── */
+.dialog-input {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.dialog-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}

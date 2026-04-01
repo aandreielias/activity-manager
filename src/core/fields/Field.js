@@ -1,11 +1,12 @@
 export class Field {
-    constructor({ rowId, colDef, value, peopleData, onChange, onEditStart }) {
+    constructor({ rowId, colDef, value, peopleData, onChange, onEditStart, onTab }) {
         this.rowId = rowId;
         this.colDef = colDef;
         this.value = value;
         this.peopleData = peopleData;
         this.onChange = onChange;
         this.onEditStart = onEditStart;
+        this.onTab = onTab; 
 
         this.td = null;
         this.contentWrap = null;
@@ -61,22 +62,33 @@ export class Field {
     }
 
     startEditing() {
-        this.td.classList.add('editing', 'expanded');
+        this.td.classList.add('editing');
+        this.td.classList.remove('expanded'); // Remove expanded state on double-click/editing
         this.contentWrap.style.display = 'none';
 
         const editor = this.createEditor();
         this.td.appendChild(editor);
 
         editor.focus();
-        if (editor.tagName === 'TEXTAREA') editor.select();
+        if (editor.tagName === 'TEXTAREA') {
+            editor.select();
+        }
 
         this.onEditStart?.();
 
-        const finish = (save) => {
+        let isFinishing = false;
+        const finish = (save, advance = false) => {
+            if (isFinishing) return;
+            isFinishing = true;
+
             if (save) {
                 this.saveEdit(editor);
             }
             this.finishEditing(editor);
+            
+            if (advance && this.onTab) {
+                this.onTab(this.colDef.id);
+            }
         };
 
         this.attachEditorListeners(editor, finish);
@@ -94,8 +106,14 @@ export class Field {
         throw new Error('extractValue must be implemented in subclass');
     }
 
-    saveEdit(editor) {
-        const newVal = this.extractValue(editor);
+    saveEdit(editorOrValue) {
+        const newVal = (editorOrValue?.tagName || editorOrValue?.nodeName) 
+            ? this.extractValue(editorOrValue) 
+            : editorOrValue;
+
+        if (newVal === this.value) {
+            return; // No change, do nothing
+        }
         this.value = newVal;
         this.updateDisplay();
         this.onChange?.(this.colDef.id, newVal);

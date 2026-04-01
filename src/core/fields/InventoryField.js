@@ -15,13 +15,20 @@ export class InventoryField extends Field {
         // Parse items like "Sessel (3), Tisch (Spieler -1)"
         const items = this._parseItems(rawValue);
         const inventory = GlobalStateManager.getInstance().getInventory();
-        const inventoryNames = inventory.map(row => (row.data?.name || '').toLowerCase());
-
         items.forEach(item => {
             const tag = document.createElement('span');
-            const isAvailable = inventoryNames.includes(item.name.toLowerCase());
+            const invRow = inventory.find(r => (r.data?.name || '').toLowerCase() === item.name.toLowerCase());
+            const invQuantity = invRow ? parseInt(invRow.data?.quantity || 0, 10) : 0;
+            const requestedNum = parseInt(item.quantity || 0, 10);
 
-            tag.className = `inventory-tag ${isAvailable ? 'available' : 'unavailable'}`;
+            let statusClass = 'available';
+            if (!invRow) {
+                statusClass = 'unavailable';
+            } else if (!isNaN(requestedNum) && requestedNum > invQuantity) {
+                statusClass = 'warning';
+            }
+
+            tag.className = `inventory-tag ${statusClass}`;
             tag.textContent = item.quantity ? `${item.name} (${item.quantity})` : item.name;
             this.contentWrap.appendChild(tag);
         });
@@ -50,108 +57,103 @@ export class InventoryField extends Field {
 
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
-            overlay.className = 'permission-overlay'; // Reuse for blur and centering
-            overlay.style.zIndex = '10000';
+            overlay.className = 'picker-overlay';
 
             const dialog = document.createElement('div');
-            dialog.className = 'permission-dialog inventory-picker-window';
-            dialog.style.maxWidth = '480px';
-            dialog.style.maxHeight = '90vh';
+            dialog.className = 'picker-dialog';
+            dialog.style.maxWidth = '500px';
 
-            const title = document.createElement('h2');
-            title.textContent = 'Gegenstände auswählen';
-            dialog.appendChild(title);
+            const header = document.createElement('div');
+            header.className = 'picker-header';
+            header.innerHTML = `<h2>Gegenstände auswählen</h2>`;
+            dialog.appendChild(header);
 
-            // Container for vertical layout
-            const scrollContainer = document.createElement('div');
-            scrollContainer.className = 'permission-container';
-            dialog.appendChild(scrollContainer);
+            const content = document.createElement('div');
+            content.className = 'picker-content';
+            dialog.appendChild(content);
 
             let internalSelected = [...currentItems.map(i => ({ ...i }))];
 
             const refreshSelected = () => {
-                const existingSection = scrollContainer.querySelector('.selected-items-section');
+                const existingSection = content.querySelector('.selected-section');
                 if (existingSection) existingSection.remove();
 
                 const section = document.createElement('div');
-                section.className = 'person-permission-section selected-items-section';
-                section.style.background = 'var(--bg)';
+                section.className = 'picker-section selected-section';
 
                 const sectionTitle = document.createElement('div');
-                sectionTitle.className = 'person-name';
+                sectionTitle.className = 'picker-section-title';
                 sectionTitle.textContent = 'Gewählte Gegenstände';
-                sectionTitle.style.marginBottom = '12px';
                 section.appendChild(sectionTitle);
 
                 const list = document.createElement('div');
-                list.style.display = 'flex';
-                list.style.flexDirection = 'column';
-                list.style.gap = '8px';
+                list.className = 'picker-list';
 
-                const inventoryNames = inventory.map(row => (row.data?.name || '').toLowerCase());
 
                 internalSelected.forEach((item, idx) => {
                     const row = document.createElement('div');
-                    row.className = 'inventory-picker-row';
-                    row.style.display = 'grid';
-                    row.style.gridTemplateColumns = '1fr 120px auto';
-                    row.style.alignItems = 'center';
-                    row.style.gap = '12px';
-                    row.style.padding = '8px';
-                    row.style.borderRadius = 'var(--radius)';
-                    row.style.border = '1px solid var(--border-light)';
-                    row.style.background = 'var(--bg-secondary)';
+                    row.className = 'picker-row';
+                    row.style.gridTemplateColumns = '1fr 100px auto';
 
-                    const isAvailable = inventoryNames.includes(item.name.toLowerCase());
+                    const invItem = inventory.find(r => (r.data?.name || '').toLowerCase() === item.name.toLowerCase());
+                    const invQuantityAvailable = invItem ? parseInt(invItem.data?.quantity || 0, 10) : 0;
+                    const isAvailable = !!invItem;
 
                     const nameCol = document.createElement('div');
                     nameCol.style.display = 'flex';
                     nameCol.style.flexDirection = 'column';
-                    nameCol.style.gap = '2px';
 
                     const tag = document.createElement('span');
-                    tag.className = `inventory-tag ${isAvailable ? 'available' : 'unavailable'}`;
+                    tag.className = 'inventory-tag';
                     tag.textContent = item.name;
                     tag.style.alignSelf = 'start';
                     nameCol.appendChild(tag);
 
-                    if (!isAvailable) {
-                        const errorMsg = document.createElement('div');
-                        errorMsg.textContent = '! Gegenstand nicht in Inventarliste';
-                        errorMsg.style.color = 'var(--error)';
-                        errorMsg.style.fontSize = '9px';
-                        errorMsg.style.fontWeight = '500';
-                        nameCol.appendChild(errorMsg);
-                    }
+                    const errorMsg = document.createElement('div');
+                    errorMsg.style.color = 'var(--error)';
+                    errorMsg.style.fontSize = '9px';
+                    errorMsg.style.marginTop = '2px';
+                    nameCol.appendChild(errorMsg);
+
+                    const updateErrors = () => {
+                        errorMsg.textContent = '';
+                        tag.className = 'inventory-tag available';
+
+                        if (!isAvailable) {
+                            errorMsg.textContent = '! Nicht im Inventar';
+                            tag.className = 'inventory-tag unavailable';
+                        } else {
+                            const val = (item.quantity || '').toString().trim();
+                            const requested = parseInt(val, 10);
+                            if (val && !isNaN(requested) && requested > invQuantityAvailable) {
+                                errorMsg.textContent = '! Nicht genug im Inventar';
+                                tag.className = 'inventory-tag warning';
+                            }
+                        }
+                    };
+
                     row.appendChild(nameCol);
 
                     const qInput = document.createElement('input');
                     qInput.type = 'text';
                     qInput.placeholder = 'Anzahl';
                     qInput.value = item.quantity;
-                    qInput.className = 'dialog-input'; // Use standard dialog input styling
+                    qInput.className = 'dialog-input';
                     qInput.style.width = '100%';
-                    qInput.style.fontSize = '12px';
-                    qInput.style.padding = '6px 12px';
-                    qInput.style.borderRadius = 'var(--radius)'; // Standard rounding
-                    qInput.style.border = '1px solid var(--border-light)'; // Light border
-                    qInput.style.outline = 'none';
-                    qInput.oninput = () => { item.quantity = qInput.value; };
+                    qInput.oninput = () => {
+                        item.quantity = qInput.value;
+                        updateErrors();
+                    };
                     row.appendChild(qInput);
+
+                    updateErrors();
 
                     const removeBtn = document.createElement('button');
                     removeBtn.innerHTML = '✕';
-                    removeBtn.className = 'footer-btn cancel';
+                    removeBtn.className = 'picker-btn secondary';
                     removeBtn.style.padding = '0';
-                    removeBtn.style.borderRadius = 'var(--radius-sm)'; // Standard small rounding
                     removeBtn.style.width = '28px';
                     removeBtn.style.height = '28px';
-                    removeBtn.style.display = 'flex';
-                    removeBtn.style.alignItems = 'center';
-                    removeBtn.style.justifyContent = 'center';
-                    removeBtn.style.border = '1px solid var(--border-light)';
-                    removeBtn.style.fontSize = '12px';
-                    removeBtn.style.flexShrink = '0';
                     removeBtn.onclick = () => {
                         internalSelected.splice(idx, 1);
                         refreshSelected();
@@ -172,18 +174,13 @@ export class InventoryField extends Field {
                 }
 
                 section.appendChild(list);
-                scrollContainer.prepend(section);
+                content.prepend(section);
             };
 
-            // Search / Add New
-            const searchSection = document.createElement('div');
-            searchSection.className = 'person-permission-section';
-
-            const searchTitle = document.createElement('div');
-            searchTitle.className = 'person-name';
-            searchTitle.textContent = 'Gegenstand hinzufügen';
-            searchTitle.style.marginBottom = '8px';
-            searchSection.appendChild(searchTitle);
+            // Add Section
+            const addSection = document.createElement('div');
+            addSection.className = 'picker-section';
+            addSection.innerHTML = `<div class="picker-section-title">Gegenstand hinzufügen</div>`;
 
             const inputGroup = document.createElement('div');
             inputGroup.style.display = 'flex';
@@ -191,44 +188,31 @@ export class InventoryField extends Field {
 
             const input = document.createElement('input');
             input.type = 'text';
-            input.placeholder = '';
+            input.placeholder = 'Name eingeben...';
             input.className = 'dialog-input';
             input.style.flex = '1';
-            input.style.borderRadius = 'var(--radius)';
-            input.style.border = '1px solid var(--border-light)';
-            input.style.padding = '8px 16px';
-            input.style.outline = 'none';
             inputGroup.appendChild(input);
 
             const addBtn = document.createElement('button');
-            addBtn.className = 'save-btn-header';
+            addBtn.className = 'picker-btn primary';
             addBtn.textContent = 'Hinzufügen';
-            addBtn.style.fontSize = '12px';
-            addBtn.style.borderRadius = 'var(--radius-sm)';
             inputGroup.appendChild(addBtn);
 
-            searchSection.appendChild(inputGroup);
-            scrollContainer.appendChild(searchSection);
+            addSection.appendChild(inputGroup);
+            content.appendChild(addSection);
 
             // Inventory List Section
             const invSection = document.createElement('div');
-            invSection.className = 'person-permission-section';
-
-            const invTitle = document.createElement('div');
-            invTitle.className = 'person-name';
-            invTitle.textContent = 'Inventar';
-            invTitle.style.marginBottom = '8px';
-            invSection.appendChild(invTitle);
+            invSection.className = 'picker-section';
+            invSection.innerHTML = `<div class="picker-section-title">Vorschläge aus Inventar</div>`;
 
             const invList = document.createElement('div');
-            invList.className = 'specific-tables-container';
-            invList.style.display = 'flex';
-            invList.style.flexDirection = 'column';
-            invList.style.maxHeight = '200px';
+            invList.className = 'picker-list';
+            invList.style.maxHeight = '180px';
             invList.style.overflowY = 'auto';
             invSection.appendChild(invList);
 
-            const refreshInventorySuggestions = (query = '') => {
+            const refreshSuggestions = (query = '') => {
                 invList.innerHTML = '';
                 const filtered = inventory.filter(row => {
                     const name = (row.data?.name || '').toLowerCase();
@@ -237,29 +221,26 @@ export class InventoryField extends Field {
 
                 if (filtered.length === 0) {
                     const noResults = document.createElement('div');
-                    noResults.textContent = 'Keine Treffer im Inventar';
-                    noResults.style.padding = '8px 12px';
+                    noResults.textContent = 'Keine Treffer';
+                    noResults.style.padding = '8px';
                     noResults.style.color = 'var(--text-muted)';
-                    noResults.style.fontSize = '13px';
+                    noResults.style.fontSize = '12px';
                     invList.appendChild(noResults);
                     return;
                 }
 
                 filtered.forEach(row => {
                     const name = row.data?.name || 'Unbekannt';
-                    const quantity = row.data?.quantity || 0;
-                    
                     const btn = document.createElement('button');
                     btn.className = 'suggestion-item';
                     btn.style.textAlign = 'left';
-                    btn.style.border = 'none';
-                    btn.style.background = 'transparent';
                     btn.style.padding = '8px 12px';
-                    btn.style.borderRadius = 'var(--radius-sm)';
                     btn.style.fontSize = '13px';
-                    btn.style.display = 'flex';
-                    btn.style.justifyContent = 'space-between';
-                    btn.innerHTML = `<span>${name}</span> <span style="color:var(--text-muted)">(${quantity})</span>`;
+                    btn.style.border = '1px solid var(--border-light)';
+                    btn.style.borderRadius = 'var(--radius-sm)';
+                    btn.style.background = 'var(--bg)';
+                    btn.style.cursor = 'pointer';
+                    btn.innerHTML = `${name} <span style="float:right; color:var(--text-muted); font-size:11px;">(${row.data?.quantity || 0})</span>`;
 
                     btn.onclick = () => {
                         if (!internalSelected.find(i => i.name === name)) {
@@ -271,14 +252,11 @@ export class InventoryField extends Field {
                 });
             };
 
-            scrollContainer.appendChild(invSection);
+            content.appendChild(invSection);
 
-            input.oninput = () => {
-                refreshInventorySuggestions(input.value.trim());
-            };
-
+            input.oninput = () => refreshSuggestions(input.value.trim());
             refreshSelected();
-            refreshInventorySuggestions();
+            refreshSuggestions();
 
             const addItem = () => {
                 const val = input.value.trim();
@@ -286,7 +264,7 @@ export class InventoryField extends Field {
                     internalSelected.push({ name: val, quantity: '' });
                     input.value = '';
                     refreshSelected();
-                    refreshInventorySuggestions();
+                    refreshSuggestions();
                 }
             };
 
@@ -295,18 +273,16 @@ export class InventoryField extends Field {
 
             // Footer
             const footer = document.createElement('div');
-            footer.className = 'dialog-footer';
+            footer.className = 'picker-footer';
 
             const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'footer-btn cancel';
+            cancelBtn.className = 'picker-btn secondary';
             cancelBtn.textContent = 'Abbrechen';
-            cancelBtn.style.borderRadius = 'var(--radius-sm)';
             footer.appendChild(cancelBtn);
 
             const saveBtn = document.createElement('button');
-            saveBtn.className = 'footer-btn save';
+            saveBtn.className = 'picker-btn primary';
             saveBtn.textContent = 'Speichern';
-            saveBtn.style.borderRadius = 'var(--radius-sm)';
             footer.appendChild(saveBtn);
 
             dialog.appendChild(footer);
@@ -315,6 +291,7 @@ export class InventoryField extends Field {
 
             setTimeout(() => input.focus(), 50);
 
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
             cancelBtn.onclick = () => overlay.remove();
             saveBtn.onclick = () => {
                 const newVal = internalSelected

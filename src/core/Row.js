@@ -36,6 +36,9 @@ export class Row {
                 },
                 onEditStart: () => {
                     this.callbacks.onEditStart?.();
+                },
+                onTab: (fieldId) => {
+                    this._editNextField(fieldId);
                 }
             });
         });
@@ -138,6 +141,19 @@ export class Row {
         }
 
         this.callbacks.onEditChange?.();
+    }
+
+    _editNextField(currentFieldId) {
+        const colIds = this.schema.map(c => c.id);
+        const currentIndex = colIds.indexOf(currentFieldId);
+        if (currentIndex !== -1 && currentIndex < colIds.length - 1) {
+            const nextColId = colIds[currentIndex + 1];
+            const nextField = this.fields[nextColId];
+            if (nextField) {
+                // Short timeout to let current finishEditing work
+                setTimeout(() => nextField.startEditing(), 10);
+            }
+        }
     }
 
     toJSON() {

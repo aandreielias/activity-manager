@@ -25,7 +25,7 @@ export class ContextMenu {
 
         if (options.onToggleFavorite) {
             const favItem = this._createMenuItem(
-                options.isFavorite ? '★ Von Favoriten entfernen' : '☆ Zu Favoriten hinzufügen',
+                options.isFavorite ? 'Von Favoriten entfernen' : 'Zu Favoriten hinzufügen',
                 () => {
                     this.close();
                     options.onToggleFavorite();
@@ -35,7 +35,7 @@ export class ContextMenu {
         }
 
         if (options.onEdit) {
-            const editItem = this._createMenuItem('✎ Feld bearbeiten', () => {
+            const editItem = this._createMenuItem('Feld bearbeiten', () => {
                 this.close();
                 options.onEdit();
             });
@@ -47,7 +47,7 @@ export class ContextMenu {
         }
 
         if (options.onShowInfo) {
-            const infoItem = this._createMenuItem('ⓘ Eintragsinfo', () => {
+            const infoItem = this._createMenuItem('Eintragsinfo', () => {
                 this.close();
                 options.onShowInfo();
             });
@@ -55,7 +55,7 @@ export class ContextMenu {
         }
 
         if (options.onDelete) {
-            const deleteItem = this._createMenuItem('🗑 Zeile löschen', async () => {
+            const deleteItem = this._createMenuItem('Zeile löschen', async () => {
                 this.close();
                 const confirmed = await Dialog.confirm({
                     message: 'Diese Zeile wirklich unwiderruflich löschen?',

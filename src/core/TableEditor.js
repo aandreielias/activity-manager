@@ -3,7 +3,8 @@ import { UserStatsService } from '../services/UserStatsService.js';
 import { DataService } from '../services/DataService.js';
 
 /**
- * TableEditor - Manages save/discard functionality and persistence
+ * TableEditor - Manages save/discard functionality and persistence.
+ * Saves rows to the relational Supabase tables via DataService.
  */
 export class TableEditor {
     constructor(table) {
@@ -12,7 +13,6 @@ export class TableEditor {
     }
 
     async _handleSave(tables) {
-        // Save all tables that have unsaved changes
         const unsavedIds = this.globalState.getUnsavedTableIds();
 
         try {
@@ -34,17 +34,19 @@ export class TableEditor {
             const tableConfig = table.tableConfig || {};
             const filename = tableConfig.file || `${table.id}.json`;
 
-            // Save to Express.js backend API
+            // Save to the relational Supabase table
             await DataService.saveTable(
                 table.id,
                 filename,
                 table.rows
             );
 
-            // Record user activity
-            const username = this.globalState.getCurrentUser();
+            // Record user activity with the user's UUID
+            const userId = this.globalState.getCurrentUserId();
             const category = (table.tableConfig || {}).category || null;
-            await UserStatsService.recordEntry(username, category);
+            if (userId) {
+                await UserStatsService.recordEntry(userId, category);
+            }
         } catch (error) {
             throw new Error(`Fehler beim Speichern der Tabelle: ${error.message}`);
         }
@@ -67,4 +69,3 @@ export class TableEditor {
         this.hideUnsavedChange();
     }
 }
-

@@ -3,6 +3,7 @@ import { UserStatsService } from '../services/UserStatsService.js';
 import { GlobalStateManager } from '../core/GlobalStateManager.js';
 import { DataService } from '../services/DataService.js';
 import { AuthService } from '../services/AuthService.js';
+import { Dialog } from './Dialog.js';
 
 /**
  * UserInfoPage - Clean Administrative Dashboard
@@ -10,14 +11,29 @@ import { AuthService } from '../services/AuthService.js';
  */
 export class UserInfoPage {
     static async show(peopleData, tableConfigs) {
+        if (window.__userInfoOverlayActive || document.querySelector('.user-info-overlay')) return;
+        window.__userInfoOverlayActive = true;
+
         return new Promise(async (resolve) => {
             const overlay = document.createElement('div');
             overlay.className = 'user-info-overlay';
+            document.body.appendChild(overlay);
+
+            // Close function that resets the flag
+            const close = () => {
+                window.__userInfoOverlayActive = false;
+                document.body.removeChild(overlay);
+                resolve();
+            };
 
             const dialog = document.createElement('div');
             dialog.className = 'user-info-dialog';
+            dialog.innerHTML = '<div class="empty-state">Lade Nutzer-Daten...</div>';
+            overlay.appendChild(dialog);
 
             const stats = await UserStatsService.getStats();
+            dialog.innerHTML = '';
+
             const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
             const globalState = GlobalStateManager.getInstance();
             const isSuperAdmin = globalState.isSuperAdmin();
@@ -62,24 +78,18 @@ export class UserInfoPage {
             };
 
             const closeBtn = header.querySelector('.close-info-btn');
-            closeBtn.onclick = () => {
-                document.body.removeChild(overlay);
-                resolve();
-            };
+            closeBtn.onclick = close;
 
-            overlay.onclick = (e) => { if (e.target === overlay) closeBtn.onclick(); };
-
-            overlay.appendChild(dialog);
-            document.body.appendChild(overlay);
+            overlay.onclick = (e) => { if (e.target === overlay) close(); };
         });
     }
 
     static _renderUserProfile(container, person, userStat, permissionsMap, tableConfigs, isSuperAdmin, canSeeStats, canSeePermissions, peopleData) {
         const name = `${person.vorname || ''} ${person.nachname || ''}`.trim();
         const userPerm = permissionsMap[name] || { type: 'except_people', canManageUsers: false, managementAccess: 'none' };
-        
-        const winRate = (userStat.blackjackWins + userStat.blackjackLosses) > 0 
-            ? Math.round((userStat.blackjackWins / (userStat.blackjackWins + userStat.blackjackLosses)) * 100) 
+
+        const winRate = (userStat.blackjackWins + userStat.blackjackLosses) > 0
+            ? Math.round((userStat.blackjackWins / (userStat.blackjackWins + userStat.blackjackLosses)) * 100)
             : 0;
 
         const topCategory = this._getTopCategory(userStat.categoryHits);
@@ -112,8 +122,16 @@ export class UserInfoPage {
                     <span class="bj-min-title">Aktivität-Details</span>
                     <div class="bj-min-stats">
                         <div class="bj-min-item">Zul.: <b>${lastLoginStr}</b></div>
-                        <div class="bj-min-item">Win: <b style="color: ${winRate > 50 ? 'var(--success)' : ''}">${winRate}%</b></div>
+                        <div class="bj-min-item winrate-stat">Win: <b style="color: ${winRate > 50 ? 'var(--success)' : ''}">${winRate}%</b>
+                            <div class="winrate-tooltip">
+                                <span class="tooltip-title">Spieldaten</span>
+                                <div class="tooltip-row">Wins: <b>${userStat.blackjackWins || 0}</b></div>
+                                <div class="tooltip-row">Losses: <b>${userStat.blackjackLosses || 0}</b></div>
+                                <div class="tooltip-row">Pushes: <b>${userStat.blackjackPushes || 0}</b></div>
+                            </div>
+                        </div>
                         <div class="bj-min-item">Streak: <b>${userStat.blackjackHighestStreak || 0}</b></div>
+                        ${isSuperAdmin ? `<button class="reset-game-btn" title="Statistik zurücksetzen">↺</button>` : ''}
                     </div>
                 </div>
                 ` : ''}
@@ -161,19 +179,19 @@ export class UserInfoPage {
             </div>
         `;
 
-        this._attachProfileListeners(container, name, userPerm, permissionsMap, peopleData, canSeePermissions, isSuperAdmin);
+        this._attachProfileListeners(container, name, userPerm, permissionsMap, peopleData, canSeePermissions, isSuperAdmin, tableConfigs, userStat);
     }
 
-    static _attachProfileListeners(container, name, userPerm, permissionsMap, peopleData, canSeePermissions, isSuperAdmin) {
+    static _attachProfileListeners(container, name, userPerm, permissionsMap, peopleData, canSeePermissions, isSuperAdmin, tableConfigs, userStat) {
         const savePerms = () => {
             const isReadonly = container.querySelector('.permission-readonly-toggle')?.classList.contains('active');
             let type = container.querySelector('.permission-type-select')?.value;
             if (isReadonly) type = 'readonly';
-            
+
             const mgmtSelect = container.querySelector('.management-access-select');
             const managementAccess = mgmtSelect ? mgmtSelect.value : (userPerm.managementAccess || 'none');
             const canManage = (managementAccess === 'stats_only' || managementAccess === 'stats_perms');
-            
+
             const tables = [];
             container.querySelectorAll('.specific-tables-grid input:checked').forEach(cb => tables.push(cb.value));
 
@@ -208,10 +226,41 @@ export class UserInfoPage {
             if (at) at.onchange = () => {
                 const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === name);
                 if (person) {
-                    person.role = at.checked ? 'Admin' : 'user';
-                    DataService.saveTable('tbl_people', 'people.json', peopleData);
+                    person.role = at.checked ? 'Admin' : 'User';
+                    // Save people table via the relational DataService
+                    DataService.savePeople(peopleData);
                 }
             };
+
+            const resetBtn = container.querySelector('.reset-game-btn');
+            if (resetBtn) {
+                resetBtn.onclick = async () => {
+                    const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === name);
+                    if (!person) return;
+                    
+                    const confirmed = await Dialog.confirm({
+                        message: `Soll die Spiel-Statistik für ${name} wirklich zurückgesetzt werden?`,
+                        confirmStyle: 'warning',
+                        confirmText: 'Zurücksetzen'
+                    });
+
+                    if (confirmed) {
+                        let userId = userStat.userId;
+                        if (!userId) {
+                            const userRecord = await AuthService.getUserByUsername(name);
+                            if (userRecord) userId = userRecord.id;
+                        }
+
+                        if (userId) {
+                            await UserStatsService.resetGameStats(userId);
+                            const newStats = await UserStatsService.getStats();
+                            this._renderUserProfile(container, person, newStats[name] || {}, permissionsMap, tableConfigs, isSuperAdmin, true, true, peopleData);
+                        } else {
+                            alert('Nutzer-Daten konnten nicht gefunden werden. Ggf. hat dieser Nutzer noch nie Blackjack gespielt.');
+                        }
+                    }
+                };
+            }
         }
     }
 

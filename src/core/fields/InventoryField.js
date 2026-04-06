@@ -1,5 +1,6 @@
 import { Field } from './Field.js';
 import { GlobalStateManager } from '../GlobalStateManager.js';
+import { InventoryService } from '../../services/InventoryService.js';
 
 export class InventoryField extends Field {
     updateDisplay() {
@@ -12,38 +13,18 @@ export class InventoryField extends Field {
             return;
         }
 
-        // Parse items like "Sessel (3), Tisch (Spieler -1)"
-        const items = this._parseItems(rawValue);
-        const inventory = GlobalStateManager.getInstance().getInventory();
+        const items = InventoryService.parseInventoryString(rawValue);
         items.forEach(item => {
+            const validation = InventoryService.validateAvailability(item.name, item.quantity);
             const tag = document.createElement('span');
-            const invRow = inventory.find(r => (r.data?.name || '').toLowerCase() === item.name.toLowerCase());
-            const invQuantity = invRow ? parseInt(invRow.data?.quantity || 0, 10) : 0;
-            const requestedNum = parseInt(item.quantity || 0, 10);
-
-            let statusClass = 'available';
-            if (!invRow) {
-                statusClass = 'unavailable';
-            } else if (!isNaN(requestedNum) && requestedNum > invQuantity) {
-                statusClass = 'warning';
-            }
-
-            tag.className = `inventory-tag ${statusClass}`;
+            tag.className = `inventory-tag ${validation.status}`;
             tag.textContent = item.quantity ? `${item.name} (${item.quantity})` : item.name;
             this.contentWrap.appendChild(tag);
         });
     }
 
-    _parseItems(rawValue) {
-        if (!rawValue || rawValue === '—') return [];
-        return rawValue.split(',').map(s => {
-            const match = s.match(/(.+?)\s*\((.+?)\)/);
-            if (match) {
-                return { name: match[1].trim(), quantity: match[2].trim() };
-            }
-            return { name: s.trim(), quantity: '' };
-        }).filter(item => item.name);
-    }
+    // Helper methods moved to InventoryService ──────────────────────
+
 
     startEditing() {
         this.onEditStart?.();
@@ -53,7 +34,7 @@ export class InventoryField extends Field {
     async _showPicker() {
         const globalState = GlobalStateManager.getInstance();
         const inventory = globalState.getInventory();
-        const currentItems = this._parseItems(this.getRawValue());
+        const currentItems = InventoryService.parseInventoryString(this.getRawValue());
 
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
@@ -116,20 +97,9 @@ export class InventoryField extends Field {
                     nameCol.appendChild(errorMsg);
 
                     const updateErrors = () => {
-                        errorMsg.textContent = '';
-                        tag.className = 'inventory-tag available';
-
-                        if (!isAvailable) {
-                            errorMsg.textContent = '! Nicht im Inventar';
-                            tag.className = 'inventory-tag unavailable';
-                        } else {
-                            const val = (item.quantity || '').toString().trim();
-                            const requested = parseInt(val, 10);
-                            if (val && !isNaN(requested) && requested > invQuantityAvailable) {
-                                errorMsg.textContent = '! Nicht genug im Inventar';
-                                tag.className = 'inventory-tag warning';
-                            }
-                        }
+                        const validation = InventoryService.validateAvailability(item.name, item.quantity);
+                        errorMsg.textContent = validation.message;
+                        tag.className = `inventory-tag ${validation.status}`;
                     };
 
                     row.appendChild(nameCol);
@@ -294,9 +264,7 @@ export class InventoryField extends Field {
             overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
             cancelBtn.onclick = () => overlay.remove();
             saveBtn.onclick = () => {
-                const newVal = internalSelected
-                    .map(i => i.quantity ? `${i.name} (${i.quantity})` : i.name)
-                    .join(', ') || '—';
+                const newVal = InventoryService.formatInventoryString(internalSelected);
                 this.onChange?.(this.colDef.id, newVal);
                 this.value = newVal;
                 this.updateDisplay();

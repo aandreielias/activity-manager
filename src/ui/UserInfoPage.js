@@ -3,47 +3,51 @@ import { UserStatsService } from '../services/UserStatsService.js';
 import { GlobalStateManager } from '../core/GlobalStateManager.js';
 import { DataService } from '../services/DataService.js';
 import { AuthService } from '../services/AuthService.js';
+import { PermissionService } from '../services/PermissionService.js';
 import { Dialog } from './Dialog.js';
 
 /**
- * UserInfoPage - Clean Administrative Dashboard
- * Perfectly aligned with the application's design system.
+ * UserInfoPage - Centralized Administrative Dashboard.
+ * Manages users, statistics, and fine-grained permissions.
  */
 export class UserInfoPage {
     static async show(peopleData, tableConfigs) {
-        if (window.__userInfoOverlayActive || document.querySelector('.user-info-overlay')) return;
-        window.__userInfoOverlayActive = true;
+        // Purely DOM-driven check for robustness
+        if (document.querySelector('.user-info-overlay')) return;
 
         return new Promise(async (resolve) => {
             const overlay = document.createElement('div');
             overlay.className = 'user-info-overlay';
             document.body.appendChild(overlay);
 
-            // Close function that resets the flag
             const close = () => {
-                window.__userInfoOverlayActive = false;
-                document.body.removeChild(overlay);
+                if (overlay.parentNode) document.body.removeChild(overlay);
                 resolve();
             };
 
             const dialog = document.createElement('div');
             dialog.className = 'user-info-dialog';
-            dialog.innerHTML = '<div class="empty-state">Lade Nutzer-Daten...</div>';
+            dialog.innerHTML = '<div class="empty-state-large">Lade Nutzer-Daten...</div>';
             overlay.appendChild(dialog);
 
-            const stats = await UserStatsService.getStats();
+            let stats = {};
+            try {
+                stats = await UserStatsService.getStats();
+            } catch (e) {
+                console.error('[UserInfoPage] Failed to load stats:', e);
+            }
             dialog.innerHTML = '';
 
-            const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
             const globalState = GlobalStateManager.getInstance();
             const isSuperAdmin = globalState.isSuperAdmin();
-            const canSeeStats = globalState.canSeeStats();
-            const canSeePermissions = globalState.canSeePermissions();
 
             const header = document.createElement('div');
             header.className = 'user-info-header';
             header.innerHTML = `
-                <h2>Nutzer-Verwaltung</h2>
+                <div class="user-info-title-area">
+                    <h2>Nutzer-Verwaltung</h2>
+                    <p>Statistiken und Berechtigungen verwalten</p>
+                </div>
                 <div class="user-info-selection">
                     <select class="user-select-dropdown">
                         <option value="" disabled selected>Nutzer auswählen...</option>
@@ -55,17 +59,19 @@ export class UserInfoPage {
                             }).join('')}
                     </select>
                 </div>
-                <button class="close-info-btn">Schließen</button>
+                <div class="user-info-header-actions">
+                    <button class="close-info-btn" aria-label="Schließen">✕</button>
+                </div>
             `;
             dialog.appendChild(header);
 
             const content = document.createElement('div');
             content.className = 'user-info-content';
             content.innerHTML = `
-                <div class="empty-state">
-                    <p style="font-size: 14px; color: var(--text-muted);">
-                        Wählen Sie einen Nutzer aus, um Statistiken und Berechtigungen anzuzeigen.
-                    </p>
+                <div class="empty-state-large">
+                    <div class="empty-state-icon">👤</div>
+                    <h3>Kein Nutzer ausgewählt</h3>
+                    <p>Wählen Sie oben einen Nutzer aus, um dessen Profil zu bearbeiten.</p>
                 </div>
             `;
             dialog.appendChild(content);
@@ -75,228 +81,330 @@ export class UserInfoPage {
                 const selectedName = e.target.value;
                 const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === selectedName);
                 if (person) {
-                    this._renderUserProfile(content, person, stats[selectedName] || {}, permissionsMap, tableConfigs, isSuperAdmin, canSeeStats, canSeePermissions, peopleData);
+                    this._renderUserProfile(content, person, stats[selectedName] || {}, tableConfigs, peopleData);
                 }
             };
 
             const closeBtn = header.querySelector('.close-info-btn');
             closeBtn.onclick = close;
-
             overlay.onclick = (e) => { if (e.target === overlay) close(); };
         });
     }
 
-    static _renderUserProfile(container, person, userStat, permissionsMap, tableConfigs, isSuperAdmin, canSeeStats, canSeePermissions, peopleData) {
+    static _renderUserProfile(container, person, userStat, tableConfigs, peopleData) {
+        const globalState = GlobalStateManager.getInstance();
         const name = `${person.vorname || ''} ${person.nachname || ''}`.trim();
-        const targetIsSuperAdmin = (person.role || '').toLowerCase() === 'superadmin';
+        
+        // Load fresh permissions map
+        const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
+        const userPerm = permissionsMap[name] || PermissionService.getDefaultPermissions();
 
-        if (targetIsSuperAdmin && !isSuperAdmin) {
-            container.innerHTML = `<div class="empty-state"><p>Zugriff verweigert: Sie können keine Superadmins verwalten.</p></div>`;
-            return;
-        }
-
-        const userPerm = permissionsMap[name] || { type: 'except_people', canManageUsers: false, managementAccess: 'none' };
-
-        const winRate = (userStat.blackjackWins + userStat.blackjackLosses) > 0
-            ? Math.round((userStat.blackjackWins / (userStat.blackjackWins + userStat.blackjackLosses)) * 100)
-            : 0;
-
-        const topCategory = this._getTopCategory(userStat.categoryHits);
-        const activityLevel = this._getActivityLevel(userStat.lastLogin);
+        const activityLevel = userStat.activityLevel || 'Idle';
         const lastLoginStr = userStat.lastLogin ? new Date(userStat.lastLogin).toLocaleDateString('de-DE') : 'N/A';
 
         container.innerHTML = `
             <div class="user-profile-view">
-                <div class="profile-hero">
+                <!-- Profile Header -->
+                <div class="profile-card hero-card">
                     <div class="hero-avatar">${(person.vorname || '?')[0].toUpperCase()}</div>
-                    <div class="hero-info">
+                    <div class="hero-details">
                         <h3>${name}</h3>
-                        <div class="hero-meta">
-                            <span class="status-aktiv" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; ${activityLevel === 'Idle' ? 'background: var(--bg-tertiary); color: var(--text-muted);' : ''}">${activityLevel}</span>
-                            <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">${person.role || 'Nutzer'}</span>
+                        <div class="hero-badges">
+                            <span class="badge role-badge">${person.role || 'Nutzer'}</span>
+                            <span class="badge status-badge ${activityLevel.toLowerCase()}">${activityLevel}</span>
                         </div>
                     </div>
                 </div>
 
-                ${canSeeStats ? `
-                <div class="stats-grid">
-                    <div class="stat-tile"><span class="tile-label">Einträge</span><span class="tile-val">${userStat.entryCount || 0}</span></div>
-                    <div class="stat-tile"><span class="tile-label">Favoriten</span><span class="tile-val" style="color:var(--accent);">${userStat.favoritesCount || 0}</span></div>
-                    <div class="stat-tile"><span class="tile-label">Area</span><span class="tile-val" style="color:var(--accent);">${topCategory}</span></div>
-                </div>
-                ` : ''}
-
-                ${canSeeStats ? `
-                <div class="blackjack-minimal-bar">
-                    <span class="bj-min-title">Aktivität-Details</span>
-                    <div class="bj-min-stats">
-                        <div class="bj-min-item">Zul.: <b>${lastLoginStr}</b></div>
-                        <div class="bj-min-item winrate-stat">Win: <b style="color: ${winRate > 50 ? 'var(--success)' : ''}">${winRate}%</b>
-                            <div class="winrate-tooltip">
-                                <span class="tooltip-title">Spieldaten</span>
-                                <div class="tooltip-row">Wins: <b>${userStat.blackjackWins || 0}</b></div>
-                                <div class="tooltip-row">Losses: <b>${userStat.blackjackLosses || 0}</b></div>
-                                <div class="tooltip-row">Pushes: <b>${userStat.blackjackPushes || 0}</b></div>
-                            </div>
+                <!-- Statistics Section -->
+                <div class="profile-section">
+                    <div class="section-header"><h4>Aktivitäts-Statistiken</h4></div>
+                    <div class="stats-grid-modern">
+                        <div class="stat-card">
+                            <span class="stat-label">Einträge</span>
+                            <span class="stat-value">${userStat.entryCount || 0}</span>
                         </div>
-                        <div class="bj-min-item">Streak: <b>${userStat.blackjackHighestStreak || 0}</b></div>
-                        ${isSuperAdmin ? `<button class="reset-game-btn" title="Statistik zurücksetzen">↺</button>` : ''}
+                        <div class="stat-card">
+                            <span class="stat-label">Favoriten</span>
+                            <span class="stat-value highlight">${userStat.favoritesCount || 0}</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Hauptbereich</span>
+                            <span class="stat-value highlight">${userStat.topCategory || 'N/A'}</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Letzter Login</span>
+                            <span class="stat-value">${lastLoginStr}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="blackjack-stats-bar">
+                        <div class="bj-metric">Winrate (BJ): <b>${userStat.winRate || 0}%</b></div>
+                        <div class="bj-metric">Streak: <b>${userStat.blackjackHighestStreak || 0}</b></div>
+                        <div class="bj-metric">Wins: <b>${userStat.wins || 0}</b></div>
+                        <div class="bj-metric">Losses: <b>${userStat.losses || 0}</b></div>
+                        <div class="bj-metric">Blackjacks: <b>${userStat.blackjacks || 0}</b></div>
+                        ${globalState.isSuperAdmin() ? `<button class="action-btn-small reset-stats-btn" title="Alle Statistiken zurücksetzen">↺ Reset</button>` : ''}
                     </div>
                 </div>
-                ` : ''}
 
-                <div class="admin-settings-container">
-                    ${isSuperAdmin ? `
-                    <div class="admin-pane">
-                        <h4>System-Privilegien</h4>
-                        <div class="mgmt-field">
-                            <label>Dashboard Zugriff</label>
-                            <select class="management-access-select">
+                <!-- Settings & Permissions -->
+                ${globalState.canManagePermissions() ? `
+                <div class="profile-section settings-section">
+                    <div class="section-header"><h4>Rechte & Rollen</h4></div>
+                    
+                    <div class="settings-grid">
+                        <!-- Management Access Card -->
+                        <div class="settings-card">
+                            <h5>Dashboard Zugriff</h5>
+                            <p class="settings-desc">Bestimmt, welche Administrations-Tools dieser Nutzer sehen kann.</p>
+                            <select class="mgmt-select-modern" ${person.role === 'Superadmin' ? 'disabled' : ''}>
                                 <option value="none" ${userPerm.managementAccess === 'none' ? 'selected' : ''}>Kein Zugriff</option>
                                 <option value="stats_only" ${userPerm.managementAccess === 'stats_only' ? 'selected' : ''}>Nur Statistiken</option>
                                 <option value="stats_perms" ${userPerm.managementAccess === 'stats_perms' ? 'selected' : ''}>Stats & Berechtigungen</option>
                             </select>
+                            
+                            <div class="admin-role-toggle">
+                                <span>Administrator-Status</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" class="admin-role-cb" ${person.role === 'Admin' ? 'checked' : ''} ${person.role === 'Superadmin' ? 'disabled' : ''}>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
                         </div>
-                        <div class="roles-box">
-                            <span>Administrator</span>
-                            <label class="switch">
-                                <input type="checkbox" class="admin-toggle-cb" ${person.role === 'Admin' ? 'checked' : ''}>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    ` : ''}
 
-                    ${canSeePermissions ? `
-                    <div class="admin-pane">
-                        <h4>Berechtigungen</h4>
-                        <div class="perm-controls">
-                            <button class="permission-readonly-toggle ${userPerm.type === 'readonly' ? 'active' : ''}">Read-Only</button>
-                            <select class="permission-type-select" style="display: ${userPerm.type === 'readonly' ? 'none' : 'block'}">
-                                <option value="all" ${userPerm.type === 'all' ? 'selected' : ''}>Voller Zugriff</option>
-                                <option value="except_people" ${userPerm.type === 'except_people' ? 'selected' : ''}>Außer Personen</option>
-                                <option value="except_inventory" ${userPerm.type === 'except_inventory' ? 'selected' : ''}>Außer Inventar</option>
-                                <option value="specific" ${userPerm.type === 'specific' ? 'selected' : ''}>Spezifisch...</option>
-                            </select>
-                        </div>
-                        <div class="specific-tables-grid" style="display: ${ (userPerm.type === 'readonly' || userPerm.type === 'specific') ? 'grid' : 'none'};">
-                            ${this._renderTableCheckboxes(tableConfigs, userPerm)}
+                        <!-- Permission Preset Card -->
+                        <div class="settings-card">
+                            <h5>Zugriffs-Profil</h5>
+                            <p class="settings-desc">Vordefinierte Berechtigungs-Schemas für schnelles Zuweisen.</p>
+                            <div class="permission-presets">
+                                <button class="preset-btn ${userPerm.type === 'readonly' ? 'active' : ''}" data-type="readonly" ${person.role === 'Superadmin' ? 'disabled' : ''}>Lese-Schutz</button>
+                                <button class="preset-btn ${userPerm.type === 'except_people' ? 'active' : ''}" data-type="except_people" ${person.role === 'Superadmin' ? 'disabled' : ''}>Ohne Personen</button>
+                                <button class="preset-btn ${userPerm.type === 'except_inventory' ? 'active' : ''}" data-type="except_inventory" ${person.role === 'Superadmin' ? 'disabled' : ''}>Ohne Inventar</button>
+                                <button class="preset-btn ${userPerm.type === 'all' ? 'active' : ''}" data-type="all" ${person.role === 'Superadmin' ? 'disabled' : ''}>Vollzugriff</button>
+                                <button class="preset-btn ${userPerm.type === 'specific' ? 'active' : ''}" data-type="specific" ${person.role === 'Superadmin' ? 'disabled' : ''}>Manuell</button>
+                            </div>
                         </div>
                     </div>
-                    ` : ''}
-                </div>
+
+                    <!-- Fine-grained Table Permissions -->
+                    <div class="table-permissions-area" style="display: ${ (userPerm.type === 'specific' || userPerm.type === 'readonly') ? 'block' : 'none'};">
+                        <h5>Tabellen-Berechtigungen</h5>
+                        <div class="table-groups-container">
+                            ${this._renderTableGroups(tableConfigs, userPerm)}
+                        </div>
+                    </div>
+                </div>` : ''}
             </div>
         `;
 
-        this._attachProfileListeners(container, name, userPerm, permissionsMap, peopleData, canSeePermissions, isSuperAdmin, tableConfigs, userStat);
+        this._attachProfileListeners(container, name, userPerm, peopleData, tableConfigs, userStat);
     }
 
-    static _attachProfileListeners(container, name, userPerm, permissionsMap, peopleData, canSeePermissions, isSuperAdmin, tableConfigs, userStat) {
-        const savePerms = () => {
-            const isReadonly = container.querySelector('.permission-readonly-toggle')?.classList.contains('active');
-            let type = container.querySelector('.permission-type-select')?.value;
-            if (isReadonly) type = 'readonly';
+    static _renderTableGroups(tableConfigs, userPerm) {
+        const globalState = GlobalStateManager.getInstance();
+        const isSuperAdmin = globalState.isSuperAdmin();
 
-            const mgmtSelect = container.querySelector('.management-access-select');
+        const groups = {
+            'System': [
+                { id: 'people_table', label: 'Personen (Split)' },
+                { id: 'tbl_people', label: 'Personen (Haupt)' },
+                { id: 'tbl_inventory', label: 'Inventar' }
+            ],
+            'Aktivitäten': tableConfigs.filter(t => t.category === 'spiele' && !['tbl_people', 'tbl_inventory'].includes(t.id)).map(t => ({ id: t.id, label: t.title })),
+            'Sportarten': tableConfigs.filter(t => t.category === 'sportarten').map(t => ({ id: t.id, label: t.title })),
+            ...this._getCustomGroups(tableConfigs)
+        };
+
+        let html = '';
+        Object.entries(groups).filter(([_, items]) => items.length > 0).forEach(([name, items]) => {
+            html += `
+                <div class="permission-group-card">
+                    <div class="group-header">
+                        <h6>${name}</h6>
+                        <div class="group-actions">
+                            <button class="group-select-all" data-group="${name}" data-mode="view">Sicht</button>
+                            <button class="group-select-all" data-group="${name}" data-mode="edit">Edit</button>
+                        </div>
+                    </div>
+                    <div class="group-rows">
+                        ${items.map(t => {
+                            const viewChecked = Array.isArray(userPerm.viewTables) ? userPerm.viewTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+                            const editChecked = Array.isArray(userPerm.editTables) ? userPerm.editTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+                            
+                            return `
+                                <div class="table-perm-row">
+                                    <span class="table-perm-label">${t.label}</span>
+                                    <div class="table-perm-checks">
+                                        <label class="compact-checkbox" title="Sichtbar">
+                                            <input type="checkbox" class="cb-view" value="${t.id}" ${viewChecked ? 'checked' : ''} data-group="${name}">
+                                            <span class="box"></span>
+                                        </label>
+                                        <label class="compact-checkbox" title="Editierbar">
+                                            <input type="checkbox" class="cb-edit" value="${t.id}" ${editChecked ? 'checked' : ''} data-group="${name}">
+                                            <span class="box"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                        
+                        ${(name === 'System' && isSuperAdmin) ? `
+                            <div class="table-perm-row special-perm-row">
+                                <span class="table-perm-label">Rollen bearbeiten (Admin+)</span>
+                                <div class="table-perm-checks">
+                                    <label class="compact-checkbox" title="Edit Roles">
+                                        <input type="checkbox" class="cb-role-edit" ${userPerm.canEditRoles ? 'checked' : ''}>
+                                        <span class="box"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="table-perm-row special-perm-row">
+                                <span class="table-perm-label">Edit-Modus berechtigen</span>
+                                <div class="table-perm-checks">
+                                    <label class="compact-checkbox" title="Edit Mode">
+                                        <input type="checkbox" class="cb-edit-mode-allow" ${userPerm.canUseEditMode ? 'checked' : ''}>
+                                        <span class="box"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        return html;
+    }
+
+    static _getCustomGroups(tableConfigs) {
+        const other = tableConfigs.filter(t => !['spiele', 'sportarten'].includes(t.category) && !['tbl_people', 'tbl_inventory'].includes(t.id));
+        return other.length > 0 ? { 'Sonstige': other.map(t => ({ id: t.id, label: t.title })) } : {};
+    }
+
+    static _attachProfileListeners(container, name, userPerm, peopleData, tableConfigs, userStat) {
+        const isSuperAdmin = GlobalStateManager.getInstance().isSuperAdmin();
+
+        const save = (overridePerms = null) => {
+            const activePreset = container.querySelector('.preset-btn.active');
+            const type = activePreset ? activePreset.dataset.type : userPerm.type;
+            
+            const mgmtSelect = container.querySelector('.mgmt-select-modern');
             const managementAccess = mgmtSelect ? mgmtSelect.value : (userPerm.managementAccess || 'none');
             const canManage = (managementAccess === 'stats_only' || managementAccess === 'stats_perms');
 
-            const tables = [];
-            container.querySelectorAll('.specific-tables-grid input:checked').forEach(cb => tables.push(cb.value));
+            const viewTables = [];
+            container.querySelectorAll('.cb-view:checked').forEach(cb => viewTables.push(cb.value));
+            
+            const editTables = [];
+            container.querySelectorAll('.cb-edit:checked').forEach(cb => editTables.push(cb.value));
 
-            const newPerms = { type: type || userPerm.type, tables, canManageUsers: canManage, managementAccess };
+            const roleEditCb = container.querySelector('.cb-role-edit');
+            const canEditRoles = roleEditCb ? roleEditCb.checked : (userPerm.canEditRoles || false);
+
+            const editModeCb = container.querySelector('.cb-edit-mode-allow');
+            const canUseEditMode = editModeCb ? editModeCb.checked : (userPerm.canUseEditMode || false);
+
+            const newPerms = overridePerms || { type, viewTables, editTables, canManageUsers: canManage, managementAccess, canEditRoles, canUseEditMode };
             AuthService.savePermissions(name, newPerms);
+            
+            // Show feedback
+            const saveIndicator = document.createElement('div');
+            saveIndicator.className = 'save-indicator-toast';
+            saveIndicator.textContent = 'Gespeichert';
+            document.body.appendChild(saveIndicator);
+            setTimeout(() => { if (saveIndicator.parentNode) saveIndicator.remove(); }, 2000);
         };
 
-        if (canSeePermissions) {
-            const roBtn = container.querySelector('.permission-readonly-toggle');
-            const typeSel = container.querySelector('.permission-type-select');
-            const grid = container.querySelector('.specific-tables-grid');
-
-            if (roBtn && typeSel && grid) {
-                roBtn.onclick = () => {
-                    roBtn.classList.toggle('active');
-                    typeSel.style.display = roBtn.classList.contains('active') ? 'none' : 'block';
-                    grid.style.display = (roBtn.classList.contains('active') || typeSel.value === 'specific') ? 'grid' : 'none';
-                    savePerms();
-                };
-                typeSel.onchange = () => {
-                    grid.style.display = (typeSel.value === 'specific') ? 'grid' : 'none';
-                    savePerms();
-                };
-                grid.querySelectorAll('input').forEach(cb => cb.onchange = savePerms);
-            }
-        }
-
-        if (isSuperAdmin) {
-            const ms = container.querySelector('.management-access-select');
-            if (ms) ms.onchange = savePerms;
-            const at = container.querySelector('.admin-toggle-cb');
-            if (at) at.onchange = () => {
-                const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === name);
-                if (person) {
-                    person.role = at.checked ? 'Admin' : 'User';
-                    // Save people table via the relational DataService
-                    DataService.savePeople(peopleData);
-                }
+        // Presets
+        container.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.onclick = () => {
+                container.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                const type = btn.dataset.type;
+                const grid = container.querySelector('.table-permissions-area');
+                if (grid) grid.style.display = (type === 'specific' || type === 'readonly') ? 'block' : 'none';
+                
+                save();
             };
+        });
 
-            const resetBtn = container.querySelector('.reset-game-btn');
-            if (resetBtn) {
-                resetBtn.onclick = async () => {
-                    const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === name);
-                    if (!person) return;
-                    
-                    const confirmed = await Dialog.confirm({
-                        message: `Soll die Spiel-Statistik für ${name} wirklich zurückgesetzt werden?`,
-                        confirmStyle: 'warning',
-                        confirmText: 'Zurücksetzen'
-                    });
+        // Group selection helpers
+        container.querySelectorAll('.group-select-all').forEach(btn => {
+            btn.onclick = () => {
+                const group = btn.dataset.group;
+                const mode = btn.dataset.mode;
+                const selector = mode === 'view' ? '.cb-view' : '.cb-edit';
+                const checkboxes = container.querySelectorAll(`${selector}[data-group="${group}"]`);
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                checkboxes.forEach(cb => cb.checked = !allChecked);
+                save();
+            };
+        });
 
-                    if (confirmed) {
-                        let userId = userStat.userId;
-                        if (!userId) {
-                            const userRecord = await AuthService.getUserByUsername(name);
-                            if (userRecord) userId = userRecord.id;
-                        }
+        // Individual checkboxes
+        container.querySelectorAll('.table-groups-container input').forEach(cb => {
+            cb.onchange = () => {
+                const row = cb.closest('.table-perm-row');
+                const viewCb = row.querySelector('.cb-view');
+                const editCb = row.querySelector('.cb-edit');
 
-                        if (userId) {
-                            await UserStatsService.resetGameStats(userId);
+                if (cb === editCb && editCb.checked) {
+                    viewCb.checked = true; // Auto-enable view if editing is enabled
+                } else if (cb === viewCb && !viewCb.checked) {
+                    editCb.checked = false; // Auto-disable editing if view is revoked
+                }
+
+                save();
+            };
+        });
+        
+        // Management access
+        const ms = container.querySelector('.mgmt-select-modern');
+        if (ms) ms.onchange = () => save();
+
+        // Admin Role toggle
+        const at = container.querySelector('.admin-role-cb');
+        if (at) at.onchange = async () => {
+            const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === name);
+            if (person) {
+                person.role = at.checked ? 'Admin' : 'User';
+                await DataService.savePeople(peopleData);
+                
+                // Automatically apply new role default permissions
+                const newPerms = PermissionService.getPermissionsForRole(person.role);
+                save(newPerms);
+                
+                // Refresh heart badge in UI
+                container.querySelector('.role-badge').textContent = person.role;
+                
+                // Re-render UI to reflect automatic preset change
+                this._renderUserProfile(container, person, userStat, tableConfigs, peopleData);
+            }
+        };
+
+        // Stats Reset
+        const resetBtn = container.querySelector('.reset-stats-btn');
+        if (resetBtn) {
+            resetBtn.onclick = async () => {
+                const confirmed = await Dialog.confirm({ 
+                    message: `Alle Statistiken für ${name} wirklich auf Null setzen?`,
+                    confirmStyle: 'warning',
+                    confirmText: 'Reset'
+                });
+                if (confirmed) {
+                    let userId = userStat.userId || (await AuthService.getUserByUsername(name))?.id;
+                    if (userId) {
+                        try {
+                            await UserStatsService.resetAllStats(userId);
                             const newStats = await UserStatsService.getStats();
-                            this._renderUserProfile(container, person, newStats[name] || {}, permissionsMap, tableConfigs, isSuperAdmin, true, true, peopleData);
-                        } else {
-                            alert('Nutzer-Daten konnten nicht gefunden werden. Ggf. hat dieser Nutzer noch nie Blackjack gespielt.');
+                            this._renderUserProfile(container, peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === name), newStats[name] || {}, tableConfigs, peopleData);
+                        } catch (err) {
+                            console.error('[UserInfoPage] Reset failed:', err);
                         }
                     }
-                };
-            }
+                }
+            };
         }
-    }
-
-    static _getActivityLevel(lastLogin) {
-        if (!lastLogin) return 'Idle';
-        const diffDays = (new Date() - new Date(lastLogin)) / (1000 * 60 * 60 * 24);
-        return diffDays < 2 ? 'Aktiv' : (diffDays < 7 ? 'Kürzlich' : 'Idle');
-    }
-
-    static _getTopCategory(hits) {
-        if (!hits || Object.keys(hits).length === 0) return 'N/A';
-        let top = 'N/A', max = 0;
-        Object.entries(hits).forEach(([cat, val]) => { if (val > max) { max = val; top = cat.charAt(0).toUpperCase() + cat.slice(1); } });
-        return top;
-    }
-
-    static _renderTableCheckboxes(tableConfigs, userPerm) {
-        const tables = [
-            { id: 'people_table', label: 'Personen (Split)' },
-            { id: 'tbl_people', label: 'Personen (Haupt)' },
-            { id: 'tbl_inventory', label: 'Inventar' },
-            ...tableConfigs.filter(t => !['tbl_people', 'tbl_inventory'].includes(t.id)).map(t => ({ id: t.id, label: t.title }))
-        ];
-
-        return tables.map(t => {
-            const checked = (userPerm.type === 'specific' || userPerm.type === 'readonly') && Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id);
-            return `<label class="perm-checkbox"><input type="checkbox" value="${t.id}" ${checked ? 'checked' : ''}><span>${t.label}</span></label>`;
-        }).join('');
     }
 }

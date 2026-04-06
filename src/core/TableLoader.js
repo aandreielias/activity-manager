@@ -14,6 +14,7 @@ export class TableLoader {
         const tablesConfig = await tablesRes.json();
 
         const tables = {};
+        const allGames = [];
 
         for (const config of tablesConfig) {
             try {
@@ -21,6 +22,10 @@ export class TableLoader {
                 const data = await DataService.loadRows(config.id);
 
                 const table = this._createTableInstance(config, data, peopleData);
+
+                if (config.category === 'spiele') {
+                    allGames.push(...data);
+                }
 
                 tables[config.id] = {
                     config,
@@ -35,6 +40,15 @@ export class TableLoader {
             }
         }
 
+        // Post-processing to link games to events
+        if (tables['tbl_events']) {
+            const gamesCol = tables['tbl_events'].instance.schema.find(c => c.id === 'games');
+            if (gamesCol) {
+                // Remove duplicates and map to simple names
+                gamesCol.availableTags = [...new Set(allGames.map(g => g.name))].sort();
+            }
+        }
+ 
         return tables;
     }
 
@@ -48,14 +62,16 @@ export class TableLoader {
             options: col.options || [],
         }));
 
-        // Dynamic responsible options replacement
         if (config.category === 'spiele' && peopleData?.length > 0) {
             const respCol = schema.find(c => c.id === 'responsible');
             if (respCol) {
-                respCol.options = peopleData.map(p => ({
-                    label: `${p.vorname} ${(p.nachname || '').charAt(0)}.`,
-                    value: p.id,
-                }));
+                // Filter out inactive members so they cannot be assigned new responsibility
+                respCol.options = peopleData
+                    .filter(p => (p.Status || '').toLowerCase() !== 'inaktiv')
+                    .map(p => ({
+                        label: `${p.vorname} ${(p.nachname || '').charAt(0)}.`,
+                        value: p.id,
+                    }));
             }
         }
 

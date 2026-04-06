@@ -1,8 +1,9 @@
 import { GlobalStateManager } from '../GlobalStateManager.js';
 
 export class Field {
-    constructor({ rowId, colDef, value, peopleData, tableId, onChange, onEditStart, onTab }) {
+    constructor({ rowId, rowData, colDef, value, peopleData, tableId, onChange, onEditStart, onTab }) {
         this.rowId = rowId;
+        this.rowData = rowData;
         this.colDef = colDef;
         this.value = value;
         this.peopleData = peopleData;
@@ -41,8 +42,21 @@ export class Field {
 
     updateDisplay() {
         if (this.contentWrap) {
-            this.contentWrap.textContent = this.getDisplayValue();
+            const val = this.getDisplayValue();
+            if (this._isLink(val)) {
+                const trimmed = val.trim();
+                const href = trimmed.toLowerCase().startsWith('www.') ? `https://${trimmed}` : trimmed;
+                this.contentWrap.innerHTML = `<a href="${href}" target="_blank" rel="noopener noreferrer" class="cell-link">${val}</a>`;
+            } else {
+                this.contentWrap.textContent = val;
+            }
         }
+    }
+
+    _isLink(val) {
+        if (!val || typeof val !== 'string' || val === '—') return false;
+        const v = val.trim().toLowerCase();
+        return v.startsWith('http://') || v.startsWith('https://') || v.startsWith('www.');
     }
 
     attachCellListeners() {
@@ -50,7 +64,8 @@ export class Field {
         this.td.addEventListener('dblclick', (e) => this.onDoubleClick(e));
     }
 
-    onClick() {
+    onClick(e) {
+        if (e.target.tagName === 'A') return;
         if (this.td.classList.contains('editing')) return;
         const isExpanded = this.td.classList.contains('expanded');
         document.querySelectorAll('.data-cell.expanded')

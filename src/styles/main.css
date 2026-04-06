@@ -99,7 +99,7 @@ html, body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 24px 32px;
+    padding: 20px 24px;
 }
 
 .tables-scroll-container {
@@ -179,7 +179,6 @@ html, body {
 
 /* ── Extracted Layout Classes from main.js ──────────── */
 .layout-row {
-    padding: 28px;
     display: flex !important;
     flex-direction: row !important;
     gap: 0;
@@ -217,20 +216,21 @@ html, body {
 }
 
 .persons-split-container {
-    flex: 0 0 50%;
+    flex: 1;
     border-left: 1px solid var(--border-light);
     padding-left: 20px;
     overflow-y: auto;
     display: none;
     flex-direction: column;
-    gap: 0;
-    min-width: 300px;
+    gap: 20px;
+    min-width: 0;
 }
 
 .persons-split-container.full-view {
     flex: 1;
     border-left: none;
-    padding-left: 0;
+    padding: 0;
+    width: 100%;
 }
 
 .table-view-wrapper {
@@ -238,6 +238,7 @@ html, body {
 }
 
 .persons-table-full {
+    width: 100%;
     flex: 0 0 auto;
 }
 

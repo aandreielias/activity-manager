@@ -665,15 +665,44 @@
         "type": "enum",
         "accepts": [],
         "options": [
-          "aktiv",
-          "inaktiv"
+          "Aktiv",
+          "Inaktiv"
         ]
       },
       {
         "id": "role",
         "label": "Rolle",
-        "type": "text",
-        "accepts": []
+        "type": "enum",
+        "options": [
+          "Superadmin",
+          "Admin",
+          "Supervisor",
+          "User"
+        ]
+      },
+      {
+        "id": "responsibility_1",
+        "label": "Verantwortlich 1",
+        "type": "enum",
+        "options": [
+          "Gruppenspiele",
+          "Zwischendurch",
+          "Icebreaker",
+          "Sport",
+          "Sonstige"
+        ]
+      },
+      {
+        "id": "responsibility_2",
+        "label": "Verantwortlich 2",
+        "type": "enum",
+        "options": [
+          "Gruppenspiele",
+          "Zwischendurch",
+          "Icebreaker",
+          "Sport",
+          "Sonstige"
+        ]
       },
       {
         "id": "Spez. Zuständigkeit",

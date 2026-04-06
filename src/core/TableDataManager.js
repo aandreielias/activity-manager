@@ -12,11 +12,16 @@ export class TableDataManager {
 
     addEmptyRow() {
         const id = this._generateId();
+        const defaults = { ...(this.table.tableConfig?.defaultRowData || {}) };
+        if (defaults.date === 'TODAY_PLACEHOLDER') {
+            defaults.date = new Date().toISOString().split('T')[0];
+        }
+
         const data = {
             id,
             createdBy: GlobalStateManager.getInstance().getCurrentUser(),
             createdAt: new Date().toISOString(),
-            ...(this.table.tableConfig?.defaultRowData || {})
+            ...defaults
         };
 
         this.table.schema.forEach(col => {
@@ -27,8 +32,8 @@ export class TableDataManager {
 
         const row = new Row({ id, data, schema: this.table.schema, peopleData: this.table.peopleData, tableId: this.table.id });
         row.setCallbacks({
-            onEditStart: () => this.table.editor.showSaveBar(),
-            onEditChange: () => this.table.editor.showSaveBar(),
+            onEditStart: () => this.table.editor.showUnsavedChange(),
+            onEditChange: () => this.table.editor.showUnsavedChange(),
             onDelete: (rowId) => this.removeRow(rowId),
         });
 
@@ -48,26 +53,36 @@ export class TableDataManager {
         const addTr = this.table._tbody.querySelector('.add-row-tr');
         this.table._tbody.insertBefore(row.render(), addTr);
         this.table.renderer.updateMeta();
-        this.table.editor.showSaveBar();
+        this.table.editor.showUnsavedChange();
     }
 
     addRow(rowData) {
+        if (!rowData.id) rowData.id = this._generateId();
         const row = new Row({ id: rowData.id, data: rowData, schema: this.table.schema, peopleData: this.table.peopleData, tableId: this.table.id });
         row.setCallbacks({
-            onEditStart: () => this.table.editor.showSaveBar(),
-            onEditChange: () => this.table.editor.showSaveBar(),
+            onEditStart: () => this.table.editor.showUnsavedChange(),
+            onEditChange: () => this.table.editor.showUnsavedChange(),
             onDelete: (rowId) => this.removeRow(rowId),
         });
 
         this.table.rows.push(row);
-        this.table.renderer.element?.querySelector('tbody')?.appendChild(row.render());
+        
+        const addTr = this.table._tbody?.querySelector('.add-row-tr');
+        if (addTr) {
+            this.table._tbody.insertBefore(row.render(), addTr);
+        } else {
+            this.table.renderer.element?.querySelector('tbody')?.appendChild(row.render());
+        }
+
         this.table.renderer.updateMeta();
+        this.table.editor.showUnsavedChange();
+        return row;
     }
 
     removeRow(id) {
         this.table.rows = this.table.rows.filter(r => r.id !== id);
         this.table.renderer.element?.querySelector(`[data-row-id="${id}"]`)?.remove();
         this.table.renderer.updateMeta();
-        this.table.editor.showSaveBar();
+        this.table.editor.showUnsavedChange();
     }
 }

@@ -7,34 +7,60 @@ import { LinkField } from './LinkField.js';
 import { InventoryField } from './InventoryField.js';
 import { TagField } from './TagField.js';
 
+import { DateField } from './DateField.js';
+import { TimeField } from './TimeField.js';
+import { LocationField } from './LocationField.js';
+
 export class FieldFactory {
-    static createField(config) {
-        const { colDef } = config;
+    static fields = {
+        number: NumberField,
+        enum: EnumField,
+        tag: TagField,
+        text: TextField,
+        date: DateField
+    };
+
+    static createField(params) {
+        const { colDef, tableId } = params;
         
         // Handle specific known columns that require customized logic
         switch (colDef.id) {
+            case 'location':
+                if (tableId === 'tbl_events') {
+                    return new LocationField(params);
+                }
+                break;
+            case 'address':
+                if (tableId.startsWith('tbl_sport_')) {
+                    return new LocationField(params);
+                }
+                break;
             case 'responsible':
-                return new PersonField(config);
+                return new PersonField(params);
             case 'Status':
-                return new StatusField(config);
+                return new StatusField(params);
             case 'link':
-                return new LinkField(config);
+                return new LinkField(params);
             case 'required_items':
-                return new InventoryField(config);
+                return new InventoryField(params);
             case 'Team':
-                return new TagField(config);
+                return new TagField(params);
         }
 
         // Fallback to general data structures
         switch (colDef.type) {
             case 'number':
-                return new NumberField(config);
+                return new NumberField(params);
             case 'enum':
-                return new EnumField(config);
+                return new EnumField(params);
             case 'tag':
-                return new TagField(config);
+                return new TagField(params);
+            case 'date':
+                return new DateField(params);
+            case 'time':
+                return new TimeField(params);
             default:
-                return new TextField(config);
+                return new TextField(params);
         }
     }
 }

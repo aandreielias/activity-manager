@@ -330,6 +330,58 @@ body.favorites-active .data-table tbody tr:not([data-favorite="true"]):not(.add-
   background-position: right 12px center;
 }
 
+/* ── Date/Time Editors ───────────────────────────── */
+.date-editor-wrapper {
+  display: flex !important;
+  gap: 4px;
+  width: 100%;
+}
+
+.date-part {
+  flex: 1;
+}
+
+.time-part {
+  flex: 0 0 90px;
+}
+
+input[type="date"].cell-editor,
+input[type="datetime-local"].cell-editor,
+input[type="time"].cell-editor {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px !important;
+  font-family: inherit;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="date"].cell-editor:focus,
+input[type="datetime-local"].cell-editor:focus,
+input[type="time"].cell-editor:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent) inset !important;
+}
+
+/* Style the picker icons for dark mode */
+::-webkit-calendar-picker-indicator {
+  filter: var(--calendar-icon-filter);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
 .data-table th[class*="handle"] {
   width: 28px;
   padding: 12px 6px;
@@ -684,6 +736,43 @@ button:focus-visible {
     padding: 8px 12px;
     cursor: pointer;
     transition: background var(--transition);
+}
+
+.search-highlight-flash {
+    animation: row-flash 2.5s ease-out forwards;
+    position: relative;
+    z-index: 10;
+}
+
+.cell-highlight-flash {
+    animation: cell-flash 2.5s ease-out forwards;
+    position: relative;
+    z-index: 11;
+}
+
+@keyframes row-flash {
+    0% {
+        background-color: transparent;
+    }
+    10% {
+        background-color: var(--accent-light);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+@keyframes cell-flash {
+    0% {
+        background-color: transparent;
+    }
+    10% {
+        background-color: var(--warning-light);
+        box-shadow: inset 0 0 0 2px var(--warning);
+    }
+    100% {
+        background-color: transparent;
+    }
 }
 
 .suggestion-item:hover {

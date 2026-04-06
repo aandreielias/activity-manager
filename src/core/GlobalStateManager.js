@@ -1,287 +1,200 @@
-import { UserStatsService } from '../services/UserStatsService.js';
-import { SUPABASE_CONFIG } from '../config.js';
+import { PermissionService } from '../services/PermissionService.js';
+import { SupabaseClient } from '../services/SupabaseClient.js';
 
 /**
- * GlobalStateManager - Singleton managing application-wide state.
- * Favorites now use the relational `user_favorites` table.
+ * GlobalStateManager - Standardized state management.
+ * Follows the Singleton pattern to ensure a consistent application state.
  */
 export class GlobalStateManager {
     static #instance = null;
 
+    #currentUser = null;
+    #currentRole = null;
+    #currentUserId = null;
+    #permissions = null;
+    #favorites = [];
+    #inventory = [];
+    #unsavedTableIds = new Set();
+    #onUnsavedChange = null;
+    #favoritesFilterActive = false;
+
     constructor() {
-        if (GlobalStateManager.#instance) {
-            return GlobalStateManager.#instance;
-        }
-
-        // State properties
-        this.currentUser = 'user_1';
-        this.currentUserId = null; // UUID from the users table
-        this.userRole = 'user';
-        this.permissions = { type: 'readonly', tables: [] };
-
-        this.unsavedTables = new Set();
-        this.inventory = [];
-        this.favorites = new Set();
-        this.favoritesFilterActive = false;
-
-        this.callbacks = {
-            onUnsavedChange: new Set()
-        };
-
+        if (GlobalStateManager.#instance) return GlobalStateManager.#instance;
         GlobalStateManager.#instance = this;
     }
 
     static getInstance() {
         if (!GlobalStateManager.#instance) {
-            new GlobalStateManager();
+            GlobalStateManager.#instance = new GlobalStateManager();
         }
         return GlobalStateManager.#instance;
     }
 
     // ── Authentication & Permissions ───────────────────────────
 
-    setCurrentUser(user, role, permissions = null) {
-        this.currentUser = user;
-        this.userRole = role;
-        this.permissions = permissions || this._getDefaultPermissions(role);
+    setCurrentUser(username, role, permissions = null) {
+        this.#currentUser = username;
+        this.#currentRole = role;
+        this.#permissions = permissions || PermissionService.getDefaultPermissions();
     }
 
-    setCurrentUserId(userId) {
-        this.currentUserId = userId;
-    }
+    setCurrentUserId(id) { this.#currentUserId = id; }
+    getCurrentUserId() { return this.#currentUserId; }
+    getCurrentUser() { return this.#currentUser; }
+    getCurrentRole() { return this.#currentRole; }
 
-    getCurrentUserId() {
-        return this.currentUserId;
-    }
+    isSuperAdmin() { return (this.#currentRole || '').toLowerCase() === 'superadmin'; }
+    isAdmin() { return (this.#currentRole || '').toLowerCase() === 'admin'; }
 
-    setPermissions(perms) {
-        this.permissions = perms;
-    }
-
-    _getDefaultPermissions(role) {
-        if (role === 'Admin' || role === 'Chef') return { type: 'all' };
-        return { type: 'except_people' };
-    }
-
-    getCurrentUser() { return this.currentUser; }
-    getUserRole() { return this.userRole; }
-    getPermissions() { return this.permissions; }
-
-    updatePermissionsFromStorage() {
-        const authUser = localStorage.getItem('auth_user');
-        if (!authUser) return;
-        const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
-        this.permissions = permissionsMap[authUser] || { type: 'all' };
-    }
-
+    /**
+     * Determines if the current user can view a specific table.
+     */
     canView(tableId) {
-        if (this.isSuperAdmin()) return true;
-
-        // 1. Check if we have specific manual overrides
-        const perms = this.permissions;
-        if (perms && perms.type) {
-            switch (perms.type) {
-                case 'all': return true;
-                case 'readonly':
-                case 'specific':
-                    return Array.isArray(perms.tables) && perms.tables.includes(tableId);
-                case 'except_people':
-                    return tableId !== 'people_table' && tableId !== 'tbl_people';
-                case 'except_inventory':
-                    return tableId !== 'tbl_inventory';
-            }
-        }
-
-        // 2. Fallback to Role-Based Defaults
-        const r = this.userRole.toLowerCase();
-        switch (tableId) {
-            case 'tbl_people':
-            case 'people_table':
-                return r === 'admin' || r === 'supervisor';
-            default:
-                return true; 
-        }
+        const context = { role: this.#currentRole, permissions: this.#permissions };
+        return PermissionService.canViewTable(tableId, context);
     }
 
+    /**
+     * Determines if the current user can edit a specific table.
+     */
     canEdit(tableId) {
-        if (this.isSuperAdmin()) return true;
-
-        // 1. Check manual overrides
-        const perms = this.permissions;
-        if (perms && perms.type) {
-            if (perms.type === 'readonly') return false;
-            switch (perms.type) {
-                case 'all': return true;
-                case 'specific':
-                    return Array.isArray(perms.tables) && perms.tables.includes(tableId);
-                case 'except_people':
-                    return !['people_table', 'tbl_people'].includes(tableId);
-                case 'except_inventory':
-                    return tableId !== 'tbl_inventory';
-            }
-        }
-
-        // 2. Fallback to Role-Based Defaults
-        const r = this.userRole.toLowerCase();
-        switch (tableId) {
-            case 'tbl_people':
-            case 'people_table':
-                return r === 'admin';
-            case 'tbl_inventory':
-                return r === 'admin' || r === 'supervisor';
-            default:
-                return true;
-        }
+        const context = { role: this.#currentRole, permissions: this.#permissions };
+        return PermissionService.canEditTable(tableId, context);
     }
 
-    canEditColumn(tableId, columnId) {
-        const r = this.userRole.toLowerCase();
-        if (r === 'superadmin') return true;
+    /**
+     * More granular column-level editing rights.
+     */
+    canEditColumn(tableId, colId) {
+        if (this.isSuperAdmin()) return true;
+        
+        // Prevent editing of metadata columns
+        if (colId === 'createdBy' || colId === 'createdAt') {
+            return false;
+        }
 
-        if ((tableId === 'tbl_people' || tableId === 'people_table') && r === 'admin') {
-            // Admin can edit everything except Role/Permissions
-            if (columnId === 'role' || columnId === 'rolle') return false;
+        // Check for specific role modification permission
+        if ((tableId === 'tbl_people' || tableId === 'people_table') && colId === 'role') {
+            const context = { role: this.#currentRole, permissions: this.#permissions };
+            if (!PermissionService.canEditRoles(context)) return false;
         }
 
         return this.canEdit(tableId);
     }
 
-    isSuperAdmin() {
-        return this.userRole.toLowerCase() === 'superadmin';
-    }
-
-    canManageUsers() {
-        const r = this.userRole.toLowerCase();
-        return r === 'superadmin' || r === 'admin';
-    }
-
+    /**
+     * Right to manage users/see stats.
+     */
     canSeeStats() {
-        const r = this.userRole.toLowerCase();
-        return r === 'superadmin' || r === 'admin' || r === 'supervisor';
-    }
-
-    canSeePermissions() {
-        if (this.isSuperAdmin()) return true;
-        return this.permissions?.managementAccess === 'stats_perms';
-    }
-
-    // ── Favorites Management (relational user_favorites table) ─
-
-    setInitialFavorites(favoriteIds) {
-        this.favorites = new Set(favoriteIds);
+        const context = { role: this.#currentRole, permissions: this.#permissions };
+        return PermissionService.canSeeStats(context);
     }
 
     /**
-     * Load favorites from the `user_favorites` table for the current user.
+     * Right to manage permissions.
      */
+    canManagePermissions() {
+        const context = { role: this.#currentRole, permissions: this.#permissions };
+        return PermissionService.canManagePermissions(context);
+    }
+
+    /**
+     * Right to use the Edit Mode.
+     */
+    canUseEditMode() {
+        const context = { role: this.#currentRole, permissions: this.#permissions };
+        return PermissionService.canUseEditMode(context);
+    }
+
+    /**
+     * Verifies if Edit Mode is applicable to a specific table for the current user.
+     */
+    canUseEditModeForTable(tableId) {
+        const context = { role: this.#currentRole, permissions: this.#permissions };
+        return PermissionService.canUseEditModeForTable(tableId, context);
+    }
+
+    updatePermissionsFromStorage() {
+        const authUser = localStorage.getItem('auth_user');
+        if (!authUser) return;
+        const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
+        this.#permissions = permissionsMap[authUser] || PermissionService.getDefaultPermissions();
+    }
+
+    // ── Favorites Management ───────────────────────────────────
+
     async loadFavorites() {
-        if (!this.currentUserId) return;
+        if (!this.#currentUserId) return;
         try {
-            const res = await fetch(
-                `${SUPABASE_CONFIG.URL}/rest/v1/user_favorites?user_id=eq.${this.currentUserId}&select=activity_id`,
-                {
-                    headers: {
-                        'apikey': SUPABASE_CONFIG.ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-                    },
-                }
-            );
+            const res = await SupabaseClient.get('user_favorites', `?user_id=eq.${this.#currentUserId}`);
             if (res.ok) {
                 const rows = await res.json();
-                this.favorites = new Set(rows.map(r => r.activity_id));
+                this.#favorites = rows.map(f => f.row_id);
             }
         } catch (e) {
-            console.error('[GlobalState] Failed to load favorites:', e);
+            console.error('[GlobalStateManager] Load favorites failed:', e);
         }
     }
 
     async toggleFavorite(rowId) {
-        const isFav = this.favorites.has(rowId);
-
-        if (isFav) {
-            this.favorites.delete(rowId);
-            // DELETE from user_favorites
-            try {
-                await fetch(
-                    `${SUPABASE_CONFIG.URL}/rest/v1/user_favorites?user_id=eq.${this.currentUserId}&activity_id=eq.${rowId}`,
-                    {
-                        method: 'DELETE',
-                        headers: {
-                            'apikey': SUPABASE_CONFIG.ANON_KEY,
-                            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-                        },
-                    }
-                );
-            } catch (e) {
-                console.error('[GlobalState] Failed to remove favorite:', e);
-            }
-        } else {
-            this.favorites.add(rowId);
-            // INSERT into user_favorites
-            try {
-                await fetch(
-                    `${SUPABASE_CONFIG.URL}/rest/v1/user_favorites`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': SUPABASE_CONFIG.ANON_KEY,
-                            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-                            'Prefer': 'resolution=merge-duplicates',
-                        },
-                        body: JSON.stringify({
-                            user_id: this.currentUserId,
-                            activity_id: rowId,
-                        }),
-                    }
-                );
-            } catch (e) {
-                console.error('[GlobalState] Failed to add favorite:', e);
-            }
-        }
-
-        // Update favorites count in user_stats
+        if (!this.#currentUserId) return;
+        const index = this.#favorites.indexOf(rowId);
         try {
-            await UserStatsService.recordFavoriteChange(this.currentUserId, this.favorites.size);
-        } catch (_) { /* best effort */ }
+            if (index === -1) {
+                this.#favorites.push(rowId);
+                await SupabaseClient.post('user_favorites', {
+                    user_id: this.#currentUserId,
+                    row_id: rowId
+                });
+            } else {
+                this.#favorites.splice(index, 1);
+                await SupabaseClient.delete('user_favorites', `?user_id=eq.${this.#currentUserId}&row_id=eq.${rowId}`);
+            }
+        } catch (e) {
+            console.error('[GlobalStateManager] Toggle favorite failed:', e);
+        }
     }
 
-    isFavorite(rowId) { return this.favorites.has(rowId); }
-    setFavoritesFilterActive(active) { this.favoritesFilterActive = active; }
-    isFavoritesFilterActive() { return this.favoritesFilterActive; }
+    isFavorite(rowId) { return this.#favorites.includes(rowId); }
 
-    // ── Unsaved Changes State ──────────────────────────────────
+    setFavoritesFilterActive(active) { this.#favoritesFilterActive = active; }
+    isFavoritesFilterActive() { return this.#favoritesFilterActive; }
+
+    // ── Unsaved Changes Tracking ──────────────────────────────
 
     markTableAsUnsaved(tableId) {
-        this.unsavedTables.add(tableId);
-        this._notifyUnsavedChange();
+        this.#unsavedTableIds.add(tableId);
+        this.#notifyUnsavedChange();
     }
 
     markTableAsSaved(tableId) {
-        this.unsavedTables.delete(tableId);
-        this._notifyUnsavedChange();
+        this.#unsavedTableIds.delete(tableId);
+        this.#notifyUnsavedChange();
     }
 
     clearAllUnsaved() {
-        this.unsavedTables.clear();
-        this._notifyUnsavedChange();
+        this.#unsavedTableIds.clear();
+        this.#notifyUnsavedChange();
     }
 
-    hasUnsavedChanges() { return this.unsavedTables.size > 0; }
-    getUnsavedTableIds() { return Array.from(this.unsavedTables); }
+    getUnsavedTableIds() { return [...this.#unsavedTableIds]; }
 
-    onUnsavedChangeCallback(callback) {
-        this.callbacks.onUnsavedChange.add(callback);
-        return () => this.callbacks.onUnsavedChange.delete(callback);
+    onUnsavedChangeCallback(cb) { this.#onUnsavedChange = cb; }
+
+    #notifyUnsavedChange() {
+        if (this.#onUnsavedChange) {
+            this.#onUnsavedChange(this.#unsavedTableIds.size > 0);
+        }
     }
 
-    _notifyUnsavedChange() {
-        const hasUnsaved = this.hasUnsavedChanges();
-        this.callbacks.onUnsavedChange.forEach(cb => cb(hasUnsaved));
-    }
+    // ── Inventory State ────────────────────────────────────────
 
-    // ── Data Cache ─────────────────────────────────────────────
+    setInventory(data) { this.#inventory = data; }
+    getInventory() { return this.#inventory; }
 
-    setInventory(data) { this.inventory = data; }
-    getInventory() { return this.inventory; }
+    // ── Edit Mode ─────────────────────────────────────────────
+
+    #editModeActive = false;
+    setEditModeActive(active) { this.#editModeActive = active; }
+    isEditModeActive() { return this.#editModeActive; }
 }

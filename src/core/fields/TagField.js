@@ -31,8 +31,8 @@ export class TagField extends Field {
         const currentTags = rawValue === '—' || !rawValue ? [] : rawValue.split(',').map(t => t.trim()).filter(t => t);
         
         // Define available tags based on column
-        let availableTags = [];
-        if (this.colDef.id === 'Team') {
+        let availableTags = this.colDef.availableTags || [];
+        if (this.colDef.id === 'Team' && availableTags.length === 0) {
             availableTags = ['Aktivitäten'];
         }
 
@@ -49,6 +49,17 @@ export class TagField extends Field {
             header.innerHTML = `<h2>${this.colDef.label} bearbeiten</h2>`;
             dialog.appendChild(header);
 
+            const displayLabel = this.colDef.label;
+            let displayLabelPlural = displayLabel.endsWith('e') ? displayLabel : displayLabel + 's';
+            let displayLabelSingular = displayLabel.endsWith('e') ? displayLabel.slice(0, -1) : displayLabel;
+            let addPrefix = 'Neuen';
+
+            if (displayLabel === 'Spiele') {
+                displayLabelPlural = 'Spiele';
+                displayLabelSingular = 'Spiel';
+                addPrefix = 'Neues';
+            }
+
             const content = document.createElement('div');
             content.className = 'picker-content';
             dialog.appendChild(content);
@@ -64,7 +75,7 @@ export class TagField extends Field {
 
                 const sectionTitle = document.createElement('div');
                 sectionTitle.className = 'picker-section-title';
-                sectionTitle.textContent = 'Ausgewählte Tags';
+                sectionTitle.textContent = `Ausgewählte ${displayLabelPlural}`;
                 section.appendChild(sectionTitle);
 
                 const list = document.createElement('div');
@@ -101,7 +112,7 @@ export class TagField extends Field {
 
                 if (internalSelected.length === 0) {
                     const empty = document.createElement('div');
-                    empty.textContent = 'Keine Tags ausgewählt';
+                    empty.textContent = `Keine ${displayLabelPlural} ausgewählt`;
                     empty.style.color = 'var(--text-muted)';
                     empty.style.fontSize = '13px';
                     list.appendChild(empty);
@@ -112,15 +123,18 @@ export class TagField extends Field {
             };
 
             // Suggestions Section
+            let suggSection = null;
+            let suggestionList = null;
+
             if (availableTags.length > 0) {
-                const suggSection = document.createElement('div');
+                suggSection = document.createElement('div');
                 suggSection.className = 'picker-section';
-                suggSection.innerHTML = `<div class="picker-section-title">Verfügbare Tags</div>`;
+                suggSection.innerHTML = `<div class="picker-section-title">Verfügbare ${displayLabelPlural}</div>`;
                 
-                const list = document.createElement('div');
-                list.className = 'picker-list';
-                list.style.flexDirection = 'row';
-                list.style.flexWrap = 'wrap';
+                suggestionList = document.createElement('div');
+                suggestionList.className = 'picker-list';
+                suggestionList.style.flexDirection = 'row';
+                suggestionList.style.flexWrap = 'wrap';
 
                 availableTags.forEach(text => {
                     const tag = document.createElement('span');
@@ -133,17 +147,34 @@ export class TagField extends Field {
                             refreshSelected();
                         }
                     };
-                    list.appendChild(tag);
+                    suggestionList.appendChild(tag);
                 });
-                suggSection.appendChild(list);
+                suggSection.appendChild(suggestionList);
                 content.appendChild(suggSection);
             }
+
+            const filterSuggestions = (val) => {
+                if (!suggestionList) return;
+                const search = val.toLowerCase().trim();
+                const children = suggestionList.children;
+                let foundMatch = false;
+
+                for (let child of children) {
+                    const matches = child.textContent.toLowerCase().includes(search);
+                    child.style.display = matches ? 'flex' : 'none';
+                    if (matches) foundMatch = true;
+                }
+
+                if (suggSection) {
+                    suggSection.style.display = search.length === 0 || foundMatch ? 'block' : 'none';
+                }
+            };
 
             // Custom Add Section (only if not restricted)
             if (this.colDef.id !== 'Team') {
                 const addSection = document.createElement('div');
                 addSection.className = 'picker-section';
-                addSection.innerHTML = `<div class="picker-section-title">Neuen Tag hinzufügen</div>`;
+                addSection.innerHTML = `<div class="picker-section-title">${addPrefix} ${displayLabelSingular} hinzufügen</div>`;
                 
                 const inputGroup = document.createElement('div');
                 inputGroup.style.display = 'flex';
@@ -152,7 +183,7 @@ export class TagField extends Field {
                 const input = document.createElement('input');
                 input.className = 'dialog-input';
                 input.style.flex = '1';
-                input.placeholder = 'Tag Name...';
+                input.placeholder = `${displayLabelSingular} Name...`;
                 inputGroup.appendChild(input);
 
                 const addBtn = document.createElement('button');
@@ -168,11 +199,18 @@ export class TagField extends Field {
                     if (val && !internalSelected.includes(val)) {
                         internalSelected.push(val);
                         input.value = '';
+                        filterSuggestions('');
                         refreshSelected();
                     }
                 };
                 addBtn.onclick = addTag;
-                input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } };
+                input.oninput = (e) => filterSuggestions(e.target.value);
+                input.onkeydown = (e) => { 
+                    if (e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        addTag(); 
+                    } 
+                };
             }
 
             refreshSelected();

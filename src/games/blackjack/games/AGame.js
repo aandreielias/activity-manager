@@ -4,10 +4,6 @@ import { IGame } from './IGame.js';
  * AGame abstract base class for games.
  */
 export class AGame extends IGame {
-    constructor() {
-        super();
-    }
-
     /**
      * Returns a plain data object describing the full current game state.
      * @returns {Object}

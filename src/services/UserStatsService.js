@@ -1,28 +1,17 @@
-import { SUPABASE_CONFIG } from '../config.js';
+import { SupabaseClient } from './SupabaseClient.js';
 
 /**
  * UserStatsService — CRUD against the relational `user_stats` and `user_category_hits` tables.
  */
 export class UserStatsService {
 
-    static _headers(extra = {}) {
-        return {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_CONFIG.ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-            ...extra,
-        };
-    }
-
     /**
      * Get stats for a single user by their user ID (UUID).
      */
     static async getStatsByUserId(userId) {
+        if (!userId) return null;
         try {
-            const res = await fetch(
-                `${SUPABASE_CONFIG.URL}/rest/v1/user_stats?user_id=eq.${userId}&select=*`,
-                { headers: this._headers() }
-            );
+            const res = await SupabaseClient.get('user_stats', `?user_id=eq.${userId}&select=*`);
             if (!res.ok) return null;
             const rows = await res.json();
             return rows[0] || null;
@@ -34,48 +23,30 @@ export class UserStatsService {
 
     /**
      * Get stats for ALL users. Returns a map of username → stats object.
-     * (Used by the admin dashboard which displays stats by name.)
      */
     static async getStats() {
         try {
-            // Join user_stats with users to get usernames
-            const res = await fetch(
-                `${SUPABASE_CONFIG.URL}/rest/v1/user_stats?select=*,users(username)`,
-                { headers: this._headers() }
-            );
+            const res = await SupabaseClient.get('user_stats', '?select=*,users(username)');
             if (!res.ok) return {};
             const rows = await res.json();
 
             const map = {};
             for (const row of rows) {
                 const username = row.users?.username || 'unknown';
-                // Also load category hits for this user
+
                 let categoryHits = {};
                 try {
-                    const chRes = await fetch(
-                        `${SUPABASE_CONFIG.URL}/rest/v1/user_category_hits?user_id=eq.${row.user_id}&select=*`,
-                        { headers: this._headers() }
+                    const chRes = await SupabaseClient.get(
+                        'user_category_hits',
+                        `?user_id=eq.${row.user_id}&select=*`
                     );
                     if (chRes.ok) {
                         const chRows = await chRes.json();
                         chRows.forEach(ch => { categoryHits[ch.category] = ch.hit_count; });
                     }
-                } catch (_) { /* ignore */ }
+                } catch (_) { /* best effort */ }
 
-                map[username] = {
-                    userId: row.user_id,
-                    lastLogin: row.last_login,
-                    entryCount: row.entry_count || 0,
-                    lastEntryDate: row.last_entry_date,
-                    blackjackWins: row.blackjack_wins || 0,
-                    blackjackLosses: row.blackjack_losses || 0,
-                    blackjackPushes: row.blackjack_pushes || 0,
-                    blackjackBlackjacks: row.blackjack_blackjacks || 0,
-                    blackjackCurrentStreak: row.blackjack_current_streak || 0,
-                    blackjackHighestStreak: row.blackjack_highest_streak || 0,
-                    favoritesCount: row.favorites_count || 0,
-                    categoryHits,
-                };
+                map[username] = this.formatUserStats(row, categoryHits);
             }
             return map;
         } catch (e) {
@@ -85,20 +56,67 @@ export class UserStatsService {
     }
 
     /**
-     * Ensure a user_stats row exists for the given user, then return it.
+     * Formats raw user stats and calculates derived metrics.
+     * Note: 'blackjack_pushes' is omitted as it does not exist in the current DB schema.
+     */
+    static formatUserStats(row, categoryHits = {}) {
+        const stats = {
+            userId: row.user_id,
+            lastLogin: row.last_login,
+            entryCount: row.entry_count || 0,
+            lastEntryDate: row.last_entry_date,
+            blackjackWins: row.blackjack_wins || 0,
+            blackjackLosses: row.blackjack_losses || 0,
+            blackjackBlackjacks: row.blackjack_blackjacks || 0,
+            blackjackCurrentStreak: row.blackjack_current_streak || 0,
+            blackjackHighestStreak: row.blackjack_highest_streak || 0,
+            favoritesCount: row.favorites_count || 0,
+            categoryHits,
+            // Mapping for legacy/UI convenience
+            wins: row.blackjack_wins || 0,
+            losses: row.blackjack_losses || 0,
+            blackjacks: row.blackjack_blackjacks || 0
+        };
+
+        // Derived Metrics
+        stats.winRate = this.calculateWinRate(stats);
+        stats.topCategory = this.getTopCategory(categoryHits);
+        stats.activityLevel = this.getActivityLevel(stats.lastLogin);
+
+        return stats;
+    }
+
+    static calculateWinRate(stats) {
+        const total = (stats.blackjackWins || 0) + (stats.blackjackLosses || 0);
+        return total > 0 ? Math.round(((stats.blackjackWins || 0) / total) * 100) : 0;
+    }
+
+    static getTopCategory(hits) {
+        if (!hits || Object.keys(hits).length === 0) return 'N/A';
+        let top = 'N/A', max = 0;
+        Object.entries(hits).forEach(([cat, val]) => {
+            if (val > max) {
+                max = val;
+                top = cat.charAt(0).toUpperCase() + cat.slice(1);
+            }
+        });
+        return top;
+    }
+
+    static getActivityLevel(lastLogin) {
+        if (!lastLogin) return 'Idle';
+        const diffDays = (new Date() - new Date(lastLogin)) / (1000 * 60 * 60 * 24);
+        return diffDays < 2 ? 'Aktiv' : (diffDays < 7 ? 'Kürzlich' : 'Idle');
+    }
+
+    /**
+     * Ensure a user_stats row exists.
      */
     static async _ensureStats(userId) {
+        if (!userId) return null;
         let stats = await this.getStatsByUserId(userId);
         if (!stats) {
-            // Create a new stats row
-            const res = await fetch(
-                `${SUPABASE_CONFIG.URL}/rest/v1/user_stats`,
-                {
-                    method: 'POST',
-                    headers: this._headers({ 'Prefer': 'return=representation' }),
-                    body: JSON.stringify({ user_id: userId }),
-                }
-            );
+            const res = await SupabaseClient.post('user_stats', { user_id: userId }, { 'Prefer': 'return=representation' });
             if (res.ok) {
                 const rows = await res.json();
                 stats = rows[0];
@@ -108,29 +126,21 @@ export class UserStatsService {
     }
 
     /**
-     * Update specific fields in user_stats for a given userId.
+     * Update specific fields in user_stats.
      */
     static async _updateStats(userId, updates) {
+        if (!userId) return;
         await this._ensureStats(userId);
-
-        await fetch(
-            `${SUPABASE_CONFIG.URL}/rest/v1/user_stats?user_id=eq.${userId}`,
-            {
-                method: 'PATCH',
-                headers: this._headers(),
-                body: JSON.stringify(updates),
-            }
-        );
+        return SupabaseClient.patch('user_stats', `?user_id=eq.${userId}`, updates);
     }
 
     // ── Records ───────────────────────────────────────────────
 
-    static async recordLogin(userId, _username) {
+    static async recordLogin(userId) {
         await this._updateStats(userId, { last_login: new Date().toISOString() });
     }
 
     static async recordEntry(userId, category) {
-        // Increment entry_count
         const stats = await this._ensureStats(userId);
         const newCount = (stats?.entry_count || 0) + 1;
 
@@ -139,33 +149,14 @@ export class UserStatsService {
             last_entry_date: new Date().toISOString(),
         });
 
-        // Upsert category hit
         if (category) {
-            // Try to load existing
-            const chRes = await fetch(
-                `${SUPABASE_CONFIG.URL}/rest/v1/user_category_hits?user_id=eq.${userId}&category=eq.${encodeURIComponent(category)}&select=*`,
-                { headers: this._headers() }
-            );
+            const chRes = await SupabaseClient.get('user_category_hits', `?user_id=eq.${userId}&category=eq.${encodeURIComponent(category)}&select=*`);
             const existing = chRes.ok ? await chRes.json() : [];
 
             if (existing.length > 0) {
-                await fetch(
-                    `${SUPABASE_CONFIG.URL}/rest/v1/user_category_hits?user_id=eq.${userId}&category=eq.${encodeURIComponent(category)}`,
-                    {
-                        method: 'PATCH',
-                        headers: this._headers(),
-                        body: JSON.stringify({ hit_count: (existing[0].hit_count || 0) + 1 }),
-                    }
-                );
+                await SupabaseClient.patch('user_category_hits', `?user_id=eq.${userId}&category=eq.${encodeURIComponent(category)}`, { hit_count: (existing[0].hit_count || 0) + 1 });
             } else {
-                await fetch(
-                    `${SUPABASE_CONFIG.URL}/rest/v1/user_category_hits`,
-                    {
-                        method: 'POST',
-                        headers: this._headers(),
-                        body: JSON.stringify({ user_id: userId, category, hit_count: 1 }),
-                    }
-                );
+                await SupabaseClient.post('user_category_hits', { user_id: userId, category, hit_count: 1 });
             }
         }
     }
@@ -175,30 +166,18 @@ export class UserStatsService {
         if (!stats) return;
 
         const update = {};
-
         if (result === 'WIN' || result === 'BLACKJACK') {
             update.blackjack_wins = (stats.blackjack_wins || 0) + 1;
             update.blackjack_current_streak = (stats.blackjack_current_streak || 0) + 1;
-            update.blackjack_highest_streak = Math.max(
-                stats.blackjack_highest_streak || 0,
-                update.blackjack_current_streak
-            );
-            if (result === 'BLACKJACK') {
-                update.blackjack_blackjacks = (stats.blackjack_blackjacks || 0) + 1;
-            }
+            update.blackjack_highest_streak = Math.max(stats.blackjack_highest_streak || 0, update.blackjack_current_streak);
+            if (result === 'BLACKJACK') update.blackjack_blackjacks = (stats.blackjack_blackjacks || 0) + 1;
         } else if (result === 'LOSS' || result === 'BUST') {
             update.blackjack_losses = (stats.blackjack_losses || 0) + 1;
             update.blackjack_current_streak = 0;
-        } else if (result === 'PUSH') {
-            update.blackjack_pushes = (stats.blackjack_pushes || 0) + 1;
         }
-
+        // Result === 'PUSH' is not recorded as the column 'blackjack_pushes' is missing in DB.
+        
         await this._updateStats(userId, update);
-    }
-
-    static async recordPasswordChange(userId) {
-        await this._updateStats(userId, {});
-        // password_last_changed is on the users table, handled by AuthService
     }
 
     static async recordFavoriteChange(userId, count) {
@@ -206,16 +185,29 @@ export class UserStatsService {
     }
 
     /**
-     * Resets the game-related stats (Blackjack) for the given user in Supabase.
+     * Resets ALL stats (Game and Activity) for the given user.
+     * Note: 'blackjack_pushes' is excluded to avoid 400 errors as it doesn't exist in the DB.
      */
-    static async resetGameStats(userId) {
+    static async resetAllStats(userId) {
+        if (!userId) return;
+        
+        // 1. Reset user_stats fields
         await this._updateStats(userId, {
             blackjack_wins: 0,
             blackjack_losses: 0,
-            blackjack_pushes: 0,
             blackjack_blackjacks: 0,
             blackjack_current_streak: 0,
             blackjack_highest_streak: 0,
+            entry_count: 0,
+            favorites_count: 0,
+            last_entry_date: null
         });
+
+        // 2. Clear category hits
+        try {
+            await SupabaseClient.delete('user_category_hits', `?user_id=eq.${userId}`);
+        } catch (e) {
+            console.error('[UserStatsService] Failed to clear category hits:', e);
+        }
     }
 }

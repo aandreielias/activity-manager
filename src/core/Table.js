@@ -45,7 +45,7 @@ export class Table {
     }
 
     addRow(rowData) {
-        this.dataManager.addRow(rowData);
+        return this.dataManager.addRow(rowData);
     }
 
     removeRow(id) {
@@ -54,7 +54,6 @@ export class Table {
 
     toJSON() {
         return {
-
             id: this.id,
             title: this.title,
             schema: this.schema,

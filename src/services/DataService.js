@@ -1,4 +1,5 @@
-import { SUPABASE_CONFIG } from '../config.js';
+import { SupabaseClient } from './SupabaseClient.js';
+import { InventoryService } from './InventoryService.js';
 
 /**
  * DataService — CRUD operations against the relational Supabase schema.
@@ -7,21 +8,6 @@ import { SUPABASE_CONFIG } from '../config.js';
  * row data between the app format and the database column format.
  */
 export class DataService {
-
-    // ── Helpers ────────────────────────────────────────────────
-
-    static _headers(extra = {}) {
-        return {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_CONFIG.ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-            ...extra,
-        };
-    }
-
-    static _url(table, query = '') {
-        return `${SUPABASE_CONFIG.URL}/rest/v1/${table}${query}`;
-    }
 
     /**
      * Determine which Supabase table a front-end table ID maps to,
@@ -35,14 +21,17 @@ export class DataService {
             return { supaTable: 'inventory', category: null };
         }
         if (tableId.startsWith('tbl_sport_')) {
-            const sport = tableId.replace('tbl_sport_', ''); // volleyball | fussball
-            return { supaTable: 'sport_venues', category: sport };
+            return { supaTable: 'sport_venues', category: tableId.replace('tbl_sport_', '') };
         }
         if (tableId.startsWith('tbl_activities_')) {
-            const cat = tableId.replace('tbl_activities_', ''); // gruppen | zwischendurch | …
-            return { supaTable: 'activities', category: cat };
+            return { supaTable: 'activities', category: tableId.replace('tbl_activities_', '') };
         }
-        // Fallback – treat as-is
+        if (tableId === 'tbl_events') {
+            return { supaTable: 'events', category: null };
+        }
+        if (tableId === 'tbl_ort') {
+            return { supaTable: 'ort', category: null };
+        }
         return { supaTable: tableId, category: null };
     }
 
@@ -57,22 +46,17 @@ export class DataService {
 
         let query = '?select=*';
         if (supaTable === 'people') {
-            // Join with person_teams and teams to get team names
             query = '?select=*,person_teams(teams(name))';
+        } else if (supaTable === 'activities' && category) {
+            query = `?select=*,activity_required_items(*,inventory(name))&category=eq.${category}`;
+        } else if (supaTable === 'sport_venues') {
+            query = '?select=*,address:ort(*)';
+            if (category) query += `&sport_type=eq.${category}`;
+        } else if (supaTable === 'events') {
+            query = '?select=*,location:ort(*)';
         }
 
-        if (supaTable === 'activities' && category) {
-            // Join with activity_required_items and inventory to get item names and quantities
-            // Using * for activity_required_items to fetch all columns including 'quantity_needed'
-            query = '?select=*,activity_required_items(*,inventory(name))';
-            query += `&category=eq.${category}`;
-        } else if (supaTable === 'sport_venues' && category) {
-            query += `&sport_type=eq.${category}`;
-        }
-
-        const res = await fetch(this._url(supaTable, query), {
-            headers: this._headers(),
-        });
+        const res = await SupabaseClient.get(supaTable, query);
 
         if (!res.ok) {
             const txt = await res.text();
@@ -80,8 +64,6 @@ export class DataService {
         }
 
         const rows = await res.json();
-
-        // Map DB column names back to app column names where needed
         return rows.map(r => this._fromDb(supaTable, r));
     }
 
@@ -101,43 +83,12 @@ export class DataService {
             return this._toDb(supaTable, plain, category);
         });
 
-        // First, delete rows that no longer exist (full replace strategy)
-        const currentIds = dbRows.map(r => r.id).filter(Boolean);
-
-        if (currentIds.length > 0) {
-            // Delete rows for this category/sport that are NOT in the current set
-            let deleteQuery = `?id=not.in.(${currentIds.map(id => `"${id}"`).join(',')})`;
-            if (supaTable === 'activities' && category) {
-                deleteQuery += `&category=eq.${category}`;
-            } else if (supaTable === 'sport_venues' && category) {
-                deleteQuery += `&sport_type=eq.${category}`;
-            }
-
-            await fetch(this._url(supaTable, deleteQuery), {
-                method: 'DELETE',
-                headers: this._headers(),
-            });
-        } else {
-            // All rows deleted — delete everything for this category
-            let deleteQuery = '?id=not.is.null';
-            if (supaTable === 'activities' && category) {
-                deleteQuery += `&category=eq.${category}`;
-            } else if (supaTable === 'sport_venues' && category) {
-                deleteQuery += `&sport_type=eq.${category}`;
-            }
-            await fetch(this._url(supaTable, deleteQuery), {
-                method: 'DELETE',
-                headers: this._headers(),
-            });
-        }
+        // Delete rows that no longer exist (full replace strategy)
+        await this._deleteRemovedRows(supaTable, category, dbRows);
 
         // Upsert all current rows
         if (dbRows.length > 0) {
-            const res = await fetch(this._url(supaTable), {
-                method: 'POST',
-                headers: this._headers({ 'Prefer': 'resolution=merge-duplicates' }),
-                body: JSON.stringify(dbRows),
-            });
+            const res = await SupabaseClient.post(supaTable, dbRows, { 'Prefer': 'resolution=merge-duplicates' });
 
             if (!res.ok) {
                 const txt = await res.text();
@@ -145,22 +96,43 @@ export class DataService {
                 throw new Error(`Fehler beim Speichern: ${res.status}. Grund: ${txt}`);
             }
 
-            // After successful save of main rows, sync junction tables
+            // After successful save, sync junction tables
             for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const plain = row.toJSON ? row.toJSON() : row;
+                const plain = rows[i].toJSON ? rows[i].toJSON() : rows[i];
                 const rowId = dbRows[i].id;
                 if (!rowId) continue;
 
-                if (supaTable === 'people' && (plain.Team !== undefined)) {
+                if (supaTable === 'people' && plain.Team !== undefined) {
                     await this._syncPersonTeams(rowId, plain.Team);
-                } else if (supaTable === 'activities' && (plain.required_items !== undefined)) {
+                } else if (supaTable === 'activities' && plain.required_items !== undefined) {
                     await this._syncActivityInventory(rowId, plain.required_items);
                 }
             }
         }
 
         return { success: true, message: `Table ${tableId} saved` };
+    }
+
+    /**
+     * Delete rows from the DB that are no longer present in the current dataset.
+     */
+    static async _deleteRemovedRows(supaTable, category, dbRows) {
+        const currentIds = dbRows.map(r => r.id).filter(Boolean);
+        let deleteQuery;
+
+        if (currentIds.length > 0) {
+            deleteQuery = `?id=not.in.(${currentIds.map(id => `"${id}"`).join(',')})`;
+        } else {
+            deleteQuery = '?id=not.is.null';
+        }
+
+        if (supaTable === 'activities' && category) {
+            deleteQuery += `&category=eq.${category}`;
+        } else if (supaTable === 'sport_venues' && category) {
+            deleteQuery += `&sport_type=eq.${category}`;
+        }
+
+        await SupabaseClient.delete(supaTable, deleteQuery);
     }
 
     // ── Column Mapping: App → DB ──────────────────────────────
@@ -174,29 +146,33 @@ export class DataService {
                     nachname: row.nachname || '',
                     telefon: row['Tel.'] || row.telefon || '',
                     status: (row.Status || row.status || 'Aktiv').toLowerCase(),
-                    rolle: (row.role || row.rolle || 'User').charAt(0).toUpperCase() + (row.role || row.rolle || 'User').slice(1).toLowerCase(),
+                    rolle: this._capitalizeFirst(row.role || row.rolle || 'User'),
                     responsibility_1: row.responsibility_1 ? row.responsibility_1.toLowerCase() : null,
                     responsibility_2: row.responsibility_2 ? row.responsibility_2.toLowerCase() : null,
                     spez_zustaendigkeit: row['Spez. Zuständigkeit'] || row.spez_zustaendigkeit || '',
+                    created_by: row.createdBy || null,
+                    created_at: row.createdAt || new Date().toISOString()
                 };
 
             case 'activities':
                 return {
                     id: row.id,
                     name: row.name || '',
-                    category: category,
+                    category,
                     short_description: row.short_description || '',
                     rules: row.rules || '',
-                    duration_minutes: row.duration_minutes ? parseInt(row.duration_minutes, 10) || null : null,
-                    preparation_minutes: row.preparation_minutes ? parseInt(row.preparation_minutes, 10) || null : null,
+                    duration_minutes: this._parseIntOrNull(row.duration_minutes),
+                    preparation_minutes: this._parseIntOrNull(row.preparation_minutes),
                     location: row.location || null,
                     location_notes: row.location_notes || '',
-                    min_players: row.min_players ? parseInt(row.min_players, 10) || null : null,
-                    max_players: row.max_players ? parseInt(row.max_players, 10) || null : null,
+                    min_players: this._parseIntOrNull(row.min_players),
+                    max_players: this._parseIntOrNull(row.max_players),
                     cost: row.cost || '',
                     link: row.link || '',
                     team_tasks: row.team_tasks || '',
                     responsible_id: row.responsible || row.responsible_id || null,
+                    created_by: row.createdBy || null,
+                    created_at: row.createdAt || new Date().toISOString()
                 };
 
             case 'inventory':
@@ -208,19 +184,50 @@ export class DataService {
                     condition: row.condition || 'Gut',
                     last_checked: row.last_checked || null,
                     notes: row.notes || '',
+                    created_by: row.createdBy || null,
+                    created_at: row.createdAt || new Date().toISOString()
                 };
 
             case 'sport_venues':
                 return {
                     id: row.id,
-                    sport_type: category,
+                    sport_type: row.category || null,
                     name: row.name || '',
-                    address: row.address || '',
+                    address: row.address?.id || null,
                     phone: row.phone || '',
                     venue_type: row.type || row.venue_type || null,
                     indoor_outdoor: row.indoor_outdoor || null,
                     cost: row.cost || '',
                     notes: row.notes || '',
+                    created_by: row.createdBy || null,
+                    created_at: row.createdAt || new Date().toISOString()
+                };
+
+            case 'events':
+                return {
+                    id: row.id,
+                    name: row.name || '',
+                    date: row.date || null,
+                    time: row.time || '18:30',
+                    location: row.location?.id || null,
+                    games: row.games || '',
+                    notes: row.notes || '',
+                    created_by: row.createdBy || null,
+                    created_at: row.createdAt || new Date().toISOString()
+                };
+
+            case 'ort':
+                return {
+                    id: row.id,
+                    title: row.title || '',
+                    street: row.street || '',
+                    address_extra: row.address_extra || '',
+                    zip_code: row.zip_code || '',
+                    city: row.city || '',
+                    link: row.link || '',
+                    notes: row.notes || '',
+                    created_by: row.createdBy || null,
+                    created_at: row.createdAt || new Date().toISOString()
                 };
 
             default:
@@ -238,12 +245,14 @@ export class DataService {
                     vorname: row.vorname || '',
                     nachname: row.nachname || '',
                     'Tel.': row.telefon || '',
-                    Status: row.status ? (row.status.charAt(0).toUpperCase() + row.status.slice(1).toLowerCase()) : 'Aktiv',
+                    Status: row.status ? this._capitalizeFirst(row.status) : 'Aktiv',
                     role: row.rolle || 'User',
-                    responsibility_1: row.responsibility_1 ? (row.responsibility_1.charAt(0).toUpperCase() + row.responsibility_1.slice(1).toLowerCase()) : '', 
-                    responsibility_2: row.responsibility_2 ? (row.responsibility_2.charAt(0).toUpperCase() + row.responsibility_2.slice(1).toLowerCase()) : '',
+                    responsibility_1: row.responsibility_1 ? this._capitalizeFirst(row.responsibility_1) : '',
+                    responsibility_2: row.responsibility_2 ? this._capitalizeFirst(row.responsibility_2) : '',
                     'Spez. Zuständigkeit': row.spez_zustaendigkeit || '',
                     Team: (row.person_teams || []).map(pt => pt.teams?.name).filter(Boolean).join(', '),
+                    createdBy: row.created_by || 'Unbekannt',
+                    createdAt: row.created_at || null,
                 };
 
             case 'activities':
@@ -266,6 +275,8 @@ export class DataService {
                     link: row.link || '',
                     team_tasks: row.team_tasks || '',
                     responsible: row.responsible_id || '',
+                    createdBy: row.created_by || 'Unbekannt',
+                    createdAt: row.created_at || null,
                 };
 
             case 'inventory':
@@ -277,6 +288,8 @@ export class DataService {
                     condition: row.condition || 'gut',
                     last_checked: row.last_checked || '',
                     notes: row.notes || '',
+                    createdBy: row.created_by || 'Unbekannt',
+                    createdAt: row.created_at || null,
                 };
 
             case 'sport_venues':
@@ -289,6 +302,35 @@ export class DataService {
                     indoor_outdoor: row.indoor_outdoor || '',
                     cost: row.cost || '',
                     notes: row.notes || '',
+                    createdBy: row.created_by || 'Unbekannt',
+                    createdAt: row.created_at || null,
+                };
+
+            case 'events':
+                return {
+                    id: row.id,
+                    name: row.name || '',
+                    date: row.date || '',
+                    time: row.time || '',
+                    location: row.location || '',
+                    games: row.games || '',
+                    notes: row.notes || '',
+                    createdBy: row.created_by || 'Unbekannt',
+                    createdAt: row.created_at || null,
+                };
+
+            case 'ort':
+                return {
+                    id: row.id,
+                    title: row.title || '',
+                    street: row.street || '',
+                    address_extra: row.address_extra || '',
+                    zip_code: row.zip_code || '',
+                    city: row.city || '',
+                    link: row.link || '',
+                    notes: row.notes || '',
+                    createdBy: row.created_by || 'Unbekannt',
+                    createdAt: row.created_at || null,
                 };
 
             default:
@@ -296,7 +338,7 @@ export class DataService {
         }
     }
 
-    // ── People-specific helpers (used by App) ─────────────────
+    // ── People-specific helpers ───────────────────────────────
 
     static async loadPeople() {
         return this.loadRows('tbl_people');
@@ -309,83 +351,70 @@ export class DataService {
     // ── Junction Sync Helpers ────────────────────────────────
 
     static async _syncPersonTeams(personId, teamString) {
-        // 1. Clear existing
-        await fetch(this._url('person_teams', `?person_id=eq.${personId}`), {
-            method: 'DELETE',
-            headers: this._headers(),
-        });
+        await SupabaseClient.delete('person_teams', `?person_id=eq.${personId}`);
 
         if (!teamString || teamString === '—') return;
 
         const teamNames = teamString.split(',').map(s => s.trim()).filter(Boolean);
         if (teamNames.length === 0) return;
 
-        // 2. Fetch team IDs
-        const teamsRes = await fetch(this._url('teams', `?name=in.(${teamNames.map(n => `"${n}"`).join(',')})`), {
-            headers: this._headers(),
-        });
+        const teamsRes = await SupabaseClient.get(
+            'teams',
+            `?name=in.(${teamNames.map(n => `"${n}"`).join(',')})`
+        );
         if (!teamsRes.ok) return;
         const teams = await teamsRes.json();
 
-        // 3. Insert new junction rows
         const junctionRows = teams.map(t => ({ person_id: personId, team_id: t.id }));
         if (junctionRows.length > 0) {
-            const res = await fetch(this._url('person_teams'), {
-                method: 'POST',
-                headers: this._headers(),
-                body: JSON.stringify(junctionRows),
-            });
+            const res = await SupabaseClient.post('person_teams', junctionRows);
             if (!res.ok) console.error('[DataService] Sync PersonTeams failed:', await res.text());
         }
     }
 
     static async _syncActivityInventory(activityId, inventoryString) {
-        // 1. Clear existing
-        await fetch(this._url('activity_required_items', `?activity_id=eq.${activityId}`), {
-            method: 'DELETE',
-            headers: this._headers(),
-        });
+        await SupabaseClient.delete('activity_required_items', `?activity_id=eq.${activityId}`);
 
-        if (!inventoryString || inventoryString === '—' || !inventoryString.trim()) return;
-
-        // Parse "Item (3), Item"
-        const items = inventoryString.split(',').map(s => {
-            const match = s.match(/(.+?)\s*\((.+?)\)/);
-            if (match) return { name: match[1].trim(), quantity: match[2].trim() };
-            return { name: s.trim(), quantity: null };
-        }).filter(i => i.name);
-
+        const items = InventoryService.parseInventoryString(inventoryString);
         if (items.length === 0) return;
 
-        // 2. Fetch inventory IDs
         const names = items.map(i => i.name);
-        const invRes = await fetch(this._url('inventory', `?name=in.(${names.map(n => `"${n}"`).join(',')})`), {
-            headers: this._headers(),
-        });
+        const invRes = await SupabaseClient.get(
+            'inventory',
+            `?name=in.(${names.map(n => `"${n}"`).join(',')})`
+        );
         if (!invRes.ok) {
             console.error('[DataService] Sync Inventory fetch failed:', await invRes.text());
             return;
         }
         const inventory = await invRes.json();
 
-        // 3. Insert new junction rows (using column 'count' for quantity as discovered)
         const junctionRows = items.map(item => {
             const match = inventory.find(inv => inv.name.toLowerCase() === item.name.toLowerCase());
             if (!match) return null;
             return {
                 activity_id: activityId,
                 inventory_id: match.id,
-                quantity_needed: item.quantity ? parseInt(item.quantity, 10) || 0 : 0
+                quantity_needed: item.quantity ? parseInt(item.quantity, 10) || 0 : 0,
             };
         }).filter(Boolean);
 
         if (junctionRows.length > 0) {
-            const res = await fetch(this._url('activity_required_items'), {
-                method: 'POST',
-                headers: this._headers(),
-                body: JSON.stringify(junctionRows),
-            });
+            const res = await SupabaseClient.post('activity_required_items', junctionRows);
             if (!res.ok) console.error('[DataService] Sync ActivityInventory failed:', await res.text());
         }
+    }
+
+    // ── Utility ───────────────────────────────────────────────
+
+    static _capitalizeFirst(str) {
+        if (!str) return '';
+        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    }
+
+    static _parseIntOrNull(value) {
+        if (!value) return null;
+        const parsed = parseInt(value, 10);
+        return isNaN(parsed) ? null : parsed;
     }
 }

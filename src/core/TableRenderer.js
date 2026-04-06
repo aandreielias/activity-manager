@@ -219,7 +219,7 @@ export class TableRenderer {
     _renderRows(tbody) {
         this.table.rows.forEach(row => {
             row.setCallbacks({
-                onEditChange: () => this.table.editor.showSaveBar(),
+                onEditChange: () => this.table.editor.showUnsavedChange(),
                 onDelete:     (rowId) => this.table.dataManager.removeRow(rowId),
             });
 

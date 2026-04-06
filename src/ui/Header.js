@@ -9,6 +9,7 @@ export class Header {
         this.appName = appName;
         this.onThemeToggle = onThemeToggle;
         this.onTableSwitch = onTableSwitch;
+        this.onCalendarToggle = null;
         this.tableConfigs = tableConfigs;
         this.tables = tables;
         this.currentTable = tableConfigs[0]?.id || 'games';
@@ -21,6 +22,8 @@ export class Header {
         this.onFavoritesToggle = null;
         this.onLogoDoubleClick = null;
         this.favoritesActive = false;
+        this.currentResults = [];
+        this.selectedIndex = -1;
     }
 
     render() {
@@ -56,7 +59,7 @@ export class Header {
         // Categories
         const spieleTables = viewableConfigs.filter(t => t.category === 'spiele');
         const sportTables = viewableConfigs.filter(t => t.category === 'sportarten');
-        const otherTables = viewableConfigs.filter(t => !t.category && t.id !== 'tbl_people' && t.id !== 'tbl_inventory');
+        const otherTables = viewableConfigs.filter(t => !t.category && !['tbl_people', 'tbl_inventory', 'tbl_ort'].includes(t.id));
 
         // Permissions for split-views
         const canViewPeople = globalState.canView('people_table') || globalState.canView('tbl_people');
@@ -85,23 +88,32 @@ export class Header {
                 </button>` : ''}
             </nav>
             <div class="header-center">
+                <div class="header-search-container">
+                    <input type="text" class="header-search-input" placeholder="Suchen..." aria-label="Global search">
+                    <div class="search-results-dropdown"></div>
+                </div>
                 <div class="unsaved-banner" style="display: none;">
                     <span class="unsaved-msg">Ungespeicherte Änderungen vorhanden</span>
                     <button class="save-btn-header">Speichern</button>
                     <button class="discard-btn-header">Verwerfen</button>
+                    <div class="save-loading-bar"></div>
                 </div>
             </div>
             <div class="header-right">
-                ${globalState.canManageUsers() ? `
+                ${globalState.canSeeStats() ? `
                     <button class="nav-btn user-info-btn" title="Nutzer verwalten">
                         Nutzer
                     </button>
                 ` : ''}
+                <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
+                    Kalender
+                </button>
                 <div class="dropdown-container user-dropdown-container">
                     <button class="header-user user-menu-btn">
                         ${globalState.getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
                     </button>
                     <div class="dropdown-menu user-dropdown-menu">
+                        ${globalState.canUseEditMode() ? `<button class="dropdown-item edit-mode-btn">Edit-Modus aktivieren</button>` : ''}
                         <button class="dropdown-item favorites-toggle-btn">Favoriten</button>
                         <button class="dropdown-item change-password-btn">Passwort ändern</button>
                         <button class="dropdown-item logout-btn">Abmelden</button>
@@ -172,12 +184,30 @@ export class Header {
                 this.onUserInfo?.();
             }
 
+            if (e.target.closest('.calendar-toggle-btn')) {
+                this._closeAllDropdowns();
+                this.onCalendarToggle?.();
+            }
+
             if (e.target.closest('.logout-btn')) {
                 this.onLogout?.();
             }
 
             if (e.target.closest('.change-password-btn')) {
                 this.onChangePassword?.();
+            }
+
+            if (e.target.closest('.edit-mode-btn')) {
+                const btn = e.target.closest('.edit-mode-btn');
+                const isActive = btn.textContent.includes('deaktivieren');
+                if (isActive) {
+                    btn.textContent = 'Edit-Modus aktivieren';
+                    btn.classList.remove('active');
+                } else {
+                    btn.textContent = 'Edit-Modus deaktivieren';
+                    btn.classList.add('active');
+                }
+                this.onEditModeToggle?.(!isActive);
             }
 
             if (e.target.closest('.favorites-toggle-btn')) {
@@ -201,14 +231,8 @@ export class Header {
         // Logo double click for Blackjack
         const logo = this.element.querySelector('.header-left');
         if (logo) {
-            console.log('Attaching dblclick listener to logo area');
-            logo.addEventListener('dblclick', (e) => {
-                console.log('Logo area double-clicked!', e.target);
-                if (this.onLogoDoubleClick) {
-                    this.onLogoDoubleClick();
-                } else {
-                    console.warn('onLogoDoubleClick callback not set');
-                }
+            logo.addEventListener('dblclick', () => {
+                this.onLogoDoubleClick?.();
             });
         }
 
@@ -241,6 +265,174 @@ export class Header {
                 this.onDiscardAll?.();
             });
         }
+
+        // Search bar
+        const searchInput = this.element.querySelector('.header-search-input');
+        const resultsDropdown = this.element.querySelector('.search-results-dropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this._handleSearch(e.target.value);
+            });
+
+            searchInput.addEventListener('focus', () => {
+                if (searchInput.value.trim().length >= 2) {
+                    resultsDropdown.classList.add('show');
+                }
+            });
+
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (this.currentResults.length > 0) {
+                        this.selectedIndex = (this.selectedIndex + 1) % this.currentResults.length;
+                        this._updateSelectedResultUI();
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (this.currentResults.length > 0) {
+                        this.selectedIndex = (this.selectedIndex - 1 + this.currentResults.length) % this.currentResults.length;
+                        this._updateSelectedResultUI();
+                    }
+                } else if (e.key === 'Enter') {
+                    const idx = this.selectedIndex >= 0 ? this.selectedIndex : 0;
+                    if (this.currentResults[idx]) {
+                        const res = this.currentResults[idx];
+                        this.switchTo(res.tableId);
+                        this.onTableSwitch?.(res.tableId, res.rowId, res.colId);
+                        resultsDropdown.classList.remove('show');
+                        searchInput.value = '';
+                        searchInput.blur();
+                    }
+                }
+            });
+        }
+
+        // Close search results on outside click
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.header-search-container')) {
+                resultsDropdown?.classList.remove('show');
+            }
+        });
+
+        // Handle result clicks
+        resultsDropdown?.addEventListener('click', (e) => {
+            const item = e.target.closest('.search-result-item');
+            if (item && item.dataset.tableId) {
+                const tableId = item.dataset.tableId;
+                const rowId = item.dataset.rowId;
+                const colId = item.dataset.colId;
+                this.switchTo(tableId);
+                this.onTableSwitch?.(tableId, rowId, colId);
+                resultsDropdown.classList.remove('show');
+                searchInput.value = '';
+            }
+        });
+
+        // Update selected index on mouse move
+        resultsDropdown?.addEventListener('mouseover', (e) => {
+            const item = e.target.closest('.search-result-item');
+            if (item && item.dataset.index) {
+                this.selectedIndex = parseInt(item.dataset.index);
+                this._updateSelectedResultUI();
+            }
+        });
+    }
+
+    _handleSearch(query) {
+        const resultsDropdown = this.element.querySelector('.search-results-dropdown');
+        const trimmedQuery = query.trim();
+
+        if (trimmedQuery.length < 2) {
+            resultsDropdown.classList.remove('show');
+            resultsDropdown.innerHTML = '';
+            this.currentResults = [];
+            this.selectedIndex = -1;
+            return;
+        }
+
+        const results = [];
+        const globalState = GlobalStateManager.getInstance();
+
+        // Iterate over all tables
+        Object.entries(this.tables).forEach(([tableId, data]) => {
+            if (!globalState.canView(tableId)) return;
+
+            const { instance, instances, config } = data;
+            const targetInstances = instances || [instance];
+            const tableTitle = config.title;
+
+            targetInstances.forEach(inst => {
+                if (!inst || !inst.rows) return;
+
+                inst.rows.forEach(row => {
+                    Object.entries(row.data).forEach(([colId, value]) => {
+                        if (value === null || value === undefined) return;
+                        
+                        const strValue = String(value);
+                        if (strValue.toLowerCase().includes(trimmedQuery.toLowerCase())) {
+                            const colDef = inst.schema.find(c => c.id === colId);
+                            // Avoid duplicate results for the same row in same table if we already found a match
+                            // (Actually the user wants column name, so multiple columns in same row are fine)
+                            results.push({
+                                tableId,
+                                tableTitle,
+                                colId,
+                                colLabel: colDef ? colDef.label : colId,
+                                value: strValue,
+                                rowId: row.id
+                            });
+                        }
+                    });
+                });
+            });
+        });
+
+        this.currentResults = results.slice(0, 5);
+        this.selectedIndex = this.currentResults.length > 0 ? 0 : -1;
+        this._renderSearchResults(this.currentResults, trimmedQuery);
+    }
+
+    _renderSearchResults(results, query) {
+        const resultsDropdown = this.element.querySelector('.search-results-dropdown');
+        if (!resultsDropdown) return;
+
+        if (results.length === 0) {
+            resultsDropdown.innerHTML = '<div class="no-results">Keine Ergebnisse gefunden</div>';
+        } else {
+            resultsDropdown.innerHTML = results.map((res, i) => `
+                <div class="search-result-item ${i === this.selectedIndex ? 'selected' : ''}" 
+                     data-index="${i}"
+                     data-table-id="${res.tableId}" 
+                     data-row-id="${res.rowId}" 
+                     data-col-id="${res.colId}">
+                    <div class="result-meta">
+                        <span class="result-table-name">${res.tableTitle}</span>
+                        <span class="result-col-name">${res.colLabel}</span>
+                    </div>
+                    <div class="result-content">
+                        ${this._highlightSearchTerm(res.value, query)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        resultsDropdown.classList.add('show');
+    }
+
+    _updateSelectedResultUI() {
+        const resultsDropdown = this.element.querySelector('.search-results-dropdown');
+        if (!resultsDropdown) return;
+
+        resultsDropdown.querySelectorAll('.search-result-item').forEach((item, i) => {
+            item.classList.toggle('selected', i === this.selectedIndex);
+        });
+    }
+
+    _highlightSearchTerm(text, query) {
+        if (!query) return text;
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return text.replace(regex, '<span class="search-highlight">$1</span>');
     }
 
     _closeAllDropdowns() {
@@ -256,11 +448,44 @@ export class Header {
 
     showUnsavedBanner() {
         const banner = this.element.querySelector('.unsaved-banner');
-        if (banner) banner.style.display = 'flex';
+        if (banner) {
+            banner.style.display = 'flex';
+            this.setLoading(false); // Reset loading state when showing banner
+        }
     }
 
     hideUnsavedBanner() {
         const banner = this.element.querySelector('.unsaved-banner');
-        if (banner) banner.style.display = 'none';
+        if (banner) {
+            banner.style.display = 'none';
+            this.setLoading(false);
+        }
+    }
+
+    setLoading(isLoading) {
+        const banner = this.element.querySelector('.unsaved-banner');
+        if (!banner) return;
+        const msg = banner.querySelector('.unsaved-msg');
+        const saveBtn = banner.querySelector('.save-btn-header');
+        const discardBtn = banner.querySelector('.discard-btn-header');
+        const bar = banner.querySelector('.save-loading-bar');
+
+        if (isLoading) {
+            if (msg) msg.textContent = 'Speichere...';
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Speichern...';
+            }
+            if (discardBtn) discardBtn.disabled = true;
+            if (bar) bar.style.display = 'block';
+        } else {
+            if (msg) msg.textContent = 'Ungespeicherte Änderungen vorhanden';
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Speichern';
+            }
+            if (discardBtn) discardBtn.disabled = false;
+            if (bar) bar.style.display = 'none';
+        }
     }
 }

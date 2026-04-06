@@ -12,38 +12,15 @@ export class TableEditor {
         this.globalState = GlobalStateManager.getInstance();
     }
 
-    async _handleSave(tables) {
-        const unsavedIds = this.globalState.getUnsavedTableIds();
-
-        try {
-            for (const tableId of unsavedIds) {
-                const table = tables[tableId];
-                if (table) {
-                    await this._saveTable(table);
-                }
-            }
-            this.globalState.clearAllUnsaved();
-        } catch (error) {
-            console.error('Speicherfehler:', error);
-            alert(`Fehler beim Speichern der Tabellen: ${error.message}`);
-        }
-    }
-
     async _saveTable(table) {
         try {
             const tableConfig = table.tableConfig || {};
             const filename = tableConfig.file || `${table.id}.json`;
 
-            // Save to the relational Supabase table
-            await DataService.saveTable(
-                table.id,
-                filename,
-                table.rows
-            );
+            await DataService.saveTable(table.id, filename, table.rows);
 
-            // Record user activity with the user's UUID
             const userId = this.globalState.getCurrentUserId();
-            const category = (table.tableConfig || {}).category || null;
+            const category = tableConfig.category || null;
             if (userId) {
                 await UserStatsService.recordEntry(userId, category);
             }
@@ -58,14 +35,5 @@ export class TableEditor {
 
     hideUnsavedChange() {
         this.globalState.markTableAsSaved(this.table.id);
-    }
-
-    // Legacy method for compatibility
-    showSaveBar() {
-        this.showUnsavedChange();
-    }
-
-    hideSaveBar() {
-        this.hideUnsavedChange();
     }
 }

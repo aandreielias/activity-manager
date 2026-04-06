@@ -27,6 +27,7 @@ export class Row {
         this.schema.forEach(col => {
             fields[col.id] = FieldFactory.createField({
                 rowId: this.id,
+                rowData: this.data,
                 colDef: col,
                 value: this.data[col.id],
                 peopleData: this.peopleData,

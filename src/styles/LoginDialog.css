@@ -34,7 +34,95 @@
     color: var(--text-primary);
 }
 
-.login-select, .login-password {
+.custom-login-select {
+    position: relative;
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+    user-select: none;
+}
+
+.login-select-display {
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all var(--transition);
+}
+
+.custom-login-select.open .login-select-display {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.login-select-display .dropdown-arrow {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    transition: transform var(--transition);
+}
+
+.custom-login-select.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.login-select-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    z-index: 10001;
+    display: none;
+    padding: 4px 0;
+}
+
+.custom-login-select.open .login-select-options {
+    display: block;
+    animation: slideInDown 0.2s ease-out;
+}
+
+@keyframes slideInDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.login-option {
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background var(--transition);
+}
+
+.login-option:hover {
+    background: var(--bg-hover);
+}
+
+.option-name {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.option-name {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.option-role {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.login-password {
     padding: 10px 12px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
@@ -47,20 +135,10 @@
     font-family: inherit;
 }
 
-.login-password:focus, .login-select:focus {
+.login-password:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--accent-light);
-}
-
-.login-select {
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    background-size: 14px;
-    padding-right: 32px;
 }
 
 .login-btn {

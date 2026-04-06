@@ -1,0 +1,972 @@
+Script started
+Fetching app_config...
+--- Table Config ---
+[
+  {
+    "id": "tables_config",
+    "config": [
+      {
+        "id": "tbl_activities_gruppen",
+        "file": "activities_gruppen.json",
+        "title": "Gemeinschaftsspiele / Gruppen",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Spielname",
+            "accepts": []
+          },
+          {
+            "id": "required_items",
+            "type": "text",
+            "label": "Benötigte Gegenstände",
+            "accepts": []
+          },
+          {
+            "id": "short_description",
+            "type": "text",
+            "label": "Kurzerklärung",
+            "accepts": []
+          },
+          {
+            "id": "rules",
+            "type": "text",
+            "label": "Spielregeln",
+            "accepts": []
+          },
+          {
+            "id": "duration_minutes",
+            "type": "number",
+            "label": "Dauer (min)",
+            "accepts": []
+          },
+          {
+            "id": "preparation_minutes",
+            "type": "number",
+            "label": "Vorbereitungszeit (min)",
+            "accepts": []
+          },
+          {
+            "id": "location",
+            "type": "enum",
+            "label": "Örtlichkeit",
+            "accepts": [],
+            "options": [
+              "überall",
+              "indoor",
+              "outdoor"
+            ]
+          },
+          {
+            "id": "location_notes",
+            "type": "text",
+            "label": "Zusätze Örtlichkeit",
+            "accepts": []
+          },
+          {
+            "id": "min_players",
+            "type": "number",
+            "label": "Mindestanzahl",
+            "accepts": []
+          },
+          {
+            "id": "max_players",
+            "type": "number",
+            "label": "Maximalanzahl",
+            "accepts": []
+          },
+          {
+            "id": "cost",
+            "type": "text",
+            "label": "Kosten",
+            "accepts": []
+          },
+          {
+            "id": "link",
+            "type": "text",
+            "label": "Link/Video/Lied",
+            "accepts": []
+          },
+          {
+            "id": "team_tasks",
+            "type": "text",
+            "label": "Aufgabe Aktivitätenteam",
+            "accepts": []
+          },
+          {
+            "id": "responsible",
+            "type": "enum",
+            "label": "Verantwortlicher",
+            "accepts": [],
+            "options": []
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ],
+        "category": "spiele"
+      },
+      {
+        "id": "tbl_activities_zwischendurch",
+        "file": "activities_zwischendurch.json",
+        "title": "Gemeinschaftsspiele / zwischendurch",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Spielname",
+            "accepts": []
+          },
+          {
+            "id": "required_items",
+            "type": "text",
+            "label": "Benötigte Gegenstände",
+            "accepts": []
+          },
+          {
+            "id": "short_description",
+            "type": "text",
+            "label": "Kurzerklärung",
+            "accepts": []
+          },
+          {
+            "id": "rules",
+            "type": "text",
+            "label": "Spielregeln",
+            "accepts": []
+          },
+          {
+            "id": "duration_minutes",
+            "type": "number",
+            "label": "Dauer (min)",
+            "accepts": []
+          },
+          {
+            "id": "preparation_minutes",
+            "type": "number",
+            "label": "Vorbereitungszeit (min)",
+            "accepts": []
+          },
+          {
+            "id": "location",
+            "type": "enum",
+            "label": "Örtlichkeit",
+            "accepts": [],
+            "options": [
+              "überall",
+              "indoor",
+              "outdoor"
+            ]
+          },
+          {
+            "id": "location_notes",
+            "type": "text",
+            "label": "Zusätze Örtlichkeit",
+            "accepts": []
+          },
+          {
+            "id": "min_players",
+            "type": "number",
+            "label": "Mindestanzahl",
+            "accepts": []
+          },
+          {
+            "id": "max_players",
+            "type": "number",
+            "label": "Maximalanzahl",
+            "accepts": []
+          },
+          {
+            "id": "cost",
+            "type": "text",
+            "label": "Kosten",
+            "accepts": []
+          },
+          {
+            "id": "link",
+            "type": "text",
+            "label": "Link/Video/Lied",
+            "accepts": []
+          },
+          {
+            "id": "team_tasks",
+            "type": "text",
+            "label": "Aufgabe Aktivitätenteam",
+            "accepts": []
+          },
+          {
+            "id": "responsible",
+            "type": "enum",
+            "label": "Verantwortlicher",
+            "accepts": [],
+            "options": []
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ],
+        "category": "spiele"
+      },
+      {
+        "id": "tbl_activities_icebreaker",
+        "file": "activities_icebreaker.json",
+        "title": "Icebreaker",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Spielname",
+            "accepts": []
+          },
+          {
+            "id": "required_items",
+            "type": "text",
+            "label": "Benötigte Gegenstände",
+            "accepts": []
+          },
+          {
+            "id": "short_description",
+            "type": "text",
+            "label": "Kurzerklärung",
+            "accepts": []
+          },
+          {
+            "id": "rules",
+            "type": "text",
+            "label": "Spielregeln",
+            "accepts": []
+          },
+          {
+            "id": "duration_minutes",
+            "type": "number",
+            "label": "Dauer (min)",
+            "accepts": []
+          },
+          {
+            "id": "preparation_minutes",
+            "type": "number",
+            "label": "Vorbereitungszeit (min)",
+            "accepts": []
+          },
+          {
+            "id": "location",
+            "type": "enum",
+            "label": "Örtlichkeit",
+            "accepts": [],
+            "options": [
+              "überall",
+              "indoor",
+              "outdoor"
+            ]
+          },
+          {
+            "id": "location_notes",
+            "type": "text",
+            "label": "Zusätze Örtlichkeit",
+            "accepts": []
+          },
+          {
+            "id": "min_players",
+            "type": "number",
+            "label": "Mindestanzahl",
+            "accepts": []
+          },
+          {
+            "id": "max_players",
+            "type": "number",
+            "label": "Maximalanzahl",
+            "accepts": []
+          },
+          {
+            "id": "cost",
+            "type": "text",
+            "label": "Kosten",
+            "accepts": []
+          },
+          {
+            "id": "link",
+            "type": "text",
+            "label": "Link/Video/Lied",
+            "accepts": []
+          },
+          {
+            "id": "team_tasks",
+            "type": "text",
+            "label": "Aufgabe Aktivitätenteam",
+            "accepts": []
+          },
+          {
+            "id": "responsible",
+            "type": "enum",
+            "label": "Verantwortlicher",
+            "accepts": [],
+            "options": []
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ],
+        "category": "spiele"
+      },
+      {
+        "id": "tbl_activities_sport",
+        "file": "activities_sport.json",
+        "title": "Sportevents",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Spielname",
+            "accepts": []
+          },
+          {
+            "id": "required_items",
+            "type": "text",
+            "label": "Benötigte Gegenstände",
+            "accepts": []
+          },
+          {
+            "id": "short_description",
+            "type": "text",
+            "label": "Kurzerklärung",
+            "accepts": []
+          },
+          {
+            "id": "rules",
+            "type": "text",
+            "label": "Spielregeln",
+            "accepts": []
+          },
+          {
+            "id": "duration_minutes",
+            "type": "number",
+            "label": "Dauer (min)",
+            "accepts": []
+          },
+          {
+            "id": "preparation_minutes",
+            "type": "number",
+            "label": "Vorbereitungszeit (min)",
+            "accepts": []
+          },
+          {
+            "id": "location",
+            "type": "enum",
+            "label": "Örtlichkeit",
+            "accepts": [],
+            "options": [
+              "überall",
+              "indoor",
+              "outdoor"
+            ]
+          },
+          {
+            "id": "location_notes",
+            "type": "text",
+            "label": "Zusätze Örtlichkeit",
+            "accepts": []
+          },
+          {
+            "id": "min_players",
+            "type": "number",
+            "label": "Mindestanzahl",
+            "accepts": []
+          },
+          {
+            "id": "max_players",
+            "type": "number",
+            "label": "Maximalanzahl",
+            "accepts": []
+          },
+          {
+            "id": "cost",
+            "type": "text",
+            "label": "Kosten",
+            "accepts": []
+          },
+          {
+            "id": "link",
+            "type": "text",
+            "label": "Link/Video/Lied",
+            "accepts": []
+          },
+          {
+            "id": "team_tasks",
+            "type": "text",
+            "label": "Aufgabe Aktivitätenteam",
+            "accepts": []
+          },
+          {
+            "id": "responsible",
+            "type": "enum",
+            "label": "Verantwortlicher",
+            "accepts": [],
+            "options": []
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ],
+        "category": "spiele"
+      },
+      {
+        "id": "tbl_activities_sonstige",
+        "file": "activities_sonstige.json",
+        "title": "Sonstige Events",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Spielname",
+            "accepts": []
+          },
+          {
+            "id": "required_items",
+            "type": "text",
+            "label": "Benötigte Gegenstände",
+            "accepts": []
+          },
+          {
+            "id": "short_description",
+            "type": "text",
+            "label": "Kurzerklärung",
+            "accepts": []
+          },
+          {
+            "id": "rules",
+            "type": "text",
+            "label": "Spielregeln",
+            "accepts": []
+          },
+          {
+            "id": "duration_minutes",
+            "type": "number",
+            "label": "Dauer (min)",
+            "accepts": []
+          },
+          {
+            "id": "preparation_minutes",
+            "type": "number",
+            "label": "Vorbereitungszeit (min)",
+            "accepts": []
+          },
+          {
+            "id": "location",
+            "type": "enum",
+            "label": "Örtlichkeit",
+            "accepts": [],
+            "options": [
+              "überall",
+              "indoor",
+              "outdoor"
+            ]
+          },
+          {
+            "id": "location_notes",
+            "type": "text",
+            "label": "Zusätze Örtlichkeit",
+            "accepts": []
+          },
+          {
+            "id": "min_players",
+            "type": "number",
+            "label": "Mindestanzahl",
+            "accepts": []
+          },
+          {
+            "id": "max_players",
+            "type": "number",
+            "label": "Maximalanzahl",
+            "accepts": []
+          },
+          {
+            "id": "cost",
+            "type": "text",
+            "label": "Kosten",
+            "accepts": []
+          },
+          {
+            "id": "link",
+            "type": "text",
+            "label": "Link/Video/Lied",
+            "accepts": []
+          },
+          {
+            "id": "team_tasks",
+            "type": "text",
+            "label": "Aufgabe Aktivitätenteam",
+            "accepts": []
+          },
+          {
+            "id": "responsible",
+            "type": "enum",
+            "label": "Verantwortlicher",
+            "accepts": [],
+            "options": []
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ],
+        "category": "spiele"
+      },
+      {
+        "id": "tbl_sport_volleyball",
+        "file": "sport_volleyball.json",
+        "title": "Volleyball",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Bezeichnung"
+          },
+          {
+            "id": "address",
+            "type": "text",
+            "label": "Adresse / Ort"
+          },
+          {
+            "id": "phone",
+            "type": "text",
+            "label": "Tel. Nummer"
+          },
+          {
+            "id": "type",
+            "type": "enum",
+            "label": "Typ",
+            "options": [
+              "Halle",
+              "Sand / Beach"
+            ]
+          },
+          {
+            "id": "indoor_outdoor",
+            "type": "enum",
+            "label": "Indoor/Outdoor",
+            "options": [
+              "Indoor",
+              "Outdoor"
+            ]
+          },
+          {
+            "id": "cost",
+            "type": "text",
+            "label": "Kosten / Gebühr"
+          },
+          {
+            "id": "notes",
+            "type": "text",
+            "label": "Anmerkungen"
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ],
+        "category": "sportarten"
+      },
+      {
+        "id": "tbl_sport_fussball",
+        "file": "sport_fussball.json",
+        "title": "Fußball",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Bezeichnung"
+          },
+          {
+            "id": "address",
+            "type": "text",
+            "label": "Adresse / Ort"
+          },
+          {
+            "id": "phone",
+            "type": "text",
+            "label": "Tel. Nummer"
+          },
+          {
+            "id": "type",
+            "type": "enum",
+            "label": "Typ",
+            "options": [
+              "Rasen",
+              "Kunstrasen",
+              "Halle",
+              "Hartplatz"
+            ]
+          },
+          {
+            "id": "indoor_outdoor",
+            "type": "enum",
+            "label": "Indoor/Outdoor",
+            "options": [
+              "Indoor",
+              "Outdoor"
+            ]
+          },
+          {
+            "id": "cost",
+            "type": "text",
+            "label": "Kosten / Gebühr"
+          },
+          {
+            "id": "notes",
+            "type": "text",
+            "label": "Anmerkungen"
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ],
+        "category": "sportarten"
+      },
+      {
+        "id": "tbl_inventory",
+        "file": "inventory.json",
+        "title": "Inventar",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Gegenstand"
+          },
+          {
+            "id": "quantity",
+            "type": "number",
+            "label": "Menge / Anzahl"
+          },
+          {
+            "id": "storage_location",
+            "type": "text",
+            "label": "Lagerort"
+          },
+          {
+            "id": "condition",
+            "type": "enum",
+            "label": "Zustand",
+            "options": [
+              "neu",
+              "gut",
+              "gebraucht",
+              "defekt"
+            ]
+          },
+          {
+            "id": "last_checked",
+            "type": "text",
+            "label": "Letzte Prüfung"
+          },
+          {
+            "id": "notes",
+            "type": "text",
+            "label": "Anmerkungen"
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ]
+      },
+      {
+        "id": "tbl_people",
+        "file": "people.json",
+        "title": "Personen",
+        "schema": [
+          {
+            "id": "vorname",
+            "type": "text",
+            "label": "Vorname",
+            "accepts": []
+          },
+          {
+            "id": "nachname",
+            "type": "text",
+            "label": "Nachname",
+            "accepts": []
+          },
+          {
+            "id": "Tel.",
+            "type": "text",
+            "label": "Telefon",
+            "accepts": []
+          },
+          {
+            "id": "Status",
+            "type": "enum",
+            "label": "Status",
+            "accepts": [],
+            "options": [
+              "Aktiv",
+              "Inaktiv"
+            ]
+          },
+          {
+            "id": "role",
+            "type": "enum",
+            "label": "Rolle",
+            "options": [
+              "Superadmin",
+              "Admin",
+              "Supervisor",
+              "User",
+              "Inaktiv"
+            ]
+          },
+          {
+            "id": "responsibility_1",
+            "type": "enum",
+            "label": "Verantwortlich 1",
+            "options": [
+              "Gruppenspiele",
+              "Zwischendurch",
+              "Icebreaker",
+              "Sport",
+              "Sonstige"
+            ]
+          },
+          {
+            "id": "responsibility_2",
+            "type": "enum",
+            "label": "Verantwortlich 2",
+            "options": [
+              "Gruppenspiele",
+              "Zwischendurch",
+              "Icebreaker",
+              "Sport",
+              "Sonstige"
+            ]
+          },
+          {
+            "id": "Spez. Zuständigkeit",
+            "type": "text",
+            "label": "Spez. Zuständigkeit",
+            "accepts": []
+          },
+          {
+            "id": "Team",
+            "type": "tag",
+            "label": "Team",
+            "accepts": []
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ]
+      },
+      {
+        "id": "tbl_events",
+        "title": "Events",
+        "schema": [
+          {
+            "id": "name",
+            "type": "text",
+            "label": "Event Name"
+          },
+          {
+            "id": "date",
+            "type": "date",
+            "label": "Datum"
+          },
+          {
+            "id": "time",
+            "type": "time",
+            "label": "Uhrzeit"
+          },
+          {
+            "id": "location",
+            "type": "text",
+            "label": "Ort"
+          },
+          {
+            "id": "games",
+            "type": "tag",
+            "label": "Spiele"
+          },
+          {
+            "id": "notes",
+            "type": "text",
+            "label": "Notizen"
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ],
+        "defaultRowData": {
+          "date": "TODAY_PLACEHOLDER",
+          "time": "18:30"
+        }
+      },
+      {
+        "id": "tbl_ort",
+        "title": "Orte",
+        "schema": [
+          {
+            "id": "title",
+            "type": "text",
+            "label": "Titel"
+          },
+          {
+            "id": "street",
+            "type": "text",
+            "label": "Straße"
+          },
+          {
+            "id": "address_extra",
+            "type": "text",
+            "label": "Addresszusatz"
+          },
+          {
+            "id": "zip_code",
+            "type": "text",
+            "label": "PLZ"
+          },
+          {
+            "id": "city",
+            "type": "text",
+            "label": "Ortschaft"
+          },
+          {
+            "id": "link",
+            "type": "text",
+            "label": "Link"
+          },
+          {
+            "id": "notes",
+            "type": "text",
+            "label": "Notiz"
+          },
+          {
+            "id": "createdBy",
+            "type": "text",
+            "label": "Erstellt von"
+          },
+          {
+            "id": "createdAt",
+            "type": "date",
+            "label": "Erstellt am"
+          }
+        ]
+      }
+    ],
+    "updated_at": "2026-04-06T17:14:32.922+00:00"
+  }
+]
+
+Fetching enums...
+--- Enums via RPC ---
+{
+  "rolle_enum": [
+    "Superadmin",
+    "Admin",
+    "Supervisor",
+    "User",
+    "Inaktiv"
+  ],
+  "status_enum": [
+    "aktiv",
+    "inaktiv"
+  ],
+  "location_enum": [
+    "ueberall",
+    "indoor",
+    "outdoor"
+  ],
+  "condition_enum": [
+    "Neu",
+    "Einwandfrei",
+    "Gut",
+    "Gebraucht",
+    "Defekt"
+  ],
+  "sport_type_enum": [
+    "volleyball",
+    "fussball"
+  ],
+  "venue_type_enum": [
+    "Halle",
+    "Sand",
+    "Rasen",
+    "Kunstrasen",
+    "Hartplatz"
+  ],
+  "indoor_outdoor_enum": [
+    "Indoor",
+    "Outdoor"
+  ],
+  "activity_category_enum": [
+    "gruppen",
+    "zwischendurch",
+    "icebreaker",
+    "sport",
+    "sonstige"
+  ]
+}

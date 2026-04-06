@@ -195,4 +195,174 @@ export class Dialog {
             okBtn.focus();
         });
     }
+
+    static async showAddColumnDialog(tableId, availableEnums = []) {
+        console.log(`[Dialog] showAddColumnDialog ${tableId}`, availableEnums);
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'custom-dialog-overlay';
+            overlay.style.zIndex = '10000';
+
+            const dialog = document.createElement('div');
+            dialog.className = 'custom-dialog';
+            dialog.style.flexDirection = 'column';
+            dialog.style.width = '460px'; // Slightly wider for row layout
+            dialog.style.alignItems = 'stretch';
+            dialog.style.gap = '16px';
+
+            const title = document.createElement('div');
+            title.className = 'unsaved-msg';
+            title.style.fontWeight = '700';
+            title.style.marginBottom = '8px';
+            title.textContent = 'Neue Spalte hinzufügen';
+            dialog.appendChild(title);
+
+            const createRow = (labelText, inputEl) => {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.justifyContent = 'space-between';
+                row.style.gap = '16px';
+
+                const lbl = document.createElement('div');
+                lbl.className = 'unsaved-msg';
+                lbl.style.fontSize = '13px';
+                lbl.style.whiteSpace = 'nowrap';
+                lbl.textContent = labelText;
+
+                inputEl.style.width = '240px';
+                inputEl.style.marginBottom = '0'; // Override previous default
+
+                row.appendChild(lbl);
+                row.appendChild(inputEl);
+                return row;
+            };
+
+            // Name
+            const nameInput = document.createElement('input');
+            nameInput.className = 'dialog-input';
+            dialog.appendChild(createRow('Name der Spalte:', nameInput));
+
+            // Type
+            const typeSelect = document.createElement('select');
+            typeSelect.className = 'dialog-input';
+            ['text', 'int', 'number', 'date', 'time', 'boolean', 'enum'].forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                typeSelect.appendChild(opt);
+            });
+            dialog.appendChild(createRow('Datentyp:', typeSelect));
+
+            // --- Enum Section ---
+            const enumSelectionRowWrap = document.createElement('div');
+            enumSelectionRowWrap.style.display = 'none';
+            const enumSelect = document.createElement('select');
+            enumSelect.className = 'dialog-input';
+            
+            const populateEnums = () => {
+                enumSelect.innerHTML = '';
+                const baseOpt = document.createElement('option');
+                baseOpt.value = '';
+                baseOpt.textContent = '-- Bestehenden Enum wählen --';
+                enumSelect.appendChild(baseOpt);
+
+                availableEnums.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e;
+                    opt.textContent = e;
+                    enumSelect.appendChild(opt);
+                });
+
+                const newOpt = document.createElement('option');
+                newOpt.value = 'CREATE_NEW';
+                newOpt.textContent = '+ Neuen Enum erstellen...';
+                enumSelect.appendChild(newOpt);
+            };
+            populateEnums();
+            enumSelectionRowWrap.appendChild(createRow('Welcher Enum?', enumSelect));
+            dialog.appendChild(enumSelectionRowWrap);
+
+            // New Enum Creation Section (Hidden initially)
+            const newEnumInputs = document.createElement('div');
+            newEnumInputs.style.display = 'none';
+            newEnumInputs.style.flexDirection = 'column';
+            newEnumInputs.style.gap = '12px';
+            newEnumInputs.style.padding = '12px';
+            newEnumInputs.style.background = 'var(--bg-secondary)';
+            newEnumInputs.style.borderRadius = 'var(--radius-sm)';
+            newEnumInputs.style.marginTop = '4px';
+
+            const newEnumNameInput = document.createElement('input');
+            newEnumNameInput.className = 'dialog-input';
+            newEnumNameInput.placeholder = 'z.B. parkplatz_enum';
+            newEnumInputs.appendChild(createRow('Enum-Name (DB):', newEnumNameInput));
+
+            const newEnumOptionsInput = document.createElement('input');
+            newEnumOptionsInput.className = 'dialog-input';
+            newEnumOptionsInput.placeholder = 'Option A, Option B, ...';
+            newEnumInputs.appendChild(createRow('Optionen:', newEnumOptionsInput));
+            dialog.appendChild(newEnumInputs);
+
+            typeSelect.onchange = () => {
+                const isEnum = typeSelect.value === 'enum';
+                enumSelectionRowWrap.style.display = isEnum ? 'block' : 'none';
+                if (!isEnum) newEnumInputs.style.display = 'none';
+            };
+
+            enumSelect.onchange = () => {
+                newEnumInputs.style.display = enumSelect.value === 'CREATE_NEW' ? 'flex' : 'none';
+            };
+
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.justifyContent = 'flex-end';
+            actions.style.gap = '12px';
+            actions.style.marginTop = '8px';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'discard-btn-header';
+            cancelBtn.textContent = 'Abbrechen';
+            
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'save-btn-header';
+            confirmBtn.textContent = 'Hinzufügen';
+
+            const cleanup = () => overlay.remove();
+
+            cancelBtn.onclick = () => { cleanup(); resolve(null); };
+            confirmBtn.onclick = () => {
+                const nameValue = nameInput.value.trim();
+                const typeValue = typeSelect.value;
+                if (!nameValue) return; // Flash handled by caller or simple return
+                
+                let result = { name: nameValue, type: typeValue };
+
+                if (typeValue === 'enum') {
+                    if (enumSelect.value === 'CREATE_NEW') {
+                        const newName = newEnumNameInput.value.trim();
+                        const options = newEnumOptionsInput.value.split(',').map(o => o.trim()).filter(o => o);
+                        if (!newName || options.length === 0) return alert('Name und Optionen für neuen Enum erforderlich');
+                        result.newEnum = { name: newName, options };
+                        result.type = newName;
+                    } else if (enumSelect.value) {
+                        result.type = enumSelect.value;
+                    } else {
+                        return alert('Bitte einen Enum wählen');
+                    }
+                }
+
+                cleanup();
+                resolve(result);
+            };
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(confirmBtn);
+            dialog.appendChild(actions);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            setTimeout(() => nameInput.focus(), 50);
+        });
+    }
 }

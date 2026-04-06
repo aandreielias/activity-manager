@@ -1,4 +1,6 @@
+import { SupabaseClient } from '../services/SupabaseClient.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
+import { PermissionService } from '../services/PermissionService.js';
 import { LoginDialog } from '../ui/LoginDialog.js';
 import { Blackjack } from '../games/blackjack/games/Blackjack.js';
 import { BlackjackUI } from '../games/blackjack/ui/BlackjackUI.js';
@@ -31,7 +33,7 @@ export class App {
             this._initTheme();
             await this._loadInitialData();
             await this._handleAuthentication();
-            this.tables = await TableLoader.loadAllTables(this.peopleData);
+            this.tables = await TableLoader.loadAllTables(this.peopleData, this.tableConfigs);
             this.uiManager.setupLayout(this.tableConfigs);
             await this.uiManager.loadTables(this.tables, this.peopleData);
             this.uiManager.setupEventListeners();
@@ -66,7 +68,41 @@ export class App {
 
     async _loadInitialData() {
         const base = import.meta.env.BASE_URL;
-        this.tableConfigs = await fetch(`${base}data/tables.json`).then(r => r.json());
+        
+        try {
+            const res = await SupabaseClient.get('app_config', '?id=eq.tables_config');
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.length > 0 && data[0].config) {
+                    this.tableConfigs = data[0].config;
+                    console.log('[App] Table configurations successfully loaded from Supabase.');
+                } else {
+                    throw new Error('Database config is empty or unreachable.');
+                }
+            } else {
+                throw new Error('Database config fetch failed.');
+            }
+        } catch (e) {
+            console.warn('[App] Falling back to check local tables.json:', e.message);
+            
+            try {
+                const localRes = await fetch(`${base}data/tables.json`);
+                if (localRes.ok) {
+                    const ct = localRes.headers.get('content-type');
+                    if (ct && ct.includes('application/json')) {
+                        this.tableConfigs = await localRes.json();
+                        console.log('[App] Falling back to local tables.json.');
+                    } else {
+                        throw new Error('Local tables.json not found or invalid.');
+                    }
+                } else {
+                    throw new Error('Local tables.json not found or invalid.');
+                }
+            } catch (err) {
+                console.error('[App] CRITICAL: No table configurations found anywhere!', err.message);
+                this.tableConfigs = [];
+            }
+        }
 
         try {
             this.peopleData = await DataService.loadPeople();
@@ -116,13 +152,13 @@ export class App {
 
         const person = this.peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === authUser);
         if (!person) {
-            this.globalState.setCurrentUser(authUser, authRole || 'user', { type: 'readonly', tables: [] });
+            this.globalState.setCurrentUser(authUser, authRole || 'User', { type: 'readonly', tables: [] });
         } else {
             // Apply Status-based role override
             if ((person.Status || '').toLowerCase() === 'inaktiv' || (person.role || '').toLowerCase() === 'inaktiv') {
                 authRole = 'Inaktiv';
             } else {
-                authRole = person.role || authRole || 'user';
+                authRole = person.role || authRole || 'User';
             }
             
             let perms = null;
@@ -137,6 +173,7 @@ export class App {
         }
 
         await this.globalState.loadFavorites();
+        await this.globalState.loadGlobalEnums();
     }
 
     // ── Interaction Handlers ─────────────────────────────────────

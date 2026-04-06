@@ -12,16 +12,18 @@ export class StatusField extends EnumField {
         }
 
         const tag = document.createElement('span');
-        tag.className = `inventory-tag status-${value.toLowerCase()}`;
+        const sanitizedValue = value.toLowerCase().replace(/\s+/g, '-');
+        tag.className = `inventory-tag status-${sanitizedValue}`;
         tag.textContent = value;
         this.contentWrap.appendChild(tag);
         
         if (this.td) {
-            this.td.classList.remove('status-cell-aktiv', 'status-cell-inaktiv');
-            const lowerVal = value.toLowerCase();
-            if (lowerVal === 'aktiv' || lowerVal === 'inaktiv') {
-                this.td.classList.add(`status-cell-${lowerVal}`);
-            }
+            // Clear existing status-cell classes
+            this.td.classList.forEach(cls => {
+                if (cls.startsWith('status-cell-')) this.td.classList.remove(cls);
+            });
+            const sanitizedValue = value.toLowerCase().replace(/\s+/g, '-');
+            this.td.classList.add(`status-cell-${sanitizedValue}`);
         }
     }
 }

@@ -148,6 +148,12 @@
     gap: 8px;
 }
 
+.calendar-event-main.status-to-do { background-color: var(--error); }
+.calendar-event-main.status-todo { background-color: var(--error); }
+.calendar-event-main.status-in-progress { background-color: var(--warning); }
+.calendar-event-main.status-done { background-color: var(--success); }
+.calendar-event-main.is-past { background-color: var(--accent) !important; }
+
 .calendar-event-name {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -195,6 +201,11 @@
     color: var(--accent);
     border-color: var(--accent);
 }
+
+.calendar-event-game-btn:hover.status-to-do { background-color: var(--error-light); color: var(--error); border-color: var(--error); }
+.calendar-event-game-btn:hover.status-todo { background-color: var(--error-light); color: var(--error); border-color: var(--error); }
+.calendar-event-game-btn:hover.status-in-progress { background-color: var(--warning-light); color: var(--warning); border-color: var(--warning); }
+.calendar-event-game-btn:hover.status-done { background-color: var(--success-light); color: var(--success); border-color: var(--success); }
 
 .calendar-day.drag-over {
     background: rgba(var(--accent-rgb), 0.1);

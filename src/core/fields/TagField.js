@@ -1,4 +1,5 @@
 import { Field } from './Field.js';
+import { GlobalStateManager } from '../GlobalStateManager.js';
 
 export class TagField extends Field {
     updateDisplay() {
@@ -30,10 +31,17 @@ export class TagField extends Field {
         const rawValue = this.getRawValue();
         const currentTags = rawValue === '—' || !rawValue ? [] : rawValue.split(',').map(t => t.trim()).filter(t => t);
         
-        // Define available tags based on column
+        const globalState = GlobalStateManager.getInstance();
         let availableTags = this.colDef.availableTags || [];
-        if (this.colDef.id === 'Team' && availableTags.length === 0) {
-            availableTags = ['Aktivitäten'];
+        
+        // If no categories are defined, try to find a matching Postgres Enum or specific table list
+        if (availableTags.length === 0) {
+            const globalEnums = globalState.getEnumOptionsForColumn(this.colDef.id, this.tableId);
+            if (globalEnums) {
+                availableTags = globalEnums;
+            } else if (this.colDef.id === 'Team') {
+                availableTags = ['Aktivitäten'];
+            }
         }
 
         return new Promise((resolve) => {

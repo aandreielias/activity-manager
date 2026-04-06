@@ -38,6 +38,7 @@ export class FieldFactory {
             case 'responsible':
                 return new PersonField(params);
             case 'Status':
+            case 'status':
                 return new StatusField(params);
             case 'link':
                 return new LinkField(params);

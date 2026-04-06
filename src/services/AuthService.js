@@ -23,7 +23,7 @@ export class AuthService {
             const insertRes = await SupabaseClient.post('users', {
                 username,
                 password_hash: password, // In production, hash this!
-                role: 'user',
+                role: 'User',
             }, { 'Prefer': 'return=representation' });
 
             if (!insertRes.ok) {
@@ -33,7 +33,7 @@ export class AuthService {
 
             const newUser = (await insertRes.json())[0];
             await UserStatsService.recordLogin(newUser.id);
-            return { success: true, username, userId: newUser.id, role: 'user' };
+            return { success: true, username, userId: newUser.id, role: 'User' };
         }
 
         const user = rows[0];
@@ -43,7 +43,7 @@ export class AuthService {
         }
 
         await UserStatsService.recordLogin(user.id);
-        return { success: true, username, userId: user.id, role: user.role || 'user' };
+        return { success: true, username, userId: user.id, role: user.role || 'User' };
     }
 
     /**

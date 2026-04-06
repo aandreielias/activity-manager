@@ -29,24 +29,72 @@ export class TableRenderer {
         const titleGroup = document.createElement('div');
         titleGroup.className = 'table-title-group';
 
-        const icon = document.createElement('span');
+        const icon = document.createElement('div');
         icon.className = 'collapse-icon';
-        icon.innerHTML = '▾';
+        icon.textContent = '▼';
 
-        const title = document.createElement('span');
+        const title = document.createElement('div');
         title.className = 'table-title';
         title.textContent = this.table.title;
 
         titleGroup.appendChild(icon);
         titleGroup.appendChild(title);
 
+        // Edit Mode: Rename Table Button
+        if (GlobalStateManager.getInstance().isEditModeActive()) {
+            const renameBtn = document.createElement('div');
+            renameBtn.className = 'table-title-edit-btn';
+            renameBtn.innerHTML = '✎';
+            renameBtn.title = 'Tabelle umbenennen';
+            renameBtn.onclick = (e) => {
+                e.stopPropagation();
+                const newTitle = prompt('Neuer Tabellentitel:', this.table.title);
+                if (newTitle && newTitle.trim()) {
+                    this.table.title = newTitle.trim();
+                    title.textContent = newTitle.trim();
+                    GlobalStateManager.getInstance().saveTableConfigs();
+                }
+            };
+            titleGroup.appendChild(renameBtn);
+        }
+
+        const metaGroup = document.createElement('div');
+        metaGroup.style.display = 'flex';
+        metaGroup.style.alignItems = 'center';
+        metaGroup.style.gap = '12px';
+
         const meta = document.createElement('span');
         meta.className = 'table-meta';
         meta.textContent = `${this.table.rows.length} Zeilen`;
-        meta.dataset.role = 'row-count';
+        metaGroup.appendChild(meta);
+
+        // Edit Mode: Add Column Button next to row count
+        if (GlobalStateManager.getInstance().isEditModeActive()) {
+            const addColBtn = document.createElement('button');
+            addColBtn.className = 'edit-mode-action-btn';
+            addColBtn.innerHTML = '+ Spalte hinzufügen';
+            addColBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const gs = GlobalStateManager.getInstance();
+                const { Dialog } = await import('../ui/Dialog.js');
+                
+                // Fetch enums from GS
+                const enums = Object.keys(gs.getEnums());
+
+                const res = await Dialog.showAddColumnDialog(this.table.id, enums);
+                if (res) {
+                    try {
+                        await gs.addColumn(this.table.id, res);
+                    } catch (err) {
+                        // GS handles flash
+                    }
+                }
+            };
+            metaGroup.appendChild(addColBtn);
+        }
 
         header.appendChild(titleGroup);
-        header.appendChild(meta);
+        header.appendChild(metaGroup);
 
         header.addEventListener('click', () => {
             this.element.classList.toggle('collapsed');
@@ -82,33 +130,105 @@ export class TableRenderer {
         tr.appendChild(favTh);
 
         // Column headers
-        this.table.schema.forEach(col => {
+        this.table.schema.forEach((col, index) => {
             const th = document.createElement('th');
-            th.textContent = col.label;
             th.dataset.colId = col.id;
-            th.setAttribute('role', 'columnheader');
             
-            // Re-wrap text to allow space for resizer
-            th.innerHTML = `<div class="th-content">${col.label}</div>`;
+            const content = document.createElement('div');
+            content.className = 'th-content';
+            content.textContent = col.label;
+            th.appendChild(content);
 
-            // Sort functionality
-            th.addEventListener('click', (e) => {
-                if (e.target.classList.contains('col-resizer')) return;
-                this.table.sorter.sortBy(col.id, th);
-            });
+            // Edit Mode: Add Rearrange controls
+            if (GlobalStateManager.getInstance().isEditModeActive()) {
+                const controls = document.createElement('div');
+                controls.className = 'col-edit-controls';
+                controls.style.display = 'flex';
+                controls.style.gap = '4px';
+                controls.style.marginTop = '4px';
 
-            // Resizer element
+                const leftBtn = document.createElement('button');
+                leftBtn.textContent = '←';
+                leftBtn.className = 'col-nav-btn';
+                leftBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this._moveColumn(index, -1);
+                };
+
+                const renameBtn = document.createElement('button');
+                renameBtn.textContent = '✎';
+                renameBtn.className = 'col-nav-btn';
+                renameBtn.title = 'Spalte umbenennen';
+                renameBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const newLabel = prompt(`Neue Beschriftung für '${col.label}':`, col.label);
+                    if (newLabel && newLabel.trim()) {
+                        col.label = newLabel.trim();
+                        this.render();
+                        GlobalStateManager.getInstance().saveTableConfigs();
+                    }
+                };
+
+                const rightBtn = document.createElement('button');
+                rightBtn.textContent = '→';
+                rightBtn.className = 'col-nav-btn';
+                rightBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this._moveColumn(index, 1);
+                };
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '✖';
+                deleteBtn.className = 'col-nav-btn col-delete-btn';
+                deleteBtn.title = 'Spalte löschen';
+                deleteBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    const { Dialog } = await import('../ui/Dialog.js');
+                    const ok = await Dialog.confirm({
+                        message: `Möchtest du die Spalte '${col.label}' wirklich löschen? Alle Daten in dieser Spalte gehen verloren!`,
+                        confirmText: 'Löschen',
+                        confirmStyle: 'warning'
+                    });
+                    if (ok) {
+                        try {
+                            const gs = GlobalStateManager.getInstance();
+                            await gs.removeColumn(this.table.id, col.id);
+                        } catch (err) {
+                            // Flash handled by GS
+                        }
+                    }
+                };
+
+                controls.appendChild(leftBtn);
+                controls.appendChild(renameBtn);
+                controls.appendChild(rightBtn);
+                controls.appendChild(deleteBtn);
+                th.appendChild(controls);
+            }
+
             const resizer = document.createElement('div');
             resizer.className = 'col-resizer';
-            th.appendChild(resizer);
-
             this._setupColumnResizing(th, resizer);
+            th.appendChild(resizer);
 
             tr.appendChild(th);
         });
 
         thead.appendChild(tr);
         return thead;
+    }
+
+    _moveColumn(index, delta) {
+        const newIdx = index + delta;
+        if (newIdx < 0 || newIdx >= this.table.schema.length) return;
+        
+        const schema = this.table.schema;
+        const item = schema.splice(index, 1)[0];
+        schema.splice(newIdx, 0, item);
+        
+        // UI Refresh
+        this.render(); 
+        GlobalStateManager.getInstance().saveTableConfigs();
     }
 
     _setupColumnResizing(th, resizer) {

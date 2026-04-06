@@ -1,0 +1,9 @@
+Fetching current app_config...
+Reordered status for tbl_activities_gruppen (after name)
+Reordered status for tbl_activities_zwischendurch (after name)
+Reordered status for tbl_activities_icebreaker (after name)
+Reordered status for tbl_activities_sport (after name)
+Reordered status for tbl_activities_sonstige (after name)
+Reordered status for tbl_events (after date)
+Updating app_config with new order...
+Successfully reordered status column in app_config

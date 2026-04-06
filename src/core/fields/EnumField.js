@@ -1,4 +1,5 @@
 import { Field } from './Field.js';
+import { GlobalStateManager } from '../GlobalStateManager.js';
 
 export class EnumField extends Field {
     createEditor() {
@@ -28,15 +29,12 @@ export class EnumField extends Field {
         const menu = document.createElement('div');
         menu.className = 'enum-dropdown-menu';
 
-        const emptyItem = document.createElement('button');
-        emptyItem.className = 'enum-dropdown-item';
-        emptyItem.type = 'button';
-        emptyItem.dataset.value = '';
-        emptyItem.textContent = '-- Auswählen --';
-        if (!originalValue || originalValue === '—') emptyItem.style.color = 'var(--accent)';
-        menu.appendChild(emptyItem);
+        const globalState = GlobalStateManager.getInstance();
+        const globalEnumName = this._getEnumNameForColumn(this.colDef.id);
+        const globalOptions = globalEnumName ? globalState.getEnumOptions(globalEnumName) : null;
+        const optionsToUse = globalOptions || (this.colDef.options || []);
 
-        (this.colDef.options || []).forEach(option => {
+        optionsToUse.forEach(option => {
             const item = document.createElement('button');
             item.className = 'enum-dropdown-item';
             item.type = 'button';
@@ -54,6 +52,31 @@ export class EnumField extends Field {
             }
             menu.appendChild(item);
         });
+
+        // Edit Mode: Add new option button
+        if (globalState.isEditModeActive() && globalEnumName) {
+            const separator = document.createElement('div');
+            separator.className = 'context-menu-separator';
+            menu.appendChild(separator);
+
+            const addBtn = document.createElement('button');
+            addBtn.className = 'enum-dropdown-item add-enum-option-btn';
+            addBtn.innerHTML = '<span style="color:var(--warning)">+ Option hinzufügen</span>';
+            addBtn.style.fontStyle = 'italic';
+            addBtn.onclick = async (e) => {
+                 e.stopPropagation();
+                 const newValue = prompt(`Neue Auswahl für '${this.colDef.label}' (${globalEnumName}):`);
+                 if (newValue && newValue.trim()) {
+                    try {
+                        await globalState.addEnumOption(globalEnumName, newValue.trim());
+                        container.closeMenu();
+                    } catch (err) {
+                        alert(`Fehler: ${err.message}`);
+                    }
+                }
+            };
+            menu.appendChild(addBtn);
+        }
 
         if (!textSpan.textContent) {
             textSpan.textContent = '-- Auswählen --';
@@ -180,5 +203,26 @@ export class EnumField extends Field {
         if (editor.destroy) {
             editor.destroy();
         }
+    }
+
+    _getEnumNameForColumn(colId) {
+        const id = colId.toLowerCase();
+        if (id === 'status' || id === 'Status') {
+            if (this.tableId === 'tbl_people') return 'status_enum';
+            return 'task_status_enum';
+        }
+        if (id === 'role' || id === 'rolle') return 'rolle_enum';
+        if (id === 'location' || id === 'ort') return 'location_enum';
+        if (id === 'category' || id === 'kategorie') return 'activity_category_enum';
+        if (id === 'condition' || id === 'zustand') return 'condition_enum';
+        if (id === 'type' || id === 'typ') {
+            // Need table context here or common guess
+            if (this.tableId === 'tbl_inventory') return 'condition_enum';
+            if (this.tableId === 'tbl_people') return 'rolle_enum';
+            if (this.tableId === 'tbl_users' || this.tableId === 'users') return 'rolle_enum';
+            if (this.tableId.includes('sport')) return 'venue_type_enum';
+        }
+        if (id === 'indoor_outdoor') return 'indoor_outdoor_enum';
+        return null;
     }
 }

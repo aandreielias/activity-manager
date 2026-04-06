@@ -24,6 +24,8 @@ export class Header {
         this.favoritesActive = false;
         this.currentResults = [];
         this.selectedIndex = -1;
+
+        GlobalStateManager.getInstance().onFlashMessageCallback((msg, type) => this.showFlash(msg, type));
     }
 
     render() {
@@ -86,12 +88,18 @@ export class Header {
                 <button class="nav-btn inventory-toggle-btn" title="Inventar-Ansicht umschalten">
                     Inventar
                 </button>` : ''}
+
+                ${globalState.isEditModeActive() ? `
+                <button class="nav-btn orte-btn" title="Orte verwalten">
+                    Orte
+                </button>` : ''}
             </nav>
             <div class="header-center">
                 <div class="header-search-container">
                     <input type="text" class="header-search-input" placeholder="Suchen..." aria-label="Global search">
                     <div class="search-results-dropdown"></div>
                 </div>
+                <div class="flash-banner" style="display: none;"></div>
                 <div class="unsaved-banner" style="display: none;">
                     <span class="unsaved-msg">Ungespeicherte Änderungen vorhanden</span>
                     <button class="save-btn-header">Speichern</button>
@@ -105,6 +113,11 @@ export class Header {
                         Nutzer
                     </button>
                 ` : ''}
+                ${globalState.isEditModeActive() ? `
+                    <button class="nav-btn add-table-btn" style="border-color:var(--warning); color:var(--warning)" title="Neue Kategorie erstellen">
+                        + Kategorie
+                    </button>
+                ` : ''}
                 <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
                     Kalender
                 </button>
@@ -113,7 +126,11 @@ export class Header {
                         ${globalState.getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
                     </button>
                     <div class="dropdown-menu user-dropdown-menu">
-                        ${globalState.canUseEditMode() ? `<button class="dropdown-item edit-mode-btn">Edit-Modus aktivieren</button>` : ''}
+                        ${globalState.canUseEditMode() ? `
+                            <button class="dropdown-item edit-mode-btn ${globalState.isEditModeActive() ? 'active' : ''}">
+                                ${globalState.isEditModeActive() ? 'Edit-Modus deaktivieren' : 'Edit-Modus aktivieren'}
+                            </button>
+                        ` : ''}
                         <button class="dropdown-item favorites-toggle-btn">Favoriten</button>
                         <button class="dropdown-item change-password-btn">Passwort ändern</button>
                         <button class="dropdown-item logout-btn">Abmelden</button>
@@ -180,8 +197,29 @@ export class Header {
                 this.onInventoryToggle?.();
             }
 
+            if (e.target.closest('.orte-btn')) {
+                this.onTableSwitch?.('tbl_ort');
+            }
+
             if (e.target.closest('.user-info-btn')) {
                 this.onUserInfo?.();
+            }
+            
+            if (e.target.closest('.add-table-btn')) {
+                const name = prompt('Name für die neue Kategorie (z.B. Escape Rooms):');
+                if (name) {
+                    try {
+                        const gs = GlobalStateManager.getInstance();
+                        const slug = name.toLowerCase().replace(/\s+/g, '_');
+                        // 1. Add to activity_category_enum
+                        await gs.addEnumOption('activity_category_enum', slug);
+                        // 2. Update local tables.json (simulated or instructions given)
+                        alert(`Kategorie '${name}' in DB erstellt. Bitte füge 'tbl_activities_${slug}' zu tables.json hinzu.`);
+                        window.location.reload();
+                    } catch (err) {
+                        alert(`Fehler: ${err.message}`);
+                    }
+                }
             }
 
             if (e.target.closest('.calendar-toggle-btn')) {
@@ -471,6 +509,7 @@ export class Header {
         const bar = banner.querySelector('.save-loading-bar');
 
         if (isLoading) {
+            document.body.style.cursor = 'wait';
             if (msg) msg.textContent = 'Speichere...';
             if (saveBtn) {
                 saveBtn.disabled = true;
@@ -479,6 +518,7 @@ export class Header {
             if (discardBtn) discardBtn.disabled = true;
             if (bar) bar.style.display = 'block';
         } else {
+            document.body.style.cursor = 'default';
             if (msg) msg.textContent = 'Ungespeicherte Änderungen vorhanden';
             if (saveBtn) {
                 saveBtn.disabled = false;
@@ -487,5 +527,22 @@ export class Header {
             if (discardBtn) discardBtn.disabled = false;
             if (bar) bar.style.display = 'none';
         }
+    }
+
+    showFlash(message, type = 'success') {
+        const banner = this.element.querySelector('.flash-banner');
+        if (!banner) return;
+
+        banner.textContent = message;
+        banner.className = `flash-banner flash-${type}`;
+        banner.style.display = 'block';
+        banner.style.opacity = '1';
+
+        setTimeout(() => {
+            banner.style.opacity = '0';
+            setTimeout(() => {
+                banner.style.display = 'none';
+            }, 300);
+        }, 3000);
     }
 }

@@ -64,6 +64,7 @@ export class DataService {
         }
 
         const rows = await res.json();
+        console.log(`[DataService] Data loaded for ${tableId || supaTable}:`, rows);
         return rows.map(r => this._fromDb(supaTable, r));
     }
 
@@ -171,6 +172,7 @@ export class DataService {
                     link: row.link || '',
                     team_tasks: row.team_tasks || '',
                     responsible_id: row.responsible || row.responsible_id || null,
+                    status: row.status || 'To Do',
                     created_by: row.createdBy || null,
                     created_at: row.createdAt || new Date().toISOString()
                 };
@@ -211,6 +213,7 @@ export class DataService {
                     time: row.time || '18:30',
                     location: row.location?.id || null,
                     games: row.games || '',
+                    status: row.status || 'To Do',
                     notes: row.notes || '',
                     created_by: row.createdBy || null,
                     created_at: row.createdAt || new Date().toISOString()
@@ -275,6 +278,7 @@ export class DataService {
                     link: row.link || '',
                     team_tasks: row.team_tasks || '',
                     responsible: row.responsible_id || '',
+                    status: row.status || 'To Do',
                     createdBy: row.created_by || 'Unbekannt',
                     createdAt: row.created_at || null,
                 };
@@ -314,6 +318,7 @@ export class DataService {
                     time: row.time || '',
                     location: row.location || '',
                     games: row.games || '',
+                    status: row.status || 'To Do',
                     notes: row.notes || '',
                     createdBy: row.created_by || 'Unbekannt',
                     createdAt: row.created_at || null,

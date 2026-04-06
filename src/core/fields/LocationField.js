@@ -175,72 +175,107 @@ export class LocationField extends Field {
             // Initially show some suggestions if any
             renderResults();
 
-            // Form Fields Grid
+            // Form Fields Dynamic Grid
             const fieldsContainer = document.createElement('div');
             fieldsContainer.style.display = 'grid';
             fieldsContainer.style.gridTemplateColumns = 'repeat(12, 1fr)';
             fieldsContainer.style.gap = '20px';
 
-            const createFieldGroup = (label, id, value = '', colSpan = 12, isTextArea = false) => {
-                const group = document.createElement('div');
-                group.style.gridColumn = `span ${colSpan}`;
-                
-                const lbl = document.createElement('div');
-                lbl.style.fontSize = '12px';
-                lbl.style.fontWeight = '500';
-                lbl.style.marginBottom = '6px';
-                lbl.style.color = 'var(--text-secondary)';
-                lbl.textContent = label;
-                
-                const input = document.createElement(isTextArea ? 'textarea' : 'input');
-                input.className = 'dialog-input';
-                input.style.width = '100%';
-                if (isTextArea) {
-                    input.style.minHeight = '80px';
-                    input.style.resize = 'vertical';
-                }
-                input.value = value || '';
-                input.dataset.fieldId = id;
-                
-                group.appendChild(lbl);
-                group.appendChild(input);
-                return { group, input };
+            const inputsMap = {};
+            const current = this.value || {};
+
+            // Find ORT schema
+            const ortConfig = GlobalStateManager.getInstance().getTableConfig('tbl_ort');
+            const schema = ortConfig?.schema || [
+                { id: 'title', label: 'Titel', type: 'text' },
+                { id: 'street', label: 'Straße', type: 'text' },
+                { id: 'address_extra', label: 'Adresszusatz', type: 'text' },
+                { id: 'zip_code', label: 'PLZ', type: 'text' },
+                { id: 'city', label: 'Ortschaft', type: 'text' },
+                { id: 'link', label: 'Link', type: 'text' },
+                { id: 'notes', label: 'Notiz', type: 'text' }
+            ];
+
+            const renderFields = () => {
+                fieldsContainer.innerHTML = '';
+                schema.forEach((col, index) => {
+                    if (['id', 'createdBy', 'createdAt'].includes(col.id)) return;
+
+                    const colSpan = (col.id === 'zip_code') ? 3 : (col.id === 'city' ? 9 : (col.id === 'address_extra' ? 5 : (col.id === 'street' ? 7 : 12)));
+                    const isTextArea = col.id === 'notes' || col.id === 'notizen';
+
+                    const group = document.createElement('div');
+                    group.className = 'field-group-container';
+                    group.style.gridColumn = `span ${colSpan}`;
+                    group.style.position = 'relative';
+
+                    const labelRow = document.createElement('div');
+                    labelRow.style.display = 'flex';
+                    labelRow.style.justifyContent = 'space-between';
+                    labelRow.style.alignItems = 'center';
+                    labelRow.style.marginBottom = '6px';
+
+                    const lbl = document.createElement('div');
+                    lbl.style.fontSize = '12px';
+                    lbl.style.fontWeight = '500';
+                    lbl.style.color = 'var(--text-secondary)';
+                    lbl.textContent = col.label;
+                    labelRow.appendChild(lbl);
+
+                    // Edit Mode Controls for Rearrange
+                    if (GlobalStateManager.getInstance().isEditModeActive()) {
+                        const controls = document.createElement('div');
+                        controls.style.display = 'flex';
+                        controls.style.gap = '4px';
+
+                        const upBtn = document.createElement('button');
+                        upBtn.className = 'col-nav-btn';
+                        upBtn.textContent = '↑';
+                        upBtn.onclick = (e) => {
+                            e.preventDefault();
+                            if (index > 0) {
+                                const item = schema.splice(index, 1)[0];
+                                schema.splice(index - 1, 0, item);
+                                renderFields();
+                                GlobalStateManager.getInstance().saveTableConfigs();
+                            }
+                        };
+
+                        const downBtn = document.createElement('button');
+                        downBtn.className = 'col-nav-btn';
+                        downBtn.textContent = '↓';
+                        downBtn.onclick = (e) => {
+                            e.preventDefault();
+                            if (index < schema.length - 1) {
+                                const item = schema.splice(index, 1)[0];
+                                schema.splice(index + 1, 0, item);
+                                renderFields();
+                                GlobalStateManager.getInstance().saveTableConfigs();
+                            }
+                        };
+
+                        controls.appendChild(upBtn);
+                        controls.appendChild(downBtn);
+                        labelRow.appendChild(controls);
+                    }
+                    
+                    const input = document.createElement(isTextArea ? 'textarea' : 'input');
+                    input.className = 'dialog-input';
+                    input.style.width = '100%';
+                    if (isTextArea) {
+                        input.style.minHeight = '80px';
+                        input.style.resize = 'vertical';
+                    }
+                    input.value = inputsMap[col.id]?.value || current[col.id] || '';
+                    inputsMap[col.id] = input;
+                    
+                    group.appendChild(labelRow);
+                    group.appendChild(input);
+                    fieldsContainer.appendChild(group);
+                });
             };
 
-            const current = this.value || {};
-            const inputsMap = {};
-
-            // Title - Row 1
-            const titleRow = createFieldGroup('Titel / Name des Ortes', 'title', current.title, 12);
-            fieldsContainer.appendChild(titleRow.group);
-            inputsMap.title = titleRow.input;
-
-            // Street & Extra - Row 2
-            const streetCol = createFieldGroup('Straße & Hausnummer', 'street', current.street, 7);
-            const extraCol = createFieldGroup('Adresszusatz', 'address_extra', current.address_extra, 5);
-            fieldsContainer.appendChild(streetCol.group);
-            fieldsContainer.appendChild(extraCol.group);
-            inputsMap.street = streetCol.input;
-            inputsMap.address_extra = extraCol.input;
-
-            // ZIP & City - Row 3
-            const zipCol = createFieldGroup('PLZ', 'zip_code', current.zip_code, 3);
-            const cityCol = createFieldGroup('Ortschaft', 'city', current.city, 9);
-            fieldsContainer.appendChild(zipCol.group);
-            fieldsContainer.appendChild(cityCol.group);
-            inputsMap.zip_code = zipCol.input;
-            inputsMap.city = cityCol.input;
-
-            // Link - Row 4
-            const linkRow = createFieldGroup('Link (Webseite / Google Maps)', 'link', current.link, 12);
-            fieldsContainer.appendChild(linkRow.group);
-            inputsMap.link = linkRow.input;
-
-            // Notes - Row 5
-            const notesRow = createFieldGroup('Notizen / Besonderheiten', 'notes', current.notes, 12, true);
-            fieldsContainer.appendChild(notesRow.group);
-            inputsMap.notes = notesRow.input;
-
+            renderFields();
             dialog.appendChild(fieldsContainer);
 
             // Buttons

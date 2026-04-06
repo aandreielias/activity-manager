@@ -23,9 +23,10 @@ export class PermissionService {
      */
     static canViewTable(tableId, context) {
         const { role, permissions } = context;
-        if (role === 'Superadmin') return true;
+        const normalizedRole = (role || '').toLowerCase();
+        if (normalizedRole === 'superadmin') return true;
         if (!permissions || !permissions.type) {
-            return role === 'Admin' || role === 'Supervisor' || true; // Default fallback
+            return normalizedRole === 'admin' || normalizedRole === 'supervisor' || true; // Default fallback
         }
 
         switch (permissions.type) {
@@ -55,13 +56,14 @@ export class PermissionService {
      */
     static canEditTable(tableId, context) {
         const { role, permissions } = context;
-        if (role === 'Superadmin') return true;
+        const r = (role || '').toLowerCase();
+        if (r === 'superadmin') return true;
 
         // Everyone (Users) can view, but only Supervisor+ can edit Events
-        if (tableId === 'tbl_events' && (role === 'User' || !role)) return false;
+        if (tableId === 'tbl_events' && (r === 'user' || !r)) return false;
 
         if (!permissions || !permissions.type) {
-            if (role === 'Admin') return true;
+            if (r === 'admin') return true;
             return tableId !== 'tbl_people' && tableId !== 'people_table';
         }
 
@@ -88,7 +90,7 @@ export class PermissionService {
      * Determines if a user can edit roles within the people table.
      */
     static canEditRoles(context) {
-        if (context.role === 'Superadmin') return true;
+        if ((context.role || '').toLowerCase() === 'superadmin') return true;
         return context.permissions?.canEditRoles === true;
     }
 
@@ -96,7 +98,7 @@ export class PermissionService {
      * Determines if a user can view administrative statistics.
      */
     static canSeeStats(context) {
-        if (context.role === 'Superadmin') return true;
+        if ((context.role || '').toLowerCase() === 'superadmin') return true;
         return context.permissions?.canManageUsers || 
                context.permissions?.managementAccess === this.MGMT_ACCESS.STATS_ONLY || 
                context.permissions?.managementAccess === this.MGMT_ACCESS.STATS_PERMS;
@@ -106,7 +108,7 @@ export class PermissionService {
      * Determines if a user can manage other users' permissions.
      */
     static canManagePermissions(context) {
-        if (context.role === 'Superadmin') return true;
+        if ((context.role || '').toLowerCase() === 'superadmin') return true;
         return context.permissions?.managementAccess === this.MGMT_ACCESS.STATS_PERMS;
     }
 
@@ -114,7 +116,7 @@ export class PermissionService {
      * Determines if a user can use the "Edit Mode" feature.
      */
     static canUseEditMode(context) {
-        if (context.role === 'Superadmin' || context.role === 'Admin') return true;
+        if ((context.role || '').toLowerCase() === 'superadmin') return true;
         return context.permissions?.canUseEditMode === true;
     }
 
@@ -131,12 +133,20 @@ export class PermissionService {
      */
     static getPermissionsForRole(role) {
         const r = (role || 'User').toLowerCase();
-        if (r === 'superadmin' || r === 'admin') {
+        if (r === 'superadmin') {
             return {
                 type: this.TYPES.ALL,
                 managementAccess: this.MGMT_ACCESS.STATS_PERMS,
-                canEditRoles: r === 'superadmin',
+                canEditRoles: true,
                 canUseEditMode: true
+            };
+        }
+        if (r === 'admin') {
+            return {
+                type: this.TYPES.ALL,
+                managementAccess: this.MGMT_ACCESS.STATS_PERMS,
+                canEditRoles: false,
+                canUseEditMode: false // Admins don't get it by default anymore
             };
         }
         if (r === 'supervisor') {

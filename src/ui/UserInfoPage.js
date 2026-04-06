@@ -158,7 +158,7 @@ export class UserInfoPage {
                         <div class="settings-card">
                             <h5>Dashboard Zugriff</h5>
                             <p class="settings-desc">Bestimmt, welche Administrations-Tools dieser Nutzer sehen kann.</p>
-                            <select class="mgmt-select-modern" ${person.role === 'Superadmin' ? 'disabled' : ''}>
+                            <select class="mgmt-select-modern" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>
                                 <option value="none" ${userPerm.managementAccess === 'none' ? 'selected' : ''}>Kein Zugriff</option>
                                 <option value="stats_only" ${userPerm.managementAccess === 'stats_only' ? 'selected' : ''}>Nur Statistiken</option>
                                 <option value="stats_perms" ${userPerm.managementAccess === 'stats_perms' ? 'selected' : ''}>Stats & Berechtigungen</option>
@@ -167,7 +167,7 @@ export class UserInfoPage {
                             <div class="admin-role-toggle">
                                 <span>Administrator-Status</span>
                                 <label class="toggle-switch">
-                                    <input type="checkbox" class="admin-role-cb" ${person.role === 'Admin' ? 'checked' : ''} ${person.role === 'Superadmin' ? 'disabled' : ''}>
+                                    <input type="checkbox" class="admin-role-cb" ${(person.role || '').toLowerCase() === 'admin' ? 'checked' : ''} ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
@@ -178,11 +178,11 @@ export class UserInfoPage {
                             <h5>Zugriffs-Profil</h5>
                             <p class="settings-desc">Vordefinierte Berechtigungs-Schemas für schnelles Zuweisen.</p>
                             <div class="permission-presets">
-                                <button class="preset-btn ${userPerm.type === 'readonly' ? 'active' : ''}" data-type="readonly" ${person.role === 'Superadmin' ? 'disabled' : ''}>Lese-Schutz</button>
-                                <button class="preset-btn ${userPerm.type === 'except_people' ? 'active' : ''}" data-type="except_people" ${person.role === 'Superadmin' ? 'disabled' : ''}>Ohne Personen</button>
-                                <button class="preset-btn ${userPerm.type === 'except_inventory' ? 'active' : ''}" data-type="except_inventory" ${person.role === 'Superadmin' ? 'disabled' : ''}>Ohne Inventar</button>
-                                <button class="preset-btn ${userPerm.type === 'all' ? 'active' : ''}" data-type="all" ${person.role === 'Superadmin' ? 'disabled' : ''}>Vollzugriff</button>
-                                <button class="preset-btn ${userPerm.type === 'specific' ? 'active' : ''}" data-type="specific" ${person.role === 'Superadmin' ? 'disabled' : ''}>Manuell</button>
+                                <button class="preset-btn ${userPerm.type === 'readonly' ? 'active' : ''}" data-type="readonly" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Lese-Schutz</button>
+                                <button class="preset-btn ${userPerm.type === 'except_people' ? 'active' : ''}" data-type="except_people" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Ohne Personen</button>
+                                <button class="preset-btn ${userPerm.type === 'except_inventory' ? 'active' : ''}" data-type="except_inventory" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Ohne Inventar</button>
+                                <button class="preset-btn ${userPerm.type === 'all' ? 'active' : ''}" data-type="all" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Vollzugriff</button>
+                                <button class="preset-btn ${userPerm.type === 'specific' ? 'active' : ''}" data-type="specific" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Manuell</button>
                             </div>
                         </div>
                     </div>

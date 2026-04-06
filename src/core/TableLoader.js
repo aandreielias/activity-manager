@@ -6,22 +6,21 @@ import { DataService } from '../services/DataService.js';
  * the relational Supabase schema. No local JSON fallback.
  */
 export class TableLoader {
-    static async loadAllTables(peopleData = null) {
-        const base = import.meta.env.BASE_URL;
-
-        // Fetch tables configuration (still a static JSON for schema definitions)
-        const tablesRes = await fetch(`${base}data/tables.json`);
-        const tablesConfig = await tablesRes.json();
+    static async loadAllTables(peopleData = null, tablesConfig = []) {
+        if (!tablesConfig || tablesConfig.length === 0) {
+            console.error('[TableLoader] No table configurations provided.');
+            return {};
+        }
 
         const tables = {};
         const allGames = [];
 
         for (const config of tablesConfig) {
             try {
-                // Load rows from the relational DB via DataService
                 const data = await DataService.loadRows(config.id);
 
                 const table = this._createTableInstance(config, data, peopleData);
+                console.log(`[TableLoader] Initialized ${config.title} (${config.id}) with ${data.length} rows.`);
 
                 if (config.category === 'spiele') {
                     allGames.push(...data);

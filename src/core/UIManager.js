@@ -41,6 +41,7 @@ export class UIManager {
     }
 
     setupLayout(tableConfigs) {
+        this.globalState.setTableConfigs(tableConfigs);
         const appElement = document.getElementById('app');
         appElement.innerHTML = '';
 
@@ -61,7 +62,14 @@ export class UIManager {
         this.header.onSaveAll = () => this.app._handleSaveAll();
         this.header.onDiscardAll = () => this.app._handleDiscardAll();
         this.header.onFavoritesToggle = (active) => this._handleFavoritesToggle(active);
-        this.header.onEditModeToggle = (active) => this.globalState.setEditModeActive(active);
+        this.header.onEditModeToggle = (active) => {
+            this.globalState.setEditModeActive(active);
+            this.reloadTables();
+            // Replacing the header in the DOM is a bit heavy, but Header.js is mostly static HTML
+            // so we can just update its internal state or find the buttons.
+            // For now, let's just reload the whole app state to be safe.
+            window.location.reload(); 
+        };
         this.header.onCalendarToggle = () => this._handleCalendarToggle();
         this.header.onLogoDoubleClick = () => this.app._launchBlackjack();
 
@@ -96,7 +104,10 @@ export class UIManager {
 
         // Initialize Calendar
         if (tables['tbl_events']) {
-            this.calendarView = new CalendarView({ eventsTable: tables['tbl_events'].instance });
+            this.calendarView = new CalendarView({ 
+                eventsTable: tables['tbl_events'].instance,
+                allTables: tables 
+            });
             const wrapper = document.createElement('div');
             wrapper.className = 'table-view-wrapper calendar-view-wrapper';
             wrapper.dataset.tableId = 'calendar';
@@ -291,8 +302,86 @@ export class UIManager {
         const calBtn = this.header.element.querySelector('.calendar-toggle-btn');
         calBtn?.classList.toggle('active', tableId === 'calendar');
 
+        // Manage Add Category button Visibility
+        this._updateAddCategoryButton(tableId);
+
         if (rowId) {
             this._highlightRow(rowId, colId);
+        }
+    }
+
+    _updateAddCategoryButton(tableId) {
+        let btn = document.getElementById('add-category-footer-btn');
+        const isEditMode = this.globalState.isEditModeActive();
+        const isCollectiveView = (tableId === 'all-spiele' || tableId === 'all-sportarten');
+
+        if (!btn && isEditMode && isCollectiveView) {
+            btn = document.createElement('button');
+            btn.id = 'add-category-footer-btn';
+            btn.className = 'add-category-footer-btn';
+            btn.innerHTML = `
+                <div class="add-cat-plus">+</div>
+                <div class="add-cat-text">Neue Kategorie hinzufügen...</div>
+            `;
+            btn.onclick = () => this._handleCreateNewCategory(tableId);
+            this.tablesContainer.appendChild(btn);
+
+            // Add CSS for this button dynamically if not in Table.css
+            const style = document.createElement('style');
+            style.textContent = `
+                .add-category-footer-btn {
+                    width: 100%;
+                    padding: 24px;
+                    background: var(--bg-secondary);
+                    border: 2px dashed var(--warning);
+                    border-radius: var(--radius);
+                    color: var(--warning);
+                    cursor: pointer;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    margin-top: 24px;
+                    margin-bottom: 48px;
+                    transition: all 0.2s;
+                }
+                .add-category-footer-btn:hover {
+                    background: var(--warning-light);
+                    border-style: solid;
+                }
+                .add-cat-plus { font-size: 32px; font-weight: bold; }
+                .add-cat-text { font-size: 14px; font-weight: 600; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        if (btn) {
+            btn.style.display = (isEditMode && isCollectiveView) ? 'flex' : 'none';
+            if (isCollectiveView) {
+                btn.querySelector('.add-cat-text').textContent = `Neue Kategorie in ${tableId === 'all-spiele' ? 'Spiele' : 'Sportarten'} hinzufügen...`;
+            }
+        }
+    }
+
+    async _handleCreateNewCategory(viewId) {
+        const name = prompt(`Name der neuen Kategorie (z.B. New Category):`);
+        if (!name || !name.trim()) return;
+
+        try {
+            const slug = name.toLowerCase().replace(/\s+/g, '_');
+            const enumName = viewId === 'all-spiele' ? 'activity_category_enum' : 'sport_type_enum';
+            
+            // 1. Database level (Enum)
+            await this.globalState.addEnumOption(enumName, slug);
+            
+            // 2. Client alert with JSON snippet
+            const schemaSnippet = viewId === 'all-spiele' ? 'ACTIVITIES_SCHEMA' : 'SPORTS_SCHEMA';
+            alert(`✅ Kategorie '${name}' in der DB erstellt!\n\nBitte füge dies zu tables.json hinzu:\n\n{ "id": "tbl_activities_${slug}", "title": "${name}", "category": "${viewId === 'all-spiele' ? 'spiele' : 'sportarten'}", "schema": ${schemaSnippet} }`);
+            
+            window.location.reload();
+        } catch (err) {
+            alert(`Fehler: ${err.message}`);
         }
     }
 

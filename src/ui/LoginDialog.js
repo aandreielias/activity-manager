@@ -19,13 +19,25 @@ export class LoginDialog {
             dialog.innerHTML = `
                 <h2>Login</h2>
                 <div class="login-input-group">
-                    <select id="login-user-select" class="login-select input-field">
-                        <option value="" disabled selected hidden>Nutzer Auswählen</option>
-                        ${(peopleData || []).map(p => {
-                            const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
-                            return name ? `<option value="${name}">${name}</option>` : '';
-                        }).join('')}
-                    </select>
+                    <div id="login-user-dropdown" class="custom-login-select">
+                        <div class="login-select-display">
+                            <span class="selected-value">Nutzer Auswählen</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="login-select-options">
+                            ${(peopleData || []).map(p => {
+                                const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
+                                if (!name) return '';
+                                const role = p.role || '';
+                                return `
+                                    <div class="login-option" data-value="${name}">
+                                        <span class="option-name">${name}</span>
+                                        <span class="option-role">${role}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
                 </div>
                 <div class="login-input-group">
                     <input type="password" id="login-password-input" placeholder="Passwort" class="login-password input-field">
@@ -37,13 +49,45 @@ export class LoginDialog {
             overlay.appendChild(dialog);
             document.body.appendChild(overlay);
 
-            const select = dialog.querySelector('#login-user-select');
+            const dropdown = dialog.querySelector('#login-user-dropdown');
+            const display = dropdown.querySelector('.login-select-display');
+            const selectedText = display.querySelector('.selected-value');
+            const optionsContainer = dropdown.querySelector('.login-select-options');
             const password = dialog.querySelector('#login-password-input');
             const submitBtn = dialog.querySelector('#login-submit-btn');
             const errorMsg = dialog.querySelector('#login-error-msg');
 
+            let selectedUser = '';
+
+            // Toggle dropdown
+            display.onclick = (e) => {
+                e.stopPropagation();
+                const isOpen = dropdown.classList.contains('open');
+                // Close all other dropdowns if any
+                dropdown.classList.toggle('open');
+            };
+
+            // Select option
+            dropdown.querySelectorAll('.login-option').forEach(opt => {
+                opt.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedUser = opt.dataset.value;
+                    selectedText.textContent = selectedUser;
+                    dropdown.classList.remove('open');
+                    password.focus();
+                };
+            });
+
+            // Close on outside click
+            const outsideClick = (e) => {
+                if (!dropdown.contains(e.target)) {
+                    dropdown.classList.remove('open');
+                }
+            };
+            window.addEventListener('click', outsideClick);
+
             const handleLogin = async () => {
-                const user = select.value;
+                const user = selectedUser;
                 const pass = password.value;
 
                 if (!user) { errorMsg.textContent = 'Bitte Nutzer auswählen'; return; }
@@ -51,10 +95,13 @@ export class LoginDialog {
 
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Wird angemeldet...';
+                document.body.style.cursor = 'wait';
 
                 try {
                     const result = await AuthService.authenticate(user, pass);
+                    document.body.style.cursor = 'default';
 
+                    window.removeEventListener('click', outsideClick);
                     document.body.removeChild(overlay);
                     resolve({
                         username: user,
@@ -66,6 +113,7 @@ export class LoginDialog {
                     errorMsg.textContent = e.message;
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Anmelden';
+                    document.body.style.cursor = 'default';
                 }
             };
 

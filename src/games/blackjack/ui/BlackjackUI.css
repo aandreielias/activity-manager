@@ -17,8 +17,8 @@
 }
 
 @keyframes blackjackFadeIn {
-    from { opacity: 0; transform: translateY(20px) scale(0.98); filter: blur(5px); }
-    to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    from { opacity: 0; transform: translateY(10px); filter: blur(10px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 .blackjack-header {
@@ -50,24 +50,43 @@
 
 .blackjack-stats {
     display: flex;
-    gap: 32px;
+    gap: 48px;
     font-family: 'DM Mono', monospace;
-    font-size: 13px;
     color: var(--text-secondary);
 }
 
 .stat-item {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    opacity: 0.6;
+}
+
+.stat-values {
+    display: flex;
+    flex-direction: column;
     align-items: center;
 }
 
 .stat-value {
     color: var(--text-primary);
     font-weight: 700;
-    padding: 2px 8px;
-    background: var(--bg-tertiary);
-    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.stat-alltime {
+    font-size: 11px;
+    color: var(--text-muted);
+    opacity: 0.5;
+    margin-top: 2px;
 }
 
 .blackjack-close {
@@ -97,7 +116,9 @@
     align-items: center;
     padding: 60px 40px;
     gap: 40px;
-    background: var(--bg);
+    background: var(--bg); /* Back to neutral background */
+    position: relative;
+    overflow-y: auto;
 }
 
 .game-area {
@@ -105,7 +126,23 @@
     max-width: 900px;
     display: flex;
     flex-direction: column;
-    gap: 60px;
+    gap: 40px;
+    padding: 80px 40px;
+    background-color: #1b4d36; /* Solid Casino Green */
+    box-shadow: var(--shadow-lg);
+    border-radius: 60px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-section-container {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    justify-content: center;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    backdrop-filter: none !important;
 }
 
 .hand-section {
@@ -113,23 +150,47 @@
     flex-direction: column;
     gap: 24px;
     position: relative;
-    padding: 30px;
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    border: 1px solid var(--border-light);
+    padding: 40px;
+    background: rgba(0, 0, 0, 0.15); /* Slightly lighter solid dark */
+    border-radius: 40px; 
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s;
+    min-width: 380px;
+}
+
+.player-section.active {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.01);
 }
 
 .hand-label {
     font-family: 'DM Mono', monospace;
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-muted);
+    letter-spacing: 0.2em;
+    color: rgba(255, 255, 255, 0.4);
     position: absolute;
-    top: -10px;
-    left: 20px;
-    background: var(--bg);
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     padding: 0 8px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.dealer-score, .player-score {
+    padding-left: 12px;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.dealer-score.bust, .player-score.bust {
+    color: var(--error);
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
 
 .cards-container {
@@ -149,17 +210,58 @@
     flex-direction: column;
     justify-content: space-between;
     padding: 12px;
-    color: #1a1a1a; /* True black for card content */
+    color: #1a1a1a; 
     box-shadow: var(--shadow-md);
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
     user-select: none;
     border: 1px solid #e0e0e0;
+    
+    /* Dealing Animation */
+    animation: cardDeal 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards,
+               cardSlideIn 0.4s ease-out;
+    backface-visibility: hidden;
+    transform-origin: center center;
+    overflow: visible;
 }
 
+@keyframes cardSlideIn {
+    from { 
+        width: 0; 
+        margin-right: -20px; 
+    }
+    to { 
+        width: 110px; 
+        margin-right: 0; 
+    }
+}
+
+@keyframes cardDeal {
+    from { 
+        transform: translateY(-800px) rotateX(60deg); 
+        opacity: 0; 
+        filter: blur(15px);
+    }
+    to { 
+        transform: translateY(0) rotateX(0); 
+        opacity: 1; 
+        filter: blur(0);
+    }
+}
+
+/* Staggered sequential deal - the official official order */
+.player-cards .card-item:nth-child(1) { animation-delay: 0.2s; }
+.dealer-cards .card-item:nth-child(1) { animation-delay: 0.6s; }
+.player-cards .card-item:nth-child(2) { animation-delay: 1.0s; }
+.dealer-cards .card-item:nth-child(2) { animation-delay: 1.4s; }
+
+/* Any subsequent cards (hit cards) should have zero delay for immediate feedback */
+.card-item:nth-child(n+3) { animation-delay: 0s; }
+
 .card-item:hover {
-    transform: translateY(-8px) rotate(2deg);
+    transform: translateY(-8px) scale(1.05);
     box-shadow: var(--shadow-lg);
+    z-index: 10;
 }
 
 .card-item.hidden {
@@ -206,30 +308,6 @@
     flex-direction: column;
     align-items: center;
     align-self: flex-end;
-}
-
-.score-badge {
-    position: absolute;
-    right: 20px;
-    top: -10px;
-    background: var(--bg);
-    padding: 0 8px;
-    min-width: 32px;
-    text-align: center;
-    border-radius: 4px;
-    font-family: 'DM Mono', monospace;
-    font-weight: 700;
-    font-size: 11px;
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    transition: all 0.3s;
-}
-
-.score-badge.bust {
-    background: var(--error);
-    color: white;
-    border-color: var(--error);
-    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
 
 @keyframes shake {

@@ -1,0 +1,35 @@
+--- PermissionService Test Audit ---
+Role            Table                Can View   Can Edit
+------------------------------------------------------------
+Superadmin      tbl_people           ✅          ✅
+Superadmin      tbl_inventory        ✅          ✅
+Superadmin      tbl_activities_sport ✅          ✅
+Superadmin      tbl_events           ✅          ✅
+------------------------------------------------------------
+Admin           tbl_people           ✅          ✅
+Admin           tbl_inventory        ✅          ✅
+Admin           tbl_activities_sport ✅          ✅
+Admin           tbl_events           ✅          ✅
+------------------------------------------------------------
+Supervisor      tbl_people           ✅          ✅
+Supervisor      tbl_inventory        ✅          ✅
+Supervisor      tbl_activities_sport ✅          ✅
+Supervisor      tbl_events           ✅          ✅
+------------------------------------------------------------
+User            tbl_people           ❌          ❌
+User            tbl_inventory        ✅          ✅
+User            tbl_activities_sport ✅          ✅
+User            tbl_events           ✅          ❌
+------------------------------------------------------------
+Inaktiv         tbl_people           ❌          ❌
+Inaktiv         tbl_inventory        ❌          ❌
+Inaktiv         tbl_activities_sport ❌          ❌
+Inaktiv         tbl_events           ❌          ❌
+------------------------------------------------------------
+
+--- Special Feature Checks ---
+[Superadmin] Stats: ✅, Manage Perms: ✅, Edit Roles: ✅, Edit Mode: ✅
+[Admin] Stats: ✅, Manage Perms: ✅, Edit Roles: ❌, Edit Mode: ❌
+[Supervisor] Stats: ✅, Manage Perms: ❌, Edit Roles: ❌, Edit Mode: ❌
+[User] Stats: ❌, Manage Perms: ❌, Edit Roles: ❌, Edit Mode: ❌
+[Inaktiv] Stats: ❌, Manage Perms: ❌, Edit Roles: ❌, Edit Mode: ❌

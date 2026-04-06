@@ -17,12 +17,15 @@ export class Blackjack extends AGame {
 
     #shoe = new Deck();
     #deadCards = [];
-    #playerHand = [];
+    #playerHands = [[]];
+    #activeHandIndex = 0;
     #dealerHand = [];
     #phase = Blackjack.PHASES.IDLE;
     #dealerHidden = true;
     #stats = { wins: 0, losses: 0, pushes: 0 };
-    #lastResult = null;
+    #lastResults = [];
+    #isDoubleDown = false;
+    #isInsuranceTaken = false;
     onRoundUpdate = null;
 
     constructor() {
@@ -42,13 +45,14 @@ export class Blackjack extends AGame {
         return {
             name: this.getName(),
             phase: this.#phase,
-            playerHand: this.#playerHand.map(c => ({ 
+            playerHands: this.#playerHands.map(hand => hand.map(c => ({ 
                 symbol: c.getRank().symbol, 
                 suitSymbol: c.getSuit().symbol, 
                 isRed: c.getSuit().isRed,
                 fullName: c.toFullString(),
                 toString: c.toString()
-            })),
+            }))),
+            activeHandIndex: this.#activeHandIndex,
             dealerHand: this.#dealerHand.map((c, i) => ({ 
                 symbol: (this.#dealerHidden && i === 1) ? '?' : c.getRank().symbol, 
                 suitSymbol: (this.#dealerHidden && i === 1) ? '?' : c.getSuit().symbol, 
@@ -57,13 +61,18 @@ export class Blackjack extends AGame {
                 isHidden: (this.#dealerHidden && i === 1),
                 toString: (this.#dealerHidden && i === 1) ? '[ ?? ]' : c.toString()
             })),
-            playerScore: this.#calculateScore(this.#playerHand),
+            playerScores: this.#playerHands.map(h => this.#calculateScore(h)),
             dealerScore: this.#calculateScore(this.#dealerHidden && this.#dealerHand.length > 0 ? [this.#dealerHand[0]] : this.#dealerHand),
             dealerFullScore: this.#calculateScore(this.#dealerHand),
             stats: { ...this.#stats },
             shoeSize: this.#shoe.size(),
-            lastResult: this.#lastResult,
-            dealerHidden: this.#dealerHidden
+            lastResults: this.#lastResults,
+            dealerHidden: this.#dealerHidden,
+            canDouble: this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands[this.#activeHandIndex].length === 2,
+            canInsurance: this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands[0].length === 2 && this.#dealerHand[0].getRank() === Rank.ACE && !this.#isInsuranceTaken,
+            canSplit: this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands.length === 1 && this.#playerHands[0].length === 2 && 
+                     this.#playerHands[0][0].getRank().defaultValue === this.#playerHands[0][1].getRank().defaultValue,
+            isInsuranceTaken: this.#isInsuranceTaken
         };
     }
 
@@ -84,13 +93,31 @@ export class Blackjack extends AGame {
                     this.#playerStand();
                 }
                 break;
+            case 'double':
+                if (this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands[this.#activeHandIndex].length === 2) {
+                    this.#isDoubleDown = true;
+                    this.#playerHit();
+                    if (this.#phase !== Blackjack.PHASES.RESULT && this.#phase !== Blackjack.PHASES.DEALER_TURN) {
+                        this.#playerStand();
+                    }
+                }
+                break;
+            case 'insurance':
+                if (this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands[0].length === 2 && this.#dealerHand[0].getRank() === Rank.ACE) {
+                    this.#isInsuranceTaken = true;
+                }
+                break;
             case 'continue':
                 if (this.#phase === Blackjack.PHASES.RESULT) {
                     this.#phase = Blackjack.PHASES.IDLE;
-                    this.#playerHand = [];
+                    this.#playerHands = [[]];
+                    this.#activeHandIndex = 0;
                     this.#dealerHand = [];
-                    this.#lastResult = null;
+                    this.#lastResults = [];
                 }
+                break;
+            case 'split':
+                this.#playerSplit();
                 break;
             default:
                 console.warn(`Unknown action: ${type}`);
@@ -111,23 +138,26 @@ export class Blackjack extends AGame {
         }
 
         this.#phase = Blackjack.PHASES.DEALING;
-        this.#playerHand = [];
+        this.#playerHands = [[]];
+        this.#activeHandIndex = 0;
         this.#dealerHand = [];
         this.#dealerHidden = true;
-        this.#lastResult = null;
+        this.#lastResults = [];
+        this.#isDoubleDown = false;
+        this.#isInsuranceTaken = false;
 
         // One burn card
         const burnCard = this.#shoe.draw();
         this.#deadCards.push(burnCard);
 
         // Alternating deal
-        this.#playerHand.push(this.#shoe.draw());
+        this.#playerHands[0].push(this.#shoe.draw());
         this.#dealerHand.push(this.#shoe.draw());
-        this.#playerHand.push(this.#shoe.draw());
+        this.#playerHands[0].push(this.#shoe.draw());
         this.#dealerHand.push(this.#shoe.draw());
 
         // Check for immediate blackjack
-        if (this.#isBlackJack(this.#playerHand) || this.#isBlackJack(this.#dealerHand)) {
+        if (this.#isBlackJack(this.#playerHands[0]) || this.#isBlackJack(this.#dealerHand)) {
             this.#resolveRound();
         } else {
             this.#phase = Blackjack.PHASES.PLAYER_TURN;
@@ -135,16 +165,41 @@ export class Blackjack extends AGame {
     }
 
     #playerHit() {
-        this.#playerHand.push(this.#shoe.draw());
-        const score = this.#calculateScore(this.#playerHand);
+        const hand = this.#playerHands[this.#activeHandIndex];
+        hand.push(this.#shoe.draw());
+        const score = this.#calculateScore(hand);
+        
         if (score > 21) {
-            this.#resolveRound();
+            this.#advanceHand();
         }
     }
 
     #playerStand() {
-        this.#phase = Blackjack.PHASES.DEALER_TURN;
-        this.#dealerPlay();
+        this.#advanceHand();
+    }
+
+    #playerSplit() {
+        if (this.#phase !== Blackjack.PHASES.PLAYER_TURN || this.#playerHands.length !== 1) return;
+        const main = this.#playerHands[0];
+        if (main.length !== 2 || main[0].getRank().defaultValue !== main[1].getRank().defaultValue) return;
+
+        const card2 = main.pop();
+        this.#playerHands.push([card2]);
+        
+        // Draw one card for each
+        this.#playerHands[0].push(this.#shoe.draw());
+        this.#playerHands[1].push(this.#shoe.draw());
+        
+        // Note: Rules vary on whether split Aces can hit. Simplified: yes.
+    }
+
+    #advanceHand() {
+        if (this.#activeHandIndex < this.#playerHands.length - 1) {
+            this.#activeHandIndex++;
+        } else {
+            this.#phase = Blackjack.PHASES.DEALER_TURN;
+            this.#dealerPlay();
+        }
     }
 
     #dealerPlay() {
@@ -231,44 +286,58 @@ export class Blackjack extends AGame {
     #resolveRound() {
         this.#phase = Blackjack.PHASES.RESULT;
         this.#dealerHidden = false;
+        this.#lastResults = [];
 
-        const pScore = this.#calculateScore(this.#playerHand);
         const dScore = this.#calculateScore(this.#dealerHand);
-        const pBJ = this.#isBlackJack(this.#playerHand);
         const dBJ = this.#isBlackJack(this.#dealerHand);
 
-        if (pScore > 21) {
-            this.#lastResult = 'BUST';
-            this.#stats.losses++;
-        } else if (pBJ && dBJ) {
-            this.#lastResult = 'PUSH';
-            this.#stats.pushes++;
-        } else if (pBJ) {
-            this.#lastResult = 'BLACKJACK';
-            this.#stats.wins++;
-        } else if (dBJ) {
-            this.#lastResult = 'LOSS';
-            this.#stats.losses++;
-        } else if (dScore > 21) {
-            this.#lastResult = 'WIN';
-            this.#stats.wins++;
-        } else if (pScore > dScore) {
-            this.#lastResult = 'WIN';
-            this.#stats.wins++;
-        } else if (dScore > pScore) {
-            this.#lastResult = 'LOSS';
-            this.#stats.losses++;
-        } else {
-            this.#lastResult = 'PUSH';
-            this.#stats.pushes++;
+        this.#playerHands.forEach((hand, idx) => {
+            const pScore = this.#calculateScore(hand);
+            const pBJ = this.#isBlackJack(hand);
+            let res = '';
+
+            if (pScore > 21) {
+                res = 'BUST';
+                this.#stats.losses++;
+            } else if (pBJ && dBJ) {
+                res = 'PUSH';
+                this.#stats.pushes++;
+            } else if (pBJ) {
+                res = 'BLACKJACK';
+                this.#stats.wins++;
+            } else if (dBJ) {
+                res = 'LOSS';
+                this.#stats.losses++;
+            } else if (dScore > 21) {
+                res = 'WIN';
+                this.#stats.wins++;
+            } else if (pScore > dScore) {
+                res = 'WIN';
+                this.#stats.wins++;
+            } else if (dScore > pScore) {
+                res = 'LOSS';
+                this.#stats.losses++;
+            } else {
+                res = 'PUSH';
+                this.#stats.pushes++;
+            }
+
+            this.#lastResults.push(res);
+        });
+
+        // Handle Insurance
+        if (this.#isInsuranceTaken && dBJ) {
+            // Simplified summary
+            this.#lastResults = ['INSURANCE PAYOUT', ...this.#lastResults];
         }
 
-        // Add all cards to dead cards
-        this.#deadCards.push(...this.#playerHand, ...this.#dealerHand);
+        // Cleanup cards
+        this.#deadCards.push(...this.#dealerHand);
+        this.#playerHands.forEach(h => this.#deadCards.push(...h));
 
-        // Notify UI/Stat service
+        // Notify
         if (this.onRoundUpdate) {
-            this.onRoundUpdate(this.#lastResult, { ...this.#stats });
+            this.onRoundUpdate(this.#lastResults[0] || 'RESULT', { ...this.#stats });
         }
     }
 }

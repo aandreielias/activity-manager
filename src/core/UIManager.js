@@ -71,6 +71,7 @@ export class UIManager {
             window.location.reload(); 
         };
         this.header.onCalendarToggle = () => this._handleCalendarToggle();
+        this.header.onCalendarFull = () => this._handleCalendarFullView();
         this.header.onLogoDoubleClick = () => this.app._launchBlackjack();
 
         appElement.appendChild(this.header.render());
@@ -284,7 +285,7 @@ export class UIManager {
 
         if (this.splitSideContainer.classList.contains('full-view')) {
             this.splitSideContainer.classList.remove('full-view');
-            const open = this.header.personsSplitOpen || this.header.inventorySplitOpen;
+            const open = this.header.personsSplitOpen || this.header.inventorySplitOpen || this.header.calendarSplitOpen;
             this.splitSideContainer.style.display = open ? 'flex' : 'none';
             this.resizer.style.display = open ? 'block' : 'none';
         }
@@ -386,9 +387,30 @@ export class UIManager {
     }
 
     _handleCalendarToggle() {
-        this._handleTableSwitch('calendar');
-        this.header.switchTo(null); // Deselect table buttons
-        this.calendarView?._updateUI();
+        if (this.splitSideContainer.classList.contains('full-view')) {
+            this.splitSideContainer.classList.remove('full-view');
+            this.tablesContainer.style.display = 'flex';
+        } else {
+            this.header.calendarSplitOpen = !this.header.calendarSplitOpen;
+            if (this.header.calendarSplitOpen) {
+                this.header.personsSplitOpen = false;
+                this.header.inventorySplitOpen = false;
+                this._setSplitContent('calendar');
+            }
+        }
+        this._updateSplitVisibility();
+    }
+
+    _handleCalendarFullView() {
+        this.tablesContainer.style.display = 'none';
+        this._setSplitContent('calendar');
+        this.splitSideContainer.style.display = 'flex';
+        this.resizer.style.display = 'none';
+        this.splitSideContainer.classList.add('full-view');
+        this.header.calendarSplitOpen = true;
+        this.header.personsSplitOpen = false;
+        this.header.inventorySplitOpen = false;
+        this._updateSplitVisibility();
     }
 
     _highlightRow(rowId, colId) {
@@ -445,12 +467,13 @@ export class UIManager {
     }
 
     _updateSplitVisibility() {
-        const open = this.header.personsSplitOpen || this.header.inventorySplitOpen;
+        const open = this.header.personsSplitOpen || this.header.inventorySplitOpen || this.header.calendarSplitOpen;
         this.splitSideContainer.style.display = open ? 'flex' : 'none';
         this.resizer.style.display = open ? 'block' : 'none';
 
         this.header.element.querySelector('.persons-toggle-btn')?.classList.toggle('active', this.header.personsSplitOpen);
         this.header.element.querySelector('.inventory-toggle-btn')?.classList.toggle('active', this.header.inventorySplitOpen);
+        this.header.element.querySelector('.calendar-toggle-btn')?.classList.toggle('active', this.header.calendarSplitOpen);
     }
 
     _setSplitContent(type) {
@@ -474,10 +497,10 @@ export class UIManager {
             this.personsTable = activeTable;
             this.inactivePersonsTable = inactiveTable;
         } else {
-            const table = type === 'inventory' ? this.inventoryTable : this.personsTable;
+            const table = type === 'inventory' ? this.inventoryTable : (type === 'calendar' ? this.calendarView : this.personsTable);
             if (table) {
                 const el = table.render();
-                el.className = 'persons-table-full';
+                el.className = type === 'calendar' ? 'calendar-table-full' : 'persons-table-full';
                 this.splitSideContainer.appendChild(el);
             }
         }
@@ -541,7 +564,7 @@ export class UIManager {
     }
 
     async reloadTables() {
-        this.tables = await TableLoader.loadAllTables(this.app.peopleData);
+        this.tables = await TableLoader.loadAllTables(this.app.peopleData, this.app.tableConfigs);
         this.header.tables = this.tables;
 
         if (this.tables['tbl_inventory']) {

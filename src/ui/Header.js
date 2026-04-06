@@ -16,11 +16,9 @@ export class Header {
         this.element = null;
         this.personsSplitOpen = false;
         this.inventorySplitOpen = false;
-        this.onUserInfo = null;
-        this.onLogout = null;
-        this.onChangePassword = null;
         this.onFavoritesToggle = null;
         this.onLogoDoubleClick = null;
+        this.onCalendarFull = null;
         this.favoritesActive = false;
         this.currentResults = [];
         this.selectedIndex = -1;
@@ -224,6 +222,7 @@ export class Header {
 
             if (e.target.closest('.calendar-toggle-btn')) {
                 this._closeAllDropdowns();
+                // Simple click handles split view toggle
                 this.onCalendarToggle?.();
             }
 
@@ -286,6 +285,14 @@ export class Header {
         if (inventoryBtn) {
             inventoryBtn.addEventListener('dblclick', () => {
                 this.onInventoryFullView?.();
+            });
+        }
+
+        const calendarBtn = this.element.querySelector('.calendar-toggle-btn');
+        if (calendarBtn) {
+            calendarBtn.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                this.onCalendarFull?.();
             });
         }
 

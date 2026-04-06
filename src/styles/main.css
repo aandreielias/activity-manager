@@ -33,6 +33,10 @@
     --shadow-md:      0 4px 8px rgba(15,15,11,0.08);
     --shadow-lg:      0 8px 16px rgba(15,15,11,0.1);
 
+    /* RGB variants for transparency */
+    --accent-rgb:     0, 132, 255;
+    --border-color-rgb: 229, 229, 227;
+
     /* Spacing & Radius */
     --radius:         6px;
     --radius-sm:      4px;
@@ -66,6 +70,9 @@
     --shadow-sm:      0 2px 4px rgba(0,0,0,0.3);
     --shadow-md:      0 4px 8px rgba(0,0,0,0.4);
     --shadow-lg:      0 8px 16px rgba(0,0,0,0.5);
+
+    --accent-rgb:     50, 145, 255;
+    --border-color-rgb: 55, 55, 55;
 }
 
 /* ── Reset ───────────────────────────────────────────── */
@@ -240,6 +247,29 @@ html, body {
 .persons-table-full {
     width: 100%;
     flex: 0 0 auto;
+}
+
+.calendar-table-full {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+.calendar-table-full .calendar-view-container {
+    padding: 12px;
+    gap: 12px;
+    border-radius: 0;
+}
+
+.calendar-table-full .calendar-grid {
+    min-width: 600px; /* Force minimum width to keep grid usable in sidebar */
+}
+
+/* Ensure individual months headers aren't huge in split view */
+.calendar-table-full .calendar-header h2 {
+    font-size: 1.1rem;
 }
 
 /* ── View Transitions ───────────────────────────────── */

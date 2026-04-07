@@ -68,7 +68,10 @@ export class Header {
         return `
             <div class="header-left" title="do NOT double click">
                 <span class="header-logo">⬡</span>
-                <span class="header-title">${this.appName}</span>
+                <div class="logo-stack">
+                    <span class="header-title">${this.appName}</span>
+                    <span class="header-version">v2.0.1</span>
+                </div>
             </div>
             <nav class="header-nav">
                 ${this._renderCategoryButton(spieleTables, 'spiele', 'Spiele')}

@@ -44,6 +44,23 @@
     color: var(--text-primary);
 }
 
+.logo-stack {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: normal;
+}
+
+.header-version {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-top: -2px;
+    opacity: 0.6;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
 .header-nav {
     display: flex;
     align-items: center;

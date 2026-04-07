@@ -22,7 +22,7 @@
 }
 
 .blackjack-header {
-    height: 64px;
+    height: 72px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -33,7 +33,7 @@
 }
 
 .blackjack-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--text-primary);
@@ -50,43 +50,71 @@
 
 .blackjack-stats {
     display: flex;
-    gap: 48px;
+    gap: 12px;
     font-family: 'DM Mono', monospace;
-    color: var(--text-secondary);
 }
 
 .stat-item {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 4px;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 14px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+    min-width: 100px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
 }
+
+.stat-item::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    opacity: 0.8;
+}
+
+.stat-item.wins::after { background: var(--success); }
+.stat-item.losses::after { background: var(--error); }
+.stat-item.pushes::after { background: var(--text-muted); }
 
 .stat-label {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.1em;
-    opacity: 0.6;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    opacity: 0.8;
 }
 
-.stat-values {
+.stat-row {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
 }
 
 .stat-value {
     color: var(--text-primary);
-    font-weight: 700;
+    font-weight: 800;
     font-size: 16px;
     line-height: 1;
 }
 
-.stat-alltime {
-    font-size: 11px;
+.stat-historical {
+    font-size: 9px;
     color: var(--text-muted);
+    font-weight: 500;
     opacity: 0.5;
-    margin-top: 2px;
+}
+
+.stat-historical::before {
+    content: 'T:'; /* Total */
+    margin-right: 2px;
+    font-size: 7px;
+    opacity: 0.7;
 }
 
 .blackjack-close {

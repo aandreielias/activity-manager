@@ -24,25 +24,25 @@ export class BlackjackUI {
             <div class="blackjack-header">
                 <div class="blackjack-title">Blackjack</div>
                 <div class="blackjack-stats">
-                    <div class="stat-item">
+                    <div class="stat-item wins">
                         <span class="stat-label">WINS</span>
-                        <div class="stat-values">
+                        <div class="stat-row">
                             <span class="stat-value wins-val">0</span>
-                            <span class="stat-alltime all-wins-val">0</span>
+                            <span class="stat-historical all-wins-val" title="All-time Total">0</span>
                         </div>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item losses">
                         <span class="stat-label">LOSSES</span>
-                        <div class="stat-values">
+                        <div class="stat-row">
                             <span class="stat-value losses-val">0</span>
-                            <span class="stat-alltime all-losses-val">0</span>
+                            <span class="stat-historical all-losses-val" title="All-time Total">0</span>
                         </div>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item pushes">
                         <span class="stat-label">PUSHES</span>
-                        <div class="stat-values">
+                        <div class="stat-row">
                             <span class="stat-value pushes-val">0</span>
-                            <span class="stat-alltime">–</span>
+                            <span class="stat-historical">—</span>
                         </div>
                     </div>
                 </div>

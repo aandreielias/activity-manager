@@ -26,7 +26,7 @@ export class PermissionService {
         const normalizedRole = (role || '').toLowerCase();
         if (normalizedRole === 'superadmin') return true;
         if (!permissions || !permissions.type) {
-            return normalizedRole === 'admin' || normalizedRole === 'supervisor' || true; // Default fallback
+            return normalizedRole === 'admin' || normalizedRole === 'supervisor'; // Safe fallback: only admins/supervisors see all by default
         }
 
         switch (permissions.type) {

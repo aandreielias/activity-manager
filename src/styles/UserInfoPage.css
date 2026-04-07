@@ -173,7 +173,41 @@
     letter-spacing: 0.5px;
 }
 
-.role-badge { background: var(--bg); border: 1px solid var(--border); color: var(--text-primary); }
+.role-select-badge {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 2px 24px 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+}
+
+.role-select-badge:hover {
+    border-color: var(--accent);
+    background-color: var(--bg-secondary);
+}
+
+.role-select-badge:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-faded);
+}
+
+.role-select-badge:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+    background-image: none;
+}
 .status-badge.aktiv { background: var(--success); color: white; }
 .status-badge.kürzlich { background: var(--warning); color: black; }
 .status-badge.idle { background: var(--bg-tertiary); color: var(--text-muted); border: 1px dotted var(--border); }
@@ -458,16 +492,7 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
     animation: slideUpFade 0.3s ease-out, fadeOut 0.5s ease-in 1.5s forwards;
 }
 
-.admin-role-toggle {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border-light);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
-    font-weight: 600;
-}
+/* .admin-role-toggle styles removed */
 
 @keyframes sectionFadeUp {
     from { opacity: 0; transform: translateY(10px); }

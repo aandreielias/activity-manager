@@ -51,6 +51,7 @@ export class LocationField extends Field {
         let orte = [];
         if (res.ok) orte = await res.json();
         
+        const inputsMap = {};
         this.selectedId = this.value?.id || null;
 
         return new Promise((resolve) => {
@@ -79,12 +80,7 @@ export class LocationField extends Field {
             header.textContent = 'Standort-Details';
             dialog.appendChild(header);
 
-            const subheader = document.createElement('div');
-            subheader.style.fontSize = '13px';
-            subheader.style.color = 'var(--text-muted)';
-            subheader.style.marginBottom = '24px';
-            subheader.textContent = 'Geben Sie eine neue Adresse ein oder wählen Sie einen bestehenden Ort.';
-            dialog.appendChild(subheader);
+
 
             // Existing selection - Custom Picker
             const pickerGroup = document.createElement('div');
@@ -104,12 +100,41 @@ export class LocationField extends Field {
             pickerLabel.textContent = 'Bestehenden Ort suchen & laden';
             pickerGroup.appendChild(pickerLabel);
 
+            const searchRow = document.createElement('div');
+            searchRow.style.display = 'flex';
+            searchRow.style.gap = '10px';
+            searchRow.style.marginBottom = '8px';
+
             const searchInput = document.createElement('input');
             searchInput.className = 'dialog-input';
             searchInput.placeholder = 'Nach Titel oder Adresse suchen...';
-            searchInput.style.width = '100%';
-            searchInput.style.marginBottom = '8px';
-            pickerGroup.appendChild(searchInput);
+            searchInput.style.flex = '1';
+            searchRow.appendChild(searchInput);
+
+            const plusBtn = document.createElement('button');
+            plusBtn.className = 'save-btn-header';
+            plusBtn.innerHTML = '<span>+</span> Neuer Ort';
+            plusBtn.style.whiteSpace = 'nowrap';
+            plusBtn.style.fontSize = '12px';
+            plusBtn.style.height = '36px';
+            plusBtn.style.display = 'flex';
+            plusBtn.style.alignItems = 'center';
+            plusBtn.style.gap = '6px';
+            plusBtn.style.padding = '0 16px';
+            plusBtn.title = 'Alle Felder leeren, um einen neuen Ort zu erstellen';
+            plusBtn.onclick = () => {
+                this.selectedId = null;
+                Object.values(inputsMap).forEach(input => input.value = '');
+                searchInput.value = '';
+                plusBtn.style.background = 'var(--accent)';
+                plusBtn.style.color = 'white';
+                setTimeout(() => {
+                    plusBtn.style.background = '';
+                    plusBtn.style.color = '';
+                }, 1000);
+            };
+            searchRow.appendChild(plusBtn);
+            pickerGroup.appendChild(searchRow);
 
             const resultsList = document.createElement('div');
             resultsList.style.maxHeight = '150px';
@@ -181,7 +206,7 @@ export class LocationField extends Field {
             fieldsContainer.style.gridTemplateColumns = 'repeat(12, 1fr)';
             fieldsContainer.style.gap = '20px';
 
-            const inputsMap = {};
+
             const current = this.value || {};
 
             // Find ORT schema

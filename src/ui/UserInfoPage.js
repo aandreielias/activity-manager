@@ -93,6 +93,7 @@ export class UserInfoPage {
 
     static _renderUserProfile(container, person, userStat, tableConfigs, peopleData) {
         const globalState = GlobalStateManager.getInstance();
+        const isSuperAdmin = globalState.isSuperAdmin();
         const name = `${person.vorname || ''} ${person.nachname || ''}`.trim();
         
         // Load fresh permissions map
@@ -110,7 +111,11 @@ export class UserInfoPage {
                     <div class="hero-details">
                         <h3>${name}</h3>
                         <div class="hero-badges">
-                            <span class="badge role-badge">${person.role || 'Nutzer'}</span>
+                            <select class="badge role-select-badge" ${((person.role || '').toLowerCase() === 'superadmin' && !isSuperAdmin) ? 'disabled' : ''}>
+                                ${['Superadmin', 'Admin', 'Supervisor', 'User', 'Inaktiv'].map(r => `
+                                    <option value="${r}" ${ (person.role || (r === 'User' ? 'User' : '')).toLowerCase() === r.toLowerCase() ? 'selected' : ''} ${ (r === 'Superadmin' && !isSuperAdmin) ? 'disabled' : ''}>${r}</option>
+                                `).join('')}
+                            </select>
                             <span class="badge status-badge ${activityLevel.toLowerCase()}">${activityLevel}</span>
                         </div>
                     </div>
@@ -164,13 +169,7 @@ export class UserInfoPage {
                                 <option value="stats_perms" ${userPerm.managementAccess === 'stats_perms' ? 'selected' : ''}>Stats & Berechtigungen</option>
                             </select>
                             
-                            <div class="admin-role-toggle">
-                                <span>Administrator-Status</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" class="admin-role-cb" ${(person.role || '').toLowerCase() === 'admin' ? 'checked' : ''} ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
+                            <!-- Administrator-Status toggle removed as role is now a direct dropdown -->
                         </div>
 
                         <!-- Permission Preset Card -->
@@ -363,22 +362,20 @@ export class UserInfoPage {
         const ms = container.querySelector('.mgmt-select-modern');
         if (ms) ms.onchange = () => save();
 
-        // Admin Role toggle
-        const at = container.querySelector('.admin-role-cb');
-        if (at) at.onchange = async () => {
+        // Role selection dropdown
+        const rs = container.querySelector('.role-select-badge');
+        if (rs) rs.onchange = async () => {
             const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === name);
             if (person) {
-                person.role = at.checked ? 'Admin' : 'User';
+                const newRole = rs.value;
+                person.role = newRole;
                 await DataService.savePeople(peopleData);
                 
                 // Automatically apply new role default permissions
-                const newPerms = PermissionService.getPermissionsForRole(person.role);
+                const newPerms = PermissionService.getPermissionsForRole(newRole);
                 save(newPerms);
                 
-                // Refresh heart badge in UI
-                container.querySelector('.role-badge').textContent = person.role;
-                
-                // Re-render UI to reflect automatic preset change
+                // Re-render UI to reflect automatic preset change and updated states
                 this._renderUserProfile(container, person, userStat, tableConfigs, peopleData);
             }
         };

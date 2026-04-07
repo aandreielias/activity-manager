@@ -7,12 +7,12 @@ var e=Object.defineProperty,t=(t,n)=>{let r={};for(var i in t)e(r,i,{get:t[i],en
                             <span class="dropdown-arrow">▼</span>
                         </div>
                         <div class="login-select-options">
-                            ${(e||[]).map(e=>{let t=`${e.vorname||``} ${e.nachname||``}`.trim();return t?`
-                                    <div class="login-option" data-value="${t}">
-                                        <span class="option-name">${t}</span>
-                                        <span class="option-role">${e.role||``}</span>
-                                    </div>
-                                `:``}).join(``)}
+                            ${(e||[]).sort((e,t)=>{let n=(e.Status||``).toLowerCase()===`inaktiv`||(e.role||``).toLowerCase()===`inaktiv`,r=(t.Status||``).toLowerCase()===`inaktiv`||(t.role||``).toLowerCase()===`inaktiv`;return n&&!r?1:!n&&r?-1:0}).map(e=>{let t=`${e.vorname||``} ${e.nachname||``}`.trim();if(!t)return``;let n=e.role||``;return`
+                                        <div class="login-option ${(e.Status||``).toLowerCase()===`inaktiv`||(e.role||``).toLowerCase()===`inaktiv`?`is-inactive`:``}" data-value="${t}">
+                                            <span class="option-name">${t}</span>
+                                            <span class="option-role">${n}</span>
+                                        </div>
+                                    `}).join(``)}
                         </div>
                     </div>
                 </div>
@@ -91,7 +91,7 @@ var e=Object.defineProperty,t=(t,n)=>{let r={};for(var i in t)e(r,i,{get:t[i],en
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v2.0.1</span>
+                    <span class="header-version">v2.0.3</span>
                 </div>
             </div>
             <nav class="header-nav">

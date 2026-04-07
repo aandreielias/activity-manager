@@ -20,12 +20,13 @@ export class Table {
         this.schema = json.schema;
         this.peopleData = json.peopleData;
 
-        this.rows = json.rows.map(r => new Row({
+        this.rows = json.rows.map((r, i) => new Row({
             id: r.id,
             data: r,
             schema: json.schema,
             peopleData: json.peopleData,
             tableId: json.id,
+            defaultIndex: i
         }));
         this.element = null;
         this.tableConfig = json.tableConfig; // Store config for saving

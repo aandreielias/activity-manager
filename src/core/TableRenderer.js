@@ -133,10 +133,13 @@ export class TableRenderer {
         this.table.schema.forEach((col, index) => {
             const th = document.createElement('th');
             th.dataset.colId = col.id;
+            th.onclick = () => this.table.sorter.sortBy(col.id, th);
             
             const content = document.createElement('div');
             content.className = 'th-content';
-            content.textContent = col.label;
+            const textSpan = document.createElement('span');
+            textSpan.textContent = col.label;
+            content.appendChild(textSpan);
             th.appendChild(content);
 
             // Edit Mode: Add Rearrange controls

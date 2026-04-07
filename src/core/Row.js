@@ -7,12 +7,13 @@ import { contextMenu } from '../ui/ContextMenu.js';
  * Row - Represents a single table row serving as a container for Field variants
  */
 export class Row {
-    constructor({ id, data, schema, peopleData, tableId }) {
+    constructor({ id, data, schema, peopleData, tableId, defaultIndex }) {
         this.id = id;
         this.data = data;
         this.schema = schema;
         this.peopleData = peopleData;
         this.tableId = tableId;
+        this.defaultIndex = defaultIndex ?? 0;
         this.element = null;
         this.callbacks = {};
 

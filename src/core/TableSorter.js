@@ -6,9 +6,14 @@ export class TableSorter {
     }
 
     sortBy(colId, clickedTh) {
-        // toggle direction if same column, else default to asc
+        // null -> asc -> desc -> null
         if (this._sortCol === colId) {
-            this._sortDir = this._sortDir === 'asc' ? 'desc' : 'asc';
+            if (this._sortDir === 'asc') this._sortDir = 'desc';
+            else if (this._sortDir === 'desc') {
+                this._sortDir = null;
+                this._sortCol = null;
+            }
+            else this._sortDir = 'asc';
         } else {
             this._sortCol = colId;
             this._sortDir = 'asc';
@@ -16,8 +21,17 @@ export class TableSorter {
 
         // sort the rows array
         this.table.rows.sort((a, b) => {
-            const valA = a.data[colId] ?? '';
-            const valB = b.data[colId] ?? '';
+            if (!this._sortDir) {
+                return (a.defaultIndex || 0) - (b.defaultIndex || 0);
+            }
+
+            let valA = a.data[colId] ?? '';
+            let valB = b.data[colId] ?? '';
+
+            // Handle objects (e.g. Location objects)
+            if (valA && typeof valA === 'object') valA = valA.title || valA.name || valA.label || '';
+            if (valB && typeof valB === 'object') valB = valB.title || valB.name || valB.label || '';
+
             const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true });
             return this._sortDir === 'asc' ? cmp : -cmp;
         });
@@ -26,7 +40,9 @@ export class TableSorter {
         this.table.renderer.element.querySelectorAll('thead th').forEach(th => {
             th.dataset.sort = '';
         });
-        clickedTh.dataset.sort = this._sortDir;
+        if (this._sortDir) {
+            clickedTh.dataset.sort = this._sortDir;
+        }
 
         // re-render tbody
         this.table.renderer.reRenderBody();

@@ -150,9 +150,18 @@
 }
 
 .th-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.th-content span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .data-table th:hover {
@@ -160,16 +169,18 @@
   color: var(--text-secondary);
 }
 
-.data-table th[data-sort="asc"]::after {
-  content: ' ↑';
+.data-table th[data-sort="asc"] .th-content::after {
+  content: '↑';
   color: var(--accent);
   font-weight: 700;
+  flex-shrink: 0;
 }
 
-.data-table th[data-sort="desc"]::after {
-  content: ' ↓';
+.data-table th[data-sort="desc"] .th-content::after {
+  content: '↓';
   color: var(--accent);
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 /* ── Rows ───────────────────────────────────────────── */

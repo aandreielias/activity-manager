@@ -102,6 +102,16 @@
     transition: background var(--transition);
 }
 
+.login-option.is-inactive {
+    opacity: 0.5;
+    background: var(--bg-secondary);
+}
+
+.login-option.is-inactive .option-name {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 .login-option:hover {
     background: var(--bg-hover);
 }

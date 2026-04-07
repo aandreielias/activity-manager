@@ -70,7 +70,7 @@ export class Header {
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v2.0.1</span>
+                    <span class="header-version">v2.0.3</span>
                 </div>
             </div>
             <nav class="header-nav">
@@ -205,7 +205,7 @@ export class Header {
             if (e.target.closest('.user-info-btn')) {
                 this.onUserInfo?.();
             }
-            
+
             if (e.target.closest('.add-table-btn')) {
                 const name = prompt('Name für die neue Kategorie (z.B. Escape Rooms):');
                 if (name) {
@@ -416,7 +416,7 @@ export class Header {
                 inst.rows.forEach(row => {
                     Object.entries(row.data).forEach(([colId, value]) => {
                         if (value === null || value === undefined) return;
-                        
+
                         const strValue = String(value);
                         if (strValue.toLowerCase().includes(trimmedQuery.toLowerCase())) {
                             const colDef = inst.schema.find(c => c.id === colId);

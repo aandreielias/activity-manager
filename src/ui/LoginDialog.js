@@ -25,17 +25,26 @@ export class LoginDialog {
                             <span class="dropdown-arrow">▼</span>
                         </div>
                         <div class="login-select-options">
-                            ${(peopleData || []).map(p => {
-                                const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
-                                if (!name) return '';
-                                const role = p.role || '';
-                                return `
-                                    <div class="login-option" data-value="${name}">
-                                        <span class="option-name">${name}</span>
-                                        <span class="option-role">${role}</span>
-                                    </div>
-                                `;
-                            }).join('')}
+                            ${(peopleData || [])
+                                .sort((a, b) => {
+                                    const aInactive = (a.Status || '').toLowerCase() === 'inaktiv' || (a.role || '').toLowerCase() === 'inaktiv';
+                                    const bInactive = (b.Status || '').toLowerCase() === 'inaktiv' || (b.role || '').toLowerCase() === 'inaktiv';
+                                    if (aInactive && !bInactive) return 1;
+                                    if (!aInactive && bInactive) return -1;
+                                    return 0;
+                                })
+                                .map(p => {
+                                    const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
+                                    if (!name) return '';
+                                    const role = p.role || '';
+                                    const isInactive = (p.Status || '').toLowerCase() === 'inaktiv' || (p.role || '').toLowerCase() === 'inaktiv';
+                                    return `
+                                        <div class="login-option ${isInactive ? 'is-inactive' : ''}" data-value="${name}">
+                                            <span class="option-name">${name}</span>
+                                            <span class="option-role">${role}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
                         </div>
                     </div>
                 </div>

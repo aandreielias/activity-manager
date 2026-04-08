@@ -75,26 +75,6 @@ export class TableRenderer {
         meta.textContent = `${this.table.rows.length} Zeilen`;
         metaGroup.appendChild(meta);
 
-        const exportBtn = document.createElement('button');
-        exportBtn.className = 'header-btn';
-        exportBtn.innerHTML = '📄 PDF';
-        exportBtn.title = 'Tabelle als PDF exportieren';
-        exportBtn.style.padding = '4px 12px';
-        exportBtn.style.borderRadius = 'var(--radius)';
-        exportBtn.style.border = '1px solid var(--border-light)';
-        exportBtn.style.background = 'var(--bg-secondary)';
-        exportBtn.style.color = 'var(--text-primary)';
-        exportBtn.style.cursor = 'pointer';
-        exportBtn.style.fontSize = '12px';
-        exportBtn.style.fontWeight = '600';
-        exportBtn.onmouseover = () => { exportBtn.style.background = 'var(--hover)'; };
-        exportBtn.onmouseout = () => { exportBtn.style.background = 'var(--bg-secondary)'; };
-        exportBtn.onclick = (e) => { 
-            e.stopPropagation(); 
-            this._exportPDF();
-        };
-        metaGroup.appendChild(exportBtn);
-
         // Edit Mode: Add Column Button next to row count
         if (GlobalStateManager.getInstance().isEditModeActive()) {
             const addColBtn = document.createElement('button');
@@ -126,6 +106,39 @@ export class TableRenderer {
         header.addEventListener('click', () => {
             this.element.classList.toggle('collapsed');
             icon.innerHTML = this.element.classList.contains('collapsed') ? '▸' : '▾';
+        });
+
+        header.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const existingMenu = document.querySelector('.category-context-menu');
+            if (existingMenu) existingMenu.remove();
+
+            const menu = document.createElement('div');
+            menu.className = 'row-context-menu category-context-menu';
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+            menu.style.position = 'fixed';
+            menu.style.zIndex = '100000';
+
+            const exportBtn = document.createElement('button');
+            exportBtn.className = 'context-menu-item';
+            exportBtn.textContent = '📄 Als PDF exportieren';
+            exportBtn.onclick = () => {
+                this._exportPDF();
+                menu.remove();
+            };
+            menu.appendChild(exportBtn);
+            document.body.appendChild(menu);
+
+            const closeMenu = (ev) => {
+                if (!menu.contains(ev.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeMenu), 0);
         });
 
         return header;

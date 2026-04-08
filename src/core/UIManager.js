@@ -7,6 +7,7 @@ import { TableLoader } from './TableLoader.js';
 import { CalendarView } from '../ui/CalendarView.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { UserStatsService } from '../services/UserStatsService.js';
 
 const PEOPLE_SCHEMA = Object.freeze([
     { id: 'vorname', label: 'Vorname', type: 'text' },
@@ -402,20 +403,29 @@ export class UIManager {
 
     async _exportCategoryPDF(categoryId) {
         try {
-            // A3 Landscape provides maximum width for large tables
-            const doc = new jsPDF({ orientation: 'landscape', format: 'a3' });
-            let isFirst = true;
+            // Portrait for people/inventory/stats, A3 landscape for game/sport tables
+            const usePortrait = ['all-people', 'all-inventory', 'all-stats'].includes(categoryId);
+            const doc = usePortrait 
+                ? new jsPDF({ orientation: 'portrait', format: 'a4' })
+                : new jsPDF({ orientation: 'landscape', format: 'a3' });
 
-            // Columns to ignore for a cleaner "cheat sheet" PDF
             const ignoreCols = ['Erstellt von', 'Erstellt am', 'createdAt', 'createdBy', 'Link/Video/Lied'];
-
             let tablesToExport = [];
             let exportFileName = 'Export';
 
-            if (categoryId === 'all-people') {
+            if (categoryId === 'all-stats') {
+                exportFileName = 'Stats_Report';
+                await this._exportStatsPDF(doc, ignoreCols);
+                doc.save(`Export_${exportFileName}.pdf`);
+                return;
+            } else if (categoryId === 'all-people') {
                 exportFileName = 'Personen';
                 if (this.personsTable) tablesToExport.push(this.personsTable);
                 if (this.inactivePersonsTable) tablesToExport.push(this.inactivePersonsTable);
+            } else if (categoryId === 'all-inventory') {
+                exportFileName = 'Inventar';
+                const inv = this.tables['tbl_inventory'];
+                if (inv && inv.instance) tablesToExport.push(inv.instance);
             } else {
                 const categoryName = categoryId === 'all-spiele' ? 'Spiele' : 'Sportarten';
                 exportFileName = categoryName;
@@ -427,23 +437,28 @@ export class UIManager {
                 });
             }
 
-            for (const tableInstance of tablesToExport) {
-                if (!isFirst) {
-                    doc.addPage();
-                }
-                isFirst = false;
+            let currentY = 15;
 
-                doc.setFontSize(18);
-                try { doc.text(tableInstance.title || '', 14, 20); } catch(e){}
+            for (const tableInstance of tablesToExport) {
+                const pageHeight = doc.internal.pageSize.getHeight();
+                // If less than 60pt left, go to next page
+                if (currentY > pageHeight - 60) {
+                    doc.addPage();
+                    currentY = 15;
+                }
+
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                try { doc.text(tableInstance.title || '', 14, currentY); } catch(e){}
+                doc.setFont(undefined, 'normal');
+                currentY += 6;
 
                 const exportSchema = tableInstance.schema.filter(col => !ignoreCols.includes(col.label) && !ignoreCols.includes(col.id));
-
                 const head = [exportSchema.map(col => col.label)];
                 const body = tableInstance.rows.map(row => {
                     return exportSchema.map(col => {
                         let val = row.data[col.id];
                         if (val === null || val === undefined) return '';
-                        
                         let strVal = '';
                         if (typeof val === 'object') {
                             if (Array.isArray(val)) {
@@ -456,11 +471,7 @@ export class UIManager {
                         } else {
                             strVal = String(val);
                         }
-
-                        // Truncate extremely long paragraphs to prevent taking up huge vertical space
-                        if (strVal.length > 250) {
-                            return strVal.substring(0, 247) + '...';
-                        }
+                        if (strVal.length > 250) return strVal.substring(0, 247) + '...';
                         return strVal;
                     });
                 });
@@ -468,18 +479,21 @@ export class UIManager {
                 autoTable(doc, {
                     head,
                     body,
-                    startY: 28,
+                    startY: currentY,
                     styles: { 
-                        fontSize: 8, 
-                        cellPadding: 3, 
+                        fontSize: usePortrait ? 7 : 8, 
+                        cellPadding: 2, 
                         overflow: 'linebreak',
                         valign: 'middle'
                     },
-                    headStyles: { fillColor: [0, 132, 255], fontSize: 9 }
+                    headStyles: { fillColor: [0, 132, 255], fontSize: usePortrait ? 8 : 9 },
+                    margin: { left: 14, right: 14 }
                 });
+
+                currentY = doc.lastAutoTable.finalY + 16;
             }
 
-            if (!isFirst) {
+            if (tablesToExport.length > 0) {
                 doc.save(`Export_${exportFileName}.pdf`);
             } else {
                 alert('Keine Tabellen zum Exportieren gefunden.');
@@ -488,6 +502,161 @@ export class UIManager {
             console.error('PDF export failed', e);
             alert('Fehler beim PDF Export.');
         }
+    }
+
+    async _exportStatsPDF(doc, ignoreCols) {
+        const allTables = this.tables;
+        const peopleData = this.app.peopleData || [];
+
+        // Fetch user stats from DB
+        let userStatsMap = {};
+        try {
+            userStatsMap = await UserStatsService.getStats();
+        } catch (e) {
+            console.error('[Stats PDF] Failed to load user stats:', e);
+        }
+
+        // Gather stats
+        let totalGames = 0, totalSports = 0;
+        let totalEvents = allTables['tbl_events']?.instance?.rows.length || 0;
+        let totalInventory = allTables['tbl_inventory']?.instance?.rows.length || 0;
+        let activePeople = peopleData.filter(p => !p.Status || String(p.Status).toLowerCase() === 'aktiv').length;
+        let inactivePeople = peopleData.filter(p => String(p.Status).toLowerCase() === 'inaktiv').length;
+        let globalTodo = 0, globalInProgress = 0, globalDone = 0;
+
+        const tableStats = [];
+
+        Object.values(allTables).forEach(tWrap => {
+            if (!tWrap.config || !tWrap.instance) return;
+            const rows = tWrap.instance.rows;
+            if (tWrap.config.category === 'spiele') totalGames += rows.length;
+            if (tWrap.config.category === 'sportarten') totalSports += rows.length;
+
+            let todo = 0, inProg = 0, done = 0;
+            rows.forEach(row => {
+                const s = String(row.data.Status || row.data.status || '').toLowerCase().replace(/\s+/g, '-');
+                if (s === 'to-do' || s === 'todo') { globalTodo++; todo++; }
+                else if (s === 'in-progress') { globalInProgress++; inProg++; }
+                else if (s === 'done') { globalDone++; done++; }
+            });
+            tableStats.push({ name: tWrap.instance.title || tWrap.config.title, count: rows.length, todo, inProg, done });
+        });
+
+        let y = 20;
+
+        // Title
+        doc.setFontSize(20);
+        doc.setFont(undefined, 'bold');
+        doc.text('System-Stats Report', 14, y);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(120);
+        doc.text(`Generiert am ${new Date().toLocaleString('de-DE')}`, 14, y + 7);
+        doc.setTextColor(0);
+        y += 18;
+
+        // KPI overview table
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('\u00dcbersicht', 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 4;
+
+        autoTable(doc, {
+            head: [['Kennzahl', 'Wert']],
+            body: [
+                ['Aktive Personen', String(activePeople)],
+                ['Inaktive Personen', String(inactivePeople)],
+                ['Spiele (Gesamt)', String(totalGames)],
+                ['Sportarten (Gesamt)', String(totalSports)],
+                ['Events', String(totalEvents)],
+                ['Inventar', String(totalInventory)],
+            ],
+            startY: y,
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: { fillColor: [0, 132, 255] },
+            theme: 'grid',
+            margin: { left: 14, right: 14 }
+        });
+        y = doc.lastAutoTable.finalY + 12;
+
+        // Status summary
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('Aufgaben-Status', 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 4;
+
+        autoTable(doc, {
+            head: [['To Do', 'In Progress', 'Done']],
+            body: [[String(globalTodo), String(globalInProgress), String(globalDone)]],
+            startY: y,
+            styles: { fontSize: 10, cellPadding: 4, halign: 'center', fontStyle: 'bold' },
+            headStyles: { fillColor: [0, 132, 255] },
+            theme: 'grid',
+            margin: { left: 14, right: 14 }
+        });
+        y = doc.lastAutoTable.finalY + 12;
+
+        // Per-table breakdown
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('Eintr\u00e4ge pro Tabelle', 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 4;
+
+        autoTable(doc, {
+            head: [['Tabelle', 'Eintr\u00e4ge', 'To Do', 'In Progress', 'Done']],
+            body: tableStats.map(t => [t.name, String(t.count), String(t.todo), String(t.inProg), String(t.done)]),
+            startY: y,
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [0, 132, 255] },
+            theme: 'grid',
+            margin: { left: 14, right: 14 }
+        });
+        y = doc.lastAutoTable.finalY + 16;
+
+        // User data - all people with individual stats
+        const pageHeight = doc.internal.pageSize.getHeight();
+        if (y > pageHeight - 60) { doc.addPage(); y = 15; }
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('Personen & Individuelle Stats', 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 4;
+
+        const peopleHead = [['Name', 'Rolle', 'Status', 'Team', 'Aktivit\u00e4t', 'Letzter Login', 'Eintr\u00e4ge', 'BJ Wins', 'BJ Losses', 'Winrate', 'Top Kategorie']];
+        const peopleBody = peopleData.map(p => {
+            const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
+            const uStats = userStatsMap[name] || {};
+            const lastLogin = uStats.lastLogin ? new Date(uStats.lastLogin).toLocaleDateString('de-DE') : '-';
+            const totalGames = (uStats.wins || 0) + (uStats.losses || 0);
+            const winRate = totalGames > 0 ? `${uStats.winRate || 0}%` : '-';
+            return [
+                name,
+                p.role || '',
+                p.Status || '',
+                Array.isArray(p.Team) ? p.Team.join(', ') : (p.Team || ''),
+                uStats.activityLevel || 'Idle',
+                lastLogin,
+                String(uStats.entryCount || 0),
+                String(uStats.wins || 0),
+                String(uStats.losses || 0),
+                winRate,
+                uStats.topCategory || '-'
+            ];
+        });
+
+        autoTable(doc, {
+            head: peopleHead,
+            body: peopleBody,
+            startY: y,
+            styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
+            headStyles: { fillColor: [0, 132, 255], fontSize: 7 },
+            theme: 'grid',
+            margin: { left: 14, right: 14 }
+        });
     }
 
     _handleCalendarToggle() {

@@ -71,7 +71,7 @@ export class Header {
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v2.0.6</span>
+                    <span class="header-version">v2.1.1</span>
                 </div>
             </div>
             <nav class="header-nav">
@@ -183,11 +183,17 @@ export class Header {
             let exportTableId = null;
             const splitBtn = e.target.closest('.split-main-btn');
             const personsBtn = e.target.closest('.persons-toggle-btn');
+            const inventoryBtn = e.target.closest('.inventory-toggle-btn');
+            const statsBtn = e.target.closest('.user-info-btn');
 
             if (splitBtn && splitBtn.dataset.table && splitBtn.dataset.table.startsWith('all-')) {
                 exportTableId = splitBtn.dataset.table;
             } else if (personsBtn) {
                 exportTableId = 'all-people';
+            } else if (inventoryBtn) {
+                exportTableId = 'all-inventory';
+            } else if (statsBtn) {
+                exportTableId = 'all-stats';
             }
 
             if (exportTableId) {
@@ -204,9 +210,13 @@ export class Header {
                 menu.style.position = 'fixed';
                 menu.style.zIndex = '100000';
 
+                const label = exportTableId === 'all-stats' 
+                    ? '📄 Stats-Report als PDF exportieren'
+                    : '📄 Als PDF exportieren';
+
                 const exportBtn = document.createElement('button');
                 exportBtn.className = 'context-menu-item';
-                exportBtn.textContent = '📄 Alle Tabellen als PDF exportieren';
+                exportBtn.textContent = label;
                 exportBtn.onclick = () => {
                     this.onCategoryExport?.(exportTableId);
                     menu.remove();

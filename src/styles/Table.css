@@ -431,6 +431,78 @@ input[type="time"].cell-editor:focus {
   border: 1px solid rgba(52, 168, 83, 0.1);
 }
 
+.status-cell-done {
+    background: var(--success-light);
+    color: var(--success);
+}
+
+.event-games-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.event-game-tag {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.event-game-tag.status-to-do, .event-game-tag.status-todo { 
+    background-color: var(--error-light); 
+    color: var(--error); 
+    border-color: var(--error); 
+}
+.event-game-tag.status-in-progress { 
+    background-color: var(--warning-light); 
+    color: var(--warning); 
+    border-color: var(--warning); 
+}
+.event-game-tag.status-done { 
+    background-color: var(--success-light); 
+    color: var(--success); 
+    border-color: var(--success); 
+}
+.event-game-tag.status-deleted {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+    border-color: #000000 !important;
+}
+
+.game-resp {
+    font-size: 0.7rem;
+    opacity: 0.8;
+    font-weight: bold;
+}
+
+.event-game-tag-preview {
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.event-game-tag-preview.status-to-do, .event-game-tag-preview.status-todo { 
+    background-color: var(--error-light); 
+    color: var(--error); 
+}
+.event-game-tag-preview.status-in-progress { 
+    background-color: var(--warning-light); 
+    color: var(--warning); 
+}
+.event-game-tag-preview.status-done { 
+    background-color: var(--success-light); 
+    color: var(--success); 
+}
+.event-game-tag-preview.status-deleted {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+}
+
 .status-cell-to-do, .status-cell-todo {
     background-color: rgba(210, 15, 15, 0.05) !important;
 }

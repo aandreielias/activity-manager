@@ -232,8 +232,14 @@
 /* Modern Stats Grid */
 .stats-grid-modern {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 850px) {
+    .stats-grid-modern {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
 }
 
 .stat-card {

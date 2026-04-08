@@ -15,10 +15,12 @@ export class GlobalStateManager {
     #favorites = [];
     #inventory = [];
     #enums = {}; // Stores Postgres enums fetched from Supabase
+    #tables = {}; // Stores loaded Table instances
     #unsavedTableIds = new Set();
     #onUnsavedChange = null;
     #favoritesFilterActive = false;
     #editModeActive = localStorage.getItem('edit_mode_active') === 'true';
+    #sessionNewGames = new Map(); // Track games created this session to prevent 'Deleted' status
 
     #tableConfigs = [];
 
@@ -31,6 +33,9 @@ export class GlobalStateManager {
     setTableConfigs(configs) { this.#tableConfigs = configs; }
     getTableConfig(id) { return this.#tableConfigs.find(c => c.id === id); }
     getAllTableConfigs() { return this.#tableConfigs; }
+
+    setTables(tables) { this.#tables = tables; }
+    getTables() { return this.#tables; }
 
     async saveTableConfigs() {
         if (!this.isEditModeActive()) return;
@@ -409,4 +414,12 @@ export class GlobalStateManager {
         localStorage.setItem('edit_mode_active', active);
     }
     isEditModeActive() { return this.#editModeActive; }
+
+    trackSessionGame(name, categoryLabel) {
+        this.#sessionNewGames.set(name, categoryLabel);
+    }
+
+    getSessionGameCategory(name) {
+        return this.#sessionNewGames.get(name);
+    }
 }

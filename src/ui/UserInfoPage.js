@@ -11,7 +11,7 @@ import { Dialog } from './Dialog.js';
  * Manages users, statistics, and fine-grained permissions.
  */
 export class UserInfoPage {
-    static async show(peopleData, tableConfigs) {
+    static async show(peopleData, tableConfigs, allTables = {}) {
         // Purely DOM-driven check for robustness
         if (document.querySelector('.user-info-overlay')) return;
 
@@ -29,6 +29,28 @@ export class UserInfoPage {
             dialog.className = 'user-info-dialog';
             dialog.innerHTML = '<div class="empty-state-large">Lade Nutzer-Daten...</div>';
             overlay.appendChild(dialog);
+            
+            // Pre-calculate game responsibility counts from events
+            const gameRespCounts = {};
+            const eventsTable = allTables['tbl_events']?.instance;
+            if (eventsTable) {
+                eventsTable.rows.forEach(row => {
+                    const gamesRaw = row.data.games || '';
+                    let games = [];
+                    try {
+                        games = JSON.parse(gamesRaw);
+                    } catch (e) {
+                        // ignore classic format for stats as it has no responsible person linked
+                    }
+                    if (Array.isArray(games)) {
+                        games.forEach(g => {
+                            if (g.responsible) {
+                                gameRespCounts[g.responsible] = (gameRespCounts[g.responsible] || 0) + 1;
+                            }
+                        });
+                    }
+                });
+            }
 
             let stats = {};
             try {
@@ -81,13 +103,23 @@ export class UserInfoPage {
                 const selectedName = e.target.value;
                 const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === selectedName);
                 if (person) {
-                    this._renderUserProfile(content, person, stats[selectedName] || {}, tableConfigs, peopleData);
+                    const userStats = stats[selectedName] || {};
+                    userStats.gameRespCount = gameRespCounts[person.id] || 0;
+                    this._renderUserProfile(content, person, userStats, tableConfigs, peopleData);
                 }
             };
 
+            const onEsc = (e) => {
+                if (e.key === 'Escape') {
+                    close();
+                    document.removeEventListener('keydown', onEsc);
+                }
+            };
+            document.addEventListener('keydown', onEsc);
+
             const closeBtn = header.querySelector('.close-info-btn');
-            closeBtn.onclick = close;
-            overlay.onclick = (e) => { if (e.target === overlay) close(); };
+            closeBtn.onclick = () => { close(); document.removeEventListener('keydown', onEsc); };
+            overlay.onclick = (e) => { if (e.target === overlay) { close(); document.removeEventListener('keydown', onEsc); } };
         });
     }
 
@@ -140,6 +172,10 @@ export class UserInfoPage {
                         <div class="stat-card">
                             <span class="stat-label">Letzter Login</span>
                             <span class="stat-value">${lastLoginStr}</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Verantwortlich f. Spiele</span>
+                            <span class="stat-value highlight">${userStat.gameRespCount || 0}</span>
                         </div>
                     </div>
                     

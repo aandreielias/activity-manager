@@ -61,12 +61,23 @@ export class TableLoader {
             options: col.options || [],
         }));
 
-        if (config.category === 'spiele' && peopleData?.length > 0) {
+        if ((config.category === 'spiele' || config.id === 'tbl_events') && peopleData?.length > 0) {
             const respCol = schema.find(c => c.id === 'responsible');
             if (respCol) {
-                // Filter out inactive members so they cannot be assigned new responsibility
+                // Filter for available responsible people
+                const isEventTable = config.id === 'tbl_events';
                 respCol.options = peopleData
-                    .filter(p => (p.Status || '').toLowerCase() !== 'inaktiv')
+                    .filter(p => {
+                        const status = (p.Status || '').toLowerCase();
+                        if (status === 'inaktiv') return false;
+                        
+                        // Only "Events" main column requires Supervisor+
+                        if (isEventTable) {
+                            const role = (p.role || '').toLowerCase();
+                            return ['supervisor', 'admin', 'superadmin'].includes(role);
+                        }
+                        return true;
+                    })
                     .map(p => ({
                         label: `${p.vorname} ${(p.nachname || '').charAt(0)}.`,
                         value: p.id,

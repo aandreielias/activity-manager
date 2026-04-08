@@ -70,7 +70,7 @@ export class Header {
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v2.0.4</span>
+                    <span class="header-version">v2.0.5</span>
                 </div>
             </div>
             <nav class="header-nav">

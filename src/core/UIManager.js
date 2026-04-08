@@ -98,6 +98,7 @@ export class UIManager {
     async loadTables(tables, peopleData) {
         this.tables = tables;
         this.header.tables = tables;
+        this.globalState.setTables(tables);
 
         if (tables['tbl_inventory']) {
             this.globalState.setInventory(tables['tbl_inventory'].instance.rows);
@@ -208,11 +209,21 @@ export class UIManager {
     setupEventListeners() {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                document.querySelectorAll('.custom-dialog-overlay, .permission-overlay, .user-info-overlay, .blackjack-overlay').forEach(el => el.remove());
+                // Remove all common overlays
+                document.querySelectorAll('.custom-dialog-overlay, .permission-overlay, .user-info-overlay, .blackjack-overlay, .picker-overlay').forEach(el => el.remove());
+                
+                // Close split views
                 if (this.header.personsSplitOpen) this._handlePersonsToggle();
                 if (this.header.inventorySplitOpen) this._handleInventoryToggle();
+                if (this.header.calendarSplitOpen) this._handleCalendarToggle();
+
+                // Clear expanded table states
                 document.querySelectorAll('.expanded-row, .data-cell.expanded').forEach(el => el.classList.remove('expanded-row', 'expanded'));
             }
+        });
+        
+        window.addEventListener('jump-to-game', (e) => {
+            this._handleJumpToGame(e.detail.gameName);
         });
 
         this.globalState.onUnsavedChangeCallback((hasUnsaved) => {
@@ -438,6 +449,34 @@ export class UIManager {
         }, 150);
     }
 
+    _handleJumpToGame(gameName) {
+        if (!gameName) return;
+        
+        // Find which table has this game
+        const tables = this.globalState.getTables();
+        let targetTableId = null;
+        let targetRowId = null;
+
+        for (const [id, tableInfo] of Object.entries(tables)) {
+            if (tableInfo.config.category !== 'spiele') continue;
+            const row = tableInfo.instance.rows.find(r => (r.data.name || '').toLowerCase() === gameName.toLowerCase());
+            if (row) {
+                targetTableId = id;
+                targetRowId = row.id;
+                break;
+            }
+        }
+
+        if (targetTableId && targetRowId) {
+            // Close any overlays
+            document.querySelectorAll('.picker-overlay, .custom-dialog-overlay').forEach(el => el.remove());
+            
+            // Switch and highlight
+            this._handleTableSwitch(targetTableId);
+            this._highlightRow(targetRowId, 'name');
+        }
+    }
+
     _handlePersonsToggle() {
         if (this.splitSideContainer.classList.contains('full-view')) {
             this.splitSideContainer.classList.remove('full-view');
@@ -557,7 +596,7 @@ export class UIManager {
     }
 
     async _handleUserInfo() {
-        await UserInfoPage.show(this.app.peopleData, this.app.tableConfigs);
+        await UserInfoPage.show(this.app.peopleData, this.app.tableConfigs, this.tables);
         this.globalState.updatePermissionsFromStorage();
         await this.reloadTables();
         this._handleTableSwitch(this.currentTableId);
@@ -566,6 +605,7 @@ export class UIManager {
     async reloadTables() {
         this.tables = await TableLoader.loadAllTables(this.app.peopleData, this.app.tableConfigs);
         this.header.tables = this.tables;
+        this.globalState.setTables(this.tables);
 
         if (this.tables['tbl_inventory']) {
             this.globalState.setInventory(this.tables['tbl_inventory'].instance.rows);

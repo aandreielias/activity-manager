@@ -6,6 +6,7 @@ import { StatusField } from './StatusField.js';
 import { LinkField } from './LinkField.js';
 import { InventoryField } from './InventoryField.js';
 import { TagField } from './TagField.js';
+import { EventGamesField } from './EventGamesField.js';
 
 import { DateField } from './DateField.js';
 import { TimeField } from './TimeField.js';
@@ -28,6 +29,11 @@ export class FieldFactory {
             case 'location':
                 if (tableId === 'tbl_events') {
                     return new LocationField(params);
+                }
+                break;
+            case 'games':
+                if (tableId === 'tbl_events') {
+                    return new EventGamesField(params);
                 }
                 break;
             case 'address':

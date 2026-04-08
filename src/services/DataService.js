@@ -214,6 +214,7 @@ export class DataService {
                     location: row.location?.id || null,
                     games: row.games || '',
                     status: row.status || 'To Do',
+                    responsible_id: row.responsible || row.responsible_id || null,
                     notes: row.notes || '',
                     created_by: row.createdBy || null,
                     created_at: row.createdAt || new Date().toISOString()
@@ -319,6 +320,7 @@ export class DataService {
                     location: row.location || '',
                     games: row.games || '',
                     status: row.status || 'To Do',
+                    responsible: row.responsible_id || '',
                     notes: row.notes || '',
                     createdBy: row.created_by || 'Unbekannt',
                     createdAt: row.created_at || null,
@@ -408,6 +410,22 @@ export class DataService {
             const res = await SupabaseClient.post('activity_required_items', junctionRows);
             if (!res.ok) console.error('[DataService] Sync ActivityInventory failed:', await res.text());
         }
+    }
+
+    static async createActivity(name, category = 'sonstige') {
+        const payload = {
+            name,
+            category,
+            status: 'To Do',
+            created_at: new Date().toISOString()
+        };
+        const res = await SupabaseClient.post('activities', payload, { 'Prefer': 'return=representation' });
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`Failed to create activity: ${txt}`);
+        }
+        const rows = await res.json();
+        return rows[0];
     }
 
     // ── Utility ───────────────────────────────────────────────

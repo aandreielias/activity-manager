@@ -85,22 +85,38 @@ export class DateField extends Field {
         const di = wrapper.dateInput;
         const ti = wrapper.timeInput;
 
+        let finished = false;
+        const wrapFinish = (success) => {
+            if (finished) return;
+            finished = true;
+            document.removeEventListener('mousedown', onClickOutside);
+            finishCallback(success);
+        };
+
         const onKey = (e) => {
-            if (e.key === 'Enter') finishCallback(true);
-            if (e.key === 'Escape') finishCallback(false);
+            if (e.key === 'Enter') wrapFinish(true);
+            if (e.key === 'Escape') wrapFinish(false);
         };
 
         di.addEventListener('keydown', onKey);
         ti.addEventListener('keydown', onKey);
 
-        // Blurs: only finish if both are lost? 
-        // Actually, set a tiny timeout to check if the new active element is the other input
+        const onClickOutside = (e) => {
+            if (!wrapper.contains(e.target)) {
+                wrapFinish(true);
+            }
+        };
+
+        // Use mousedown to trigger before focus shifts in some scenarios
+        document.addEventListener('mousedown', onClickOutside);
+
+        // Blurs: check if we moved within the same wrapper
         const checkBlur = () => {
             setTimeout(() => {
-                if (document.activeElement !== di && document.activeElement !== ti) {
-                    finishCallback(true);
+                if (document.activeElement !== di && document.activeElement !== ti && !finished) {
+                    wrapFinish(true);
                 }
-            }, 50);
+            }, 100);
         };
 
         di.addEventListener('blur', checkBlur);

@@ -261,14 +261,24 @@ export class InventoryField extends Field {
 
             setTimeout(() => input.focus(), 50);
 
-            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-            cancelBtn.onclick = () => overlay.remove();
+            // Esc Key support
+            const onEsc = (e) => {
+                if (e.key === 'Escape') {
+                    overlay.remove();
+                    document.removeEventListener('keydown', onEsc);
+                }
+            };
+            document.addEventListener('keydown', onEsc);
+
+            overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); document.removeEventListener('keydown', onEsc); } };
+            cancelBtn.onclick = () => { overlay.remove(); document.removeEventListener('keydown', onEsc); };
             saveBtn.onclick = () => {
                 const newVal = InventoryService.formatInventoryString(internalSelected);
                 this.onChange?.(this.colDef.id, newVal);
                 this.value = newVal;
                 this.updateDisplay();
                 overlay.remove();
+                document.removeEventListener('keydown', onEsc);
             };
         });
     }

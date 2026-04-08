@@ -23,6 +23,8 @@ export class App {
         this.peopleData = [];
         this.uiManager = new UIManager(this);
         this.tableElements = {};
+        // Track newly created games in session to prevent 'Deleted' status
+        this.sessionNewGames = new Map();
     }
 
     /**
@@ -38,6 +40,18 @@ export class App {
             await this.uiManager.loadTables(this.tables, this.peopleData);
             this.uiManager.setupEventListeners();
             this.uiManager.showInitialView();
+
+            // Listen for cross-component data refresh requests
+            window.addEventListener('refresh-data', async () => {
+                console.log('[App] Refreshing data...');
+                try {
+                    this.peopleData = await DataService.loadRows('tbl_people');
+                    this.tables = await TableLoader.loadAllTables(this.peopleData, this.tableConfigs);
+                    await this.uiManager.loadTables(this.tables, this.peopleData);
+                } catch (e) {
+                    console.error('[App] Refresh failed:', e);
+                }
+            });
         } catch (error) {
             console.error('[App] Initialization failed:', error);
         }

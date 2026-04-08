@@ -241,14 +241,24 @@ export class TagField extends Field {
             overlay.appendChild(dialog);
             document.body.appendChild(overlay);
 
-            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-            cancelBtn.onclick = () => overlay.remove();
+            // Esc Key support
+            const onEsc = (e) => {
+                if (e.key === 'Escape') {
+                    overlay.remove();
+                    document.removeEventListener('keydown', onEsc);
+                }
+            };
+            document.addEventListener('keydown', onEsc);
+
+            overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); document.removeEventListener('keydown', onEsc); } };
+            cancelBtn.onclick = () => { overlay.remove(); document.removeEventListener('keydown', onEsc); };
             saveBtn.onclick = () => {
                 const newVal = internalSelected.join(', ') || '—';
                 this.onChange?.(this.colDef.id, newVal);
                 this.value = newVal;
                 this.updateDisplay();
                 overlay.remove();
+                document.removeEventListener('keydown', onEsc);
             };
         });
     }

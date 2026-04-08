@@ -146,84 +146,101 @@ export class CalendarView {
         const month = this.currentDate.getMonth();
         
         const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 is Sunday
-        const lastDateOfMonth = new Date(year, month + 1, 0).getDate();
-        const lastDateOfPrevMonth = new Date(year, month, 0).getDate();
-        
         const offset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
         
+        const startDate = new Date(year, month, 1);
+        startDate.setDate(startDate.getDate() - offset);
+        
         let html = '';
-        
-        // Prev month days
-        for (let i = offset; i > 0; i--) {
-            html += `<div class="calendar-day other-month">
-                <span class="calendar-day-num">${lastDateOfPrevMonth - i + 1}</span>
-            </div>`;
-        }
-        
         const events = this.eventsTable?.rows || [];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Current month days
-        for (let i = 1; i <= lastDateOfMonth; i++) {
-            const isToday = today.getDate() === i && today.getMonth() === month && today.getFullYear() === year;
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        for (let i = 0; i < 42; i++) {
+            const currentCellDate = new Date(startDate);
+            currentCellDate.setDate(startDate.getDate() + i);
             
-            const eventDate = new Date(dateStr);
-            eventDate.setHours(0, 0, 0, 0);
-            const isPast = eventDate < today;
-
-            const dayEvents = events.filter(e => e.data.date === dateStr);
+            const isOtherMonth = currentCellDate.getMonth() !== month;
+            const isToday = currentCellDate.getTime() === today.getTime();
+            const dateStr = `${currentCellDate.getFullYear()}-${String(currentCellDate.getMonth() + 1).padStart(2, '0')}-${String(currentCellDate.getDate()).padStart(2, '0')}`;
+            const isPast = currentCellDate < today;
             
-            html += `<div class="calendar-day ${isToday ? 'today' : ''}">
-                <div class="calendar-day-top">
-                    <span class="calendar-day-num">${i}</span>
-                    <button class="calendar-add-btn" data-date="${dateStr}" title="Event zu diesem Tag hinzufügen">+</button>
-                </div>
-                <div class="calendar-events-list">
-                    ${dayEvents.map(e => {
-                        const games = (e.data.games || '').split(',').map(g => g.trim()).filter(g => g);
-                        const isFav = GlobalStateManager.getInstance().isFavorite(e.id);
-                        const locationName = e.data.location?.title || (typeof e.data.location === 'string' ? e.data.location : '');
-                        
-                        const statusClass = (e.data.status || '').toLowerCase().replace(/\s+/g, '-');
-                        const pastClass = isPast ? 'is-past' : '';
+            const isMonday = i % 7 === 0;
+            let kwHtml = '';
+            if (isMonday) {
+                const kw = this._getISOWeek(currentCellDate);
+                kwHtml = `<span class="calendar-kw">KW ${kw}</span>`;
+            }
 
-                        return `
-                            <div class="calendar-event-wrapper" data-event-id="${e.id}" draggable="true">
-                                <button class="calendar-event-main ${statusClass ? 'status-' + statusClass : ''} ${pastClass}" title="${e.data.name}${locationName ? ' @ ' + locationName : ''}">
-                                    <span class="calendar-event-name">${isFav ? '❤️ ' : ''}${e.data.name}</span>
-                                    ${locationName ? `<span class="calendar-event-location">${locationName}</span>` : ''}
-                                </button>
-                                <div class="calendar-event-games">
-                                    ${games.map(g => {
-                                        const gameStatus = this._getGameStatus(g);
-                                        const gameStatusClass = gameStatus ? 'status-' + gameStatus.toLowerCase().replace(/\s+/g, '-') : '';
-                                        return `
-                                            <button class="calendar-event-game-btn ${gameStatusClass}" title="Spiel ${g} anzeigen (Status: ${gameStatus || '?'})">
-                                                ${g}
-                                            </button>
-                                        `;
-                                    }).join('')}
+            if (isOtherMonth) {
+                html += `<div class="calendar-day other-month">
+                    <div class="calendar-day-top">
+                        <div class="calendar-day-info">
+                            <span class="calendar-day-num">${currentCellDate.getDate()}</span>
+                            ${kwHtml}
+                        </div>
+                    </div>
+                </div>`;
+            } else {
+                const dayEvents = events.filter(e => e.data.date === dateStr);
+                html += `<div class="calendar-day ${isToday ? 'today' : ''}">
+                    <div class="calendar-day-top">
+                        <div class="calendar-day-info">
+                            <span class="calendar-day-num">${currentCellDate.getDate()}</span>
+                            ${kwHtml}
+                        </div>
+                        <button class="calendar-add-btn" data-date="${dateStr}" title="Event zu diesem Tag hinzufügen">+</button>
+                    </div>
+                    <div class="calendar-events-list">
+                        ${dayEvents.map(e => {
+                            let games = [];
+                            try {
+                                const parsed = JSON.parse(e.data.games || '[]');
+                                games = Array.isArray(parsed) ? parsed.map(g => (typeof g === 'string' ? g : g.name)) : [];
+                            } catch (err) {
+                                games = (e.data.games || '').split(',').map(g => g.trim()).filter(g => g);
+                            }
+
+                            const isFav = GlobalStateManager.getInstance().isFavorite(e.id);
+                            const locationName = e.data.location?.title || (typeof e.data.location === 'string' ? e.data.location : '');
+                            
+                            const statusClass = (e.data.status || '').toLowerCase().replace(/\s+/g, '-');
+                            const pastClass = isPast ? 'is-past' : '';
+
+                            return `
+                                <div class="calendar-event-wrapper" data-event-id="${e.id}" draggable="true">
+                                    <button class="calendar-event-main ${statusClass ? 'status-' + statusClass : ''} ${pastClass}" title="${e.data.name}${locationName ? ' @ ' + locationName : ''}">
+                                        <span class="calendar-event-name">${isFav ? '❤️ ' : ''}${e.data.name}</span>
+                                        ${locationName ? `<span class="calendar-event-location">${locationName}</span>` : ''}
+                                    </button>
+                                    <div class="calendar-event-games">
+                                        ${games.map(g => {
+                                            const gameStatus = this._getGameStatus(g);
+                                            const gameStatusClass = gameStatus ? 'status-' + gameStatus.toLowerCase().replace(/\s+/g, '-') : '';
+                                            return `
+                                                <button class="calendar-event-game-btn ${gameStatusClass}" title="Spiel ${g} anzeigen (Status: ${gameStatus || '?'})">
+                                                    ${g}
+                                                </button>
+                                            `;
+                                        }).join('')}
+                                    </div>
                                 </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>`;
-        }
-        
-        // Next month filling
-        const dayCount = (html.match(/calendar-day/g) || []).length;
-        const totalCells = dayCount;
-        const remaining = 42 - totalCells;
-        for (let i = 1; i <= remaining; i++) {
-            html += `<div class="calendar-day other-month">
-                <span class="calendar-day-num">${i}</span>
-            </div>`;
+                            `;
+                        }).join('')}
+                    </div>
+                </div>`;
+            }
         }
         
         return html;
+    }
+
+    _getISOWeek(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     }
 
     _getGameStatus(gameName) {

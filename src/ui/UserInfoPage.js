@@ -29,7 +29,7 @@ export class UserInfoPage {
             dialog.className = 'user-info-dialog';
             dialog.innerHTML = '<div class="empty-state-large">Lade Nutzer-Daten...</div>';
             overlay.appendChild(dialog);
-            
+
             // Pre-calculate game responsibility counts from events
             const gameRespCounts = {};
             const eventsTable = allTables['tbl_events']?.instance;
@@ -67,18 +67,18 @@ export class UserInfoPage {
             header.className = 'user-info-header';
             header.innerHTML = `
                 <div class="user-info-title-area">
-                    <h2>Nutzer-Verwaltung</h2>
-                    <p>Statistiken und Berechtigungen verwalten</p>
+                    <h2>System-Stats</h2>
+                    <p>Dashboard & Berechtigungen verwalten</p>
                 </div>
                 <div class="user-info-selection">
                     <select class="user-select-dropdown">
                         <option value="" disabled selected>Nutzer auswählen...</option>
                         ${peopleData
-                            .filter(p => isSuperAdmin || (p.role || '').toLowerCase() !== 'superadmin')
-                            .map(p => {
-                                const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
-                                return `<option value="${name}">${name}</option>`;
-                            }).join('')}
+        .filter(p => isSuperAdmin || (p.role || '').toLowerCase() !== 'superadmin')
+        .map(p => {
+            const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
+            return `<option value="${name}">${name}</option>`;
+        }).join('')}
                     </select>
                 </div>
                 <div class="user-info-header-actions">
@@ -89,11 +89,99 @@ export class UserInfoPage {
 
             const content = document.createElement('div');
             content.className = 'user-info-content';
+
+            let totalGames = 0;
+            let totalSports = 0;
+            let totalEvents = allTables['tbl_events']?.instance?.rows.length || 0;
+            let totalInventory = allTables['tbl_inventory']?.instance?.rows.length || 0;
+            let activePeople = peopleData.filter(p => !p.Status || String(p.Status).toLowerCase() === 'aktiv').length;
+            let inactivePeople = peopleData.filter(p => String(p.Status).toLowerCase() === 'inaktiv').length;
+
+            // Count statuses across all tables
+            let globalTodo = 0, globalInProgress = 0, globalDone = 0;
+
+            Object.values(allTables).forEach(tWrap => {
+                if (!tWrap.config || !tWrap.instance) return;
+                if (tWrap.config.category === 'spiele') totalGames += tWrap.instance.rows.length;
+                if (tWrap.config.category === 'sportarten') totalSports += tWrap.instance.rows.length;
+
+                tWrap.instance.rows.forEach(row => {
+                    const s = String(row.data.Status || row.data.status || '').toLowerCase().replace(/\s+/g, '-');
+                    if (s === 'to-do' || s === 'todo') globalTodo++;
+                    else if (s === 'in-progress') globalInProgress++;
+                    else if (s === 'done') globalDone++;
+                });
+            });
+
+            const totalEntries = Object.values(allTables)
+                .filter(t => t.instance)
+                .reduce((sum, t) => sum + t.instance.rows.length, 0);
+
+            // Build per-table cards with mini status bars
+            const tableCardsHtml = Object.values(allTables)
+                .filter(tWrap => tWrap.config && tWrap.instance)
+                .map(tWrap => {
+                    const rows = tWrap.instance.rows;
+                    const count = rows.length;
+                    let todo = 0, inProg = 0, done = 0;
+                    rows.forEach(row => {
+                        const s = String(row.data.Status || row.data.status || '').toLowerCase().replace(/\s+/g, '-');
+                        if (s === 'to-do' || s === 'todo') todo++;
+                        else if (s === 'in-progress') inProg++;
+                        else if (s === 'done') done++;
+                    });
+                    const hasStatus = (todo + inProg + done) > 0;
+                    const statusBar = hasStatus ? `
+                        <div class="dash-mini-status">
+                            ${todo ? `<span class="dash-status-dot todo">${todo} To Do</span>` : ''}
+                            ${inProg ? `<span class="dash-status-dot inprog">${inProg} In Progress</span>` : ''}
+                            ${done ? `<span class="dash-status-dot done">${done} Done</span>` : ''}
+                        </div>
+                    ` : '';
+                    return `
+                        <div class="dash-table-card">
+                            <div class="dash-table-card-header">
+                                <span class="dash-table-name">${tWrap.instance.title || tWrap.config.title}</span>
+                                <span class="dash-table-count">${count}</span>
+                            </div>
+                            ${statusBar}
+                        </div>
+                    `;
+                }).join('');
+
             content.innerHTML = `
-                <div class="empty-state-large">
-                    <div class="empty-state-icon">👤</div>
-                    <h3>Kein Nutzer ausgewählt</h3>
-                    <p>Wählen Sie oben einen Nutzer aus, um dessen Profil zu bearbeiten.</p>
+                <div class="profile-section dash-section" style="margin-top: 0;">
+                    <div class="section-header"><h4>System-Übersicht</h4></div>
+                    <div class="dash-overview-row">
+                        <div class="dash-kpi"><span class="dash-kpi-val accent">${totalEntries}</span><span class="dash-kpi-lbl">Einträge gesamt</span></div>
+                        <div class="dash-kpi"><span class="dash-kpi-val accent">${activePeople}</span><span class="dash-kpi-lbl">Aktive Personen</span></div>
+                        <div class="dash-kpi"><span class="dash-kpi-val muted">${inactivePeople}</span><span class="dash-kpi-lbl">Inaktive Personen</span></div>
+                        <div class="dash-kpi"><span class="dash-kpi-val accent">${totalGames}</span><span class="dash-kpi-lbl">Spiele</span></div>
+                        <div class="dash-kpi"><span class="dash-kpi-val accent">${totalSports}</span><span class="dash-kpi-lbl">Sportarten</span></div>
+                        <div class="dash-kpi"><span class="dash-kpi-val">${totalEvents}</span><span class="dash-kpi-lbl">Events</span></div>
+                        <div class="dash-kpi"><span class="dash-kpi-val">${totalInventory}</span><span class="dash-kpi-lbl">Inventar</span></div>
+                    </div>
+
+                    <div class="section-header" style="margin-top: 20px;"><h4>Aufgaben-Status (Alle Tabellen)</h4></div>
+                    <div class="dash-status-summary">
+                        <div class="dash-status-block todo-block">
+                            <span class="dash-status-num">${globalTodo}</span>
+                            <span class="dash-status-lbl">To Do</span>
+                        </div>
+                        <div class="dash-status-block inprog-block">
+                            <span class="dash-status-num">${globalInProgress}</span>
+                            <span class="dash-status-lbl">In Progress</span>
+                        </div>
+                        <div class="dash-status-block done-block">
+                            <span class="dash-status-num">${globalDone}</span>
+                            <span class="dash-status-lbl">Done</span>
+                        </div>
+                    </div>
+
+                    <div class="section-header" style="margin-top: 20px;"><h4>Tabellen-Details</h4></div>
+                    <div class="dash-tables-grid">
+                        ${tableCardsHtml}
+                    </div>
                 </div>
             `;
             dialog.appendChild(content);
@@ -127,7 +215,7 @@ export class UserInfoPage {
         const globalState = GlobalStateManager.getInstance();
         const isSuperAdmin = globalState.isSuperAdmin();
         const name = `${person.vorname || ''} ${person.nachname || ''}`.trim();
-        
+
         // Load fresh permissions map
         const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
         const userPerm = permissionsMap[name] || PermissionService.getDefaultPermissions();
@@ -185,7 +273,7 @@ export class UserInfoPage {
                         <div class="bj-metric">Wins: <b>${userStat.wins || 0}</b></div>
                         <div class="bj-metric">Losses: <b>${userStat.losses || 0}</b></div>
                         <div class="bj-metric">Blackjacks: <b>${userStat.blackjacks || 0}</b></div>
-                        ${globalState.isSuperAdmin() ? `<button class="action-btn-small reset-stats-btn" title="Alle Statistiken zurücksetzen">↺ Reset</button>` : ''}
+                        ${globalState.isSuperAdmin() ? '<button class="action-btn-small reset-stats-btn" title="Alle Statistiken zurücksetzen">↺ Reset</button>' : ''}
                     </div>
                 </div>
 
@@ -264,10 +352,10 @@ export class UserInfoPage {
                     </div>
                     <div class="group-rows">
                         ${items.map(t => {
-                            const viewChecked = Array.isArray(userPerm.viewTables) ? userPerm.viewTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
-                            const editChecked = Array.isArray(userPerm.editTables) ? userPerm.editTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
-                            
-                            return `
+        const viewChecked = Array.isArray(userPerm.viewTables) ? userPerm.viewTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+        const editChecked = Array.isArray(userPerm.editTables) ? userPerm.editTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+
+        return `
                                 <div class="table-perm-row">
                                     <span class="table-perm-label">${t.label}</span>
                                     <div class="table-perm-checks">
@@ -282,7 +370,7 @@ export class UserInfoPage {
                                     </div>
                                 </div>
                             `;
-                        }).join('')}
+    }).join('')}
                         
                         ${(name === 'System' && isSuperAdmin) ? `
                             <div class="table-perm-row special-perm-row">
@@ -299,6 +387,15 @@ export class UserInfoPage {
                                 <div class="table-perm-checks">
                                     <label class="compact-checkbox" title="Edit Mode">
                                         <input type="checkbox" class="cb-edit-mode-allow" ${userPerm.canUseEditMode ? 'checked' : ''}>
+                                        <span class="box"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="table-perm-row special-perm-row">
+                                <span class="table-perm-label">Audit-Logs ansehen</span>
+                                <div class="table-perm-checks">
+                                    <label class="compact-checkbox" title="View Logs">
+                                        <input type="checkbox" class="cb-view-logs-allow" ${userPerm.canViewLogs ? 'checked' : ''}>
                                         <span class="box"></span>
                                     </label>
                                 </div>
@@ -322,14 +419,14 @@ export class UserInfoPage {
         const save = (overridePerms = null) => {
             const activePreset = container.querySelector('.preset-btn.active');
             const type = activePreset ? activePreset.dataset.type : userPerm.type;
-            
+
             const mgmtSelect = container.querySelector('.mgmt-select-modern');
             const managementAccess = mgmtSelect ? mgmtSelect.value : (userPerm.managementAccess || 'none');
             const canManage = (managementAccess === 'stats_only' || managementAccess === 'stats_perms');
 
             const viewTables = [];
             container.querySelectorAll('.cb-view:checked').forEach(cb => viewTables.push(cb.value));
-            
+
             const editTables = [];
             container.querySelectorAll('.cb-edit:checked').forEach(cb => editTables.push(cb.value));
 
@@ -339,9 +436,12 @@ export class UserInfoPage {
             const editModeCb = container.querySelector('.cb-edit-mode-allow');
             const canUseEditMode = editModeCb ? editModeCb.checked : (userPerm.canUseEditMode || false);
 
-            const newPerms = overridePerms || { type, viewTables, editTables, canManageUsers: canManage, managementAccess, canEditRoles, canUseEditMode };
+            const viewLogsCb = container.querySelector('.cb-view-logs-allow');
+            const canViewLogs = viewLogsCb ? viewLogsCb.checked : (userPerm.canViewLogs || false);
+
+            const newPerms = overridePerms || { type, viewTables, editTables, canManageUsers: canManage, managementAccess, canEditRoles, canUseEditMode, canViewLogs };
             AuthService.savePermissions(name, newPerms);
-            
+
             // Show feedback
             const saveIndicator = document.createElement('div');
             saveIndicator.className = 'save-indicator-toast';
@@ -355,11 +455,11 @@ export class UserInfoPage {
             btn.onclick = () => {
                 container.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                
+
                 const type = btn.dataset.type;
                 const grid = container.querySelector('.table-permissions-area');
                 if (grid) grid.style.display = (type === 'specific' || type === 'readonly') ? 'block' : 'none';
-                
+
                 save();
             };
         });
@@ -393,7 +493,7 @@ export class UserInfoPage {
                 save();
             };
         });
-        
+
         // Management access
         const ms = container.querySelector('.mgmt-select-modern');
         if (ms) ms.onchange = () => save();
@@ -406,11 +506,11 @@ export class UserInfoPage {
                 const newRole = rs.value;
                 person.role = newRole;
                 await DataService.savePeople(peopleData);
-                
+
                 // Automatically apply new role default permissions
                 const newPerms = PermissionService.getPermissionsForRole(newRole);
                 save(newPerms);
-                
+
                 // Re-render UI to reflect automatic preset change and updated states
                 this._renderUserProfile(container, person, userStat, tableConfigs, peopleData);
             }
@@ -420,7 +520,7 @@ export class UserInfoPage {
         const resetBtn = container.querySelector('.reset-stats-btn');
         if (resetBtn) {
             resetBtn.onclick = async () => {
-                const confirmed = await Dialog.confirm({ 
+                const confirmed = await Dialog.confirm({
                     message: `Alle Statistiken für ${name} wirklich auf Null setzen?`,
                     confirmStyle: 'warning',
                     confirmText: 'Reset'

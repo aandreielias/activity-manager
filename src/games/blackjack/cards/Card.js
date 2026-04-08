@@ -60,7 +60,7 @@ export class Card {
         if (this.#rank.defaultValue !== other.getRank().defaultValue) {
             return this.#rank.defaultValue - other.getRank().defaultValue;
         }
-        
+
         // Use keys of Suit to compare by enum order
         const suits = Object.keys(Suit);
         const thisSuitIdx = suits.indexOf(this.#suit.name);

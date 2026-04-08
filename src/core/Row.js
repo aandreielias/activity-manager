@@ -62,6 +62,20 @@ export class Row {
             this.element.dataset.favorite = 'true';
         }
 
+        // Bulk Selection Checkbox
+        const bulkTd = document.createElement('td');
+        bulkTd.className = 'bulk-cell';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'bulk-checkbox';
+        checkbox.onclick = (e) => {
+            e.stopPropagation();
+            this.callbacks.onSelect?.(this.id, checkbox.checked);
+        };
+        this.bulkCheckbox = checkbox;
+        bulkTd.appendChild(checkbox);
+        this.element.appendChild(bulkTd);
+
         const favTd = document.createElement('td');
         favTd.className = 'favorite-cell';
 

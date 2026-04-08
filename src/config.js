@@ -1,6 +1,6 @@
 /**
  * Supabase Configuration
- * These keys are safe to use in the frontend as long as Row Level Security is configured, 
+ * These keys are safe to use in the frontend as long as Row Level Security is configured,
  * or for low-traffic private projects where we've disabled RLS.
  */
 export const SUPABASE_CONFIG = {

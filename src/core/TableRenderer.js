@@ -1,5 +1,7 @@
 import '../styles/Table.css';
 import { GlobalStateManager } from './GlobalStateManager.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /**
  * TableRenderer - Handles rendering and updating the table UI
@@ -8,6 +10,7 @@ export class TableRenderer {
     constructor(table) {
         this.table = table;
         this.element = null;
+        this.selectedRows = new Set();
     }
 
     render() {
@@ -16,6 +19,9 @@ export class TableRenderer {
 
         this.element.appendChild(this._renderHeader());
         this.element.appendChild(this._renderTableScroll());
+        
+        this.bulkBar = this._renderBulkActionsBar();
+        this.element.appendChild(this.bulkBar);
 
         return this.element;
     }
@@ -65,8 +71,29 @@ export class TableRenderer {
 
         const meta = document.createElement('span');
         meta.className = 'table-meta';
+        meta.dataset.role = 'row-count';
         meta.textContent = `${this.table.rows.length} Zeilen`;
         metaGroup.appendChild(meta);
+
+        const exportBtn = document.createElement('button');
+        exportBtn.className = 'header-btn';
+        exportBtn.innerHTML = '📄 PDF';
+        exportBtn.title = 'Tabelle als PDF exportieren';
+        exportBtn.style.padding = '4px 12px';
+        exportBtn.style.borderRadius = 'var(--radius)';
+        exportBtn.style.border = '1px solid var(--border-light)';
+        exportBtn.style.background = 'var(--bg-secondary)';
+        exportBtn.style.color = 'var(--text-primary)';
+        exportBtn.style.cursor = 'pointer';
+        exportBtn.style.fontSize = '12px';
+        exportBtn.style.fontWeight = '600';
+        exportBtn.onmouseover = () => { exportBtn.style.background = 'var(--hover)'; };
+        exportBtn.onmouseout = () => { exportBtn.style.background = 'var(--bg-secondary)'; };
+        exportBtn.onclick = (e) => { 
+            e.stopPropagation(); 
+            this._exportPDF();
+        };
+        metaGroup.appendChild(exportBtn);
 
         // Edit Mode: Add Column Button next to row count
         if (GlobalStateManager.getInstance().isEditModeActive()) {
@@ -77,7 +104,7 @@ export class TableRenderer {
                 e.stopPropagation();
                 const gs = GlobalStateManager.getInstance();
                 const { Dialog } = await import('../ui/Dialog.js');
-                
+
                 // Fetch enums from GS
                 const enums = Object.keys(gs.getEnums());
 
@@ -122,6 +149,30 @@ export class TableRenderer {
         const thead = document.createElement('thead');
         const tr = document.createElement('tr');
 
+        // Checkbox column header
+        const chkTh = document.createElement('th');
+        chkTh.className = 'bulk-col-header';
+        chkTh.style.width = '40px';
+        chkTh.style.minWidth = '40px';
+        const chkAll = document.createElement('input');
+        chkAll.type = 'checkbox';
+        chkAll.title = 'Alle auswählen';
+        chkAll.onchange = (e) => {
+            const isChecked = e.target.checked;
+            this.selectedRows.clear();
+            const rowEls = this.element.querySelectorAll('tbody tr[data-row-id]');
+            rowEls.forEach(rowEl => {
+                const cb = rowEl.querySelector('.bulk-checkbox');
+                if (cb) {
+                    cb.checked = isChecked;
+                    if (isChecked) this.selectedRows.add(rowEl.dataset.rowId);
+                }
+            });
+            this._updateBulkBarVisibility();
+        };
+        chkTh.appendChild(chkAll);
+        tr.appendChild(chkTh);
+
         // Favorite column header
         const favTh = document.createElement('th');
         favTh.className = 'favorite-col-header';
@@ -134,7 +185,7 @@ export class TableRenderer {
             const th = document.createElement('th');
             th.dataset.colId = col.id;
             th.onclick = () => this.table.sorter.sortBy(col.id, th);
-            
+
             const content = document.createElement('div');
             content.className = 'th-content';
             const textSpan = document.createElement('span');
@@ -224,13 +275,13 @@ export class TableRenderer {
     _moveColumn(index, delta) {
         const newIdx = index + delta;
         if (newIdx < 0 || newIdx >= this.table.schema.length) return;
-        
+
         const schema = this.table.schema;
         const item = schema.splice(index, 1)[0];
         schema.splice(newIdx, 0, item);
-        
+
         // UI Refresh
-        this.render(); 
+        this.render();
         GlobalStateManager.getInstance().saveTableConfigs();
     }
 
@@ -278,20 +329,20 @@ export class TableRenderer {
         const colDef = this.table.schema.find(c => c.id === colId);
         const table = this.element.querySelector('.data-table');
         const cells = table.querySelectorAll(`td[data-col-id="${colId}"] .cell-content`);
-        
+
         // Determine cap based on content type
         const isLongText = ['rules', 'short_description', 'team_tasks', 'rules', 'Spez. Zuständigkeit'].includes(colId) || colDef?.type === 'text';
         const maxWidthCap = isLongText ? 400 : 600;
 
         let maxWidth = 80;
-        
+
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         const headerFont = window.getComputedStyle(th).font;
         context.font = headerFont;
 
         // Measure header
-        const headerWidth = context.measureText(th.textContent).width + 50; 
+        const headerWidth = context.measureText(th.textContent).width + 50;
         maxWidth = Math.max(maxWidth, headerWidth);
 
         // Measure cells
@@ -318,7 +369,7 @@ export class TableRenderer {
         }
 
         this._renderAddRowButton(tbody);
-        
+
         // Auto-size columns after body is populated
         setTimeout(() => this._autoSizeAllColumns(), 0);
 
@@ -330,7 +381,7 @@ export class TableRenderer {
         tr.setAttribute('role', 'row');
 
         const td = document.createElement('td');
-        td.colSpan = this.table.schema.length + 1;
+        td.colSpan = this.table.schema.length + 2;
         td.className = 'empty-row';
         td.setAttribute('role', 'cell');
         td.textContent = 'Keine Einträge vorhanden';
@@ -344,6 +395,11 @@ export class TableRenderer {
             row.setCallbacks({
                 onEditChange: () => this.table.editor.showUnsavedChange(),
                 onDelete:     (rowId) => this.table.dataManager.removeRow(rowId),
+                onSelect:     (rowId, selected) => {
+                    if (selected) this.selectedRows.add(rowId);
+                    else this.selectedRows.delete(rowId);
+                    this._updateBulkBarVisibility();
+                }
             });
 
             const rowEl = row.render();
@@ -362,7 +418,7 @@ export class TableRenderer {
         tr.setAttribute('role', 'row');
 
         const td = document.createElement('td');
-        td.colSpan = this.table.schema.length + 2;
+        td.colSpan = this.table.schema.length + 3;
         td.className = 'add-row-cell';
         td.setAttribute('role', 'cell');
 
@@ -381,6 +437,15 @@ export class TableRenderer {
         if (meta) {
             meta.textContent = `${this.table.rows.length} Zeilen`;
         }
+        
+        // Remove deleted rows from selection
+        const existingRowIds = new Set(this.table.rows.map(r => r.id));
+        for (const id of this.selectedRows) {
+            if (!existingRowIds.has(id)) {
+                this.selectedRows.delete(id);
+            }
+        }
+        this._updateBulkBarVisibility();
     }
 
     reRenderBody() {
@@ -396,5 +461,166 @@ export class TableRenderer {
         }
 
         this._renderAddRowButton(tbody);
+        
+        // Restore checkmarks if row still selected
+        const rowEls = tbody.querySelectorAll('tr[data-row-id]');
+        rowEls.forEach(el => {
+            if (this.selectedRows.has(el.dataset.rowId)) {
+                const cb = el.querySelector('.bulk-checkbox');
+                if (cb) cb.checked = true;
+            }
+        });
+        
+        // Uncheck 'Select All' header if body refreshed and not all are checked
+        if (this.selectedRows.size === 0) {
+           const chkAll = this.element?.querySelector('.bulk-col-header input[type="checkbox"]');
+           if (chkAll) chkAll.checked = false;
+        }
+    }
+
+
+
+    async _exportPDF() {
+        try {
+            const doc = new jsPDF({ orientation: 'landscape', format: 'a3' });
+            doc.setFontSize(18);
+            doc.text(this.table.title || 'Export', 14, 20);
+
+            const ignoreCols = ['Erstellt von', 'Erstellt am', 'createdAt', 'createdBy', 'Link/Video/Lied'];
+            const exportSchema = this.table.schema.filter(col => !ignoreCols.includes(col.label) && !ignoreCols.includes(col.id));
+
+            const head = [exportSchema.map(col => col.label)];
+            const body = this.table.rows.map(row => {
+                return exportSchema.map(col => {
+                    let val = row.data[col.id];
+                    if (val === null || val === undefined) return '';
+                    
+                    let strVal = '';
+                    if (typeof val === 'object') {
+                        if (Array.isArray(val)) {
+                            strVal = val.map(v => typeof v === 'object' ? v.name || v.id : v).join(', ');
+                        } else if (val.title || val.name) {
+                            strVal = val.title || val.name;
+                        } else {
+                            strVal = JSON.stringify(val);
+                        }
+                    } else {
+                        strVal = String(val);
+                    }
+
+                    if (strVal.length > 250) {
+                        return strVal.substring(0, 247) + '...';
+                    }
+                    return strVal;
+                });
+            });
+
+            autoTable(doc, {
+                head,
+                body,
+                startY: 28,
+                styles: { 
+                    fontSize: 8, 
+                    cellPadding: 3, 
+                    overflow: 'linebreak',
+                    valign: 'middle'
+                },
+                headStyles: { fillColor: [0, 132, 255], fontSize: 9 }
+            });
+
+            doc.save(`${this.table.title || 'export'}.pdf`);
+        } catch (e) {
+            console.error('PDF export failed', e);
+            alert('Fehler beim PDF Export. Bitte versuche es erneut.');
+        }
+    }
+    
+    _renderBulkActionsBar() {
+        const bar = document.createElement('div');
+        bar.className = 'bulk-actions-bar';
+        bar.style.display = 'none';
+        bar.style.position = 'fixed';
+        bar.style.bottom = '20px';
+        bar.style.left = '50%';
+        bar.style.transform = 'translateX(-50%)';
+        bar.style.background = 'var(--bg)';
+        bar.style.padding = '12px 24px';
+        bar.style.borderRadius = 'var(--radius)';
+        bar.style.boxShadow = 'var(--shadow-lg)';
+        bar.style.border = '1px solid var(--border)';
+        bar.style.zIndex = '1000';
+        bar.style.alignItems = 'center';
+        bar.style.gap = '16px';
+        bar.style.color = 'var(--text-primary)';
+        
+        const msg = document.createElement('span');
+        msg.className = 'bulk-actions-msg';
+        msg.style.fontWeight = '600';
+        bar.appendChild(msg);
+        
+        // Let's add a bulk field selector
+        const actionGroup = document.createElement('div');
+        actionGroup.style.display = 'flex';
+        actionGroup.style.gap = '8px';
+        
+        const applyBtn = document.createElement('button');
+        applyBtn.className = 'header-btn';
+        applyBtn.textContent = 'Löschen (Bulk)';
+        applyBtn.style.color = '#ff4d4d';
+        applyBtn.style.padding = '6px 16px';
+        applyBtn.style.borderRadius = 'var(--radius)';
+        applyBtn.style.border = '1px solid #ff4d4d';
+        applyBtn.style.background = 'transparent';
+        applyBtn.style.cursor = 'pointer';
+        applyBtn.style.fontWeight = 'bold';
+        
+        actionGroup.appendChild(applyBtn);
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'header-btn no-icon';
+        closeBtn.textContent = '✕';
+        closeBtn.style.padding = '6px 10px';
+        closeBtn.style.borderRadius = 'var(--radius)';
+        closeBtn.style.border = 'none';
+        closeBtn.style.background = 'transparent';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.color = 'var(--text-secondary)';
+        closeBtn.onclick = () => {
+            this.selectedRows.clear();
+            const checkboxes = this.element.querySelectorAll('.bulk-checkbox, .bulk-col-header input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+            this._updateBulkBarVisibility();
+        };
+        
+        bar.appendChild(actionGroup);
+        bar.appendChild(closeBtn);
+        
+        applyBtn.onclick = async () => {
+            const { Dialog } = await import('../ui/Dialog.js');
+            const ok = await Dialog.confirm({
+                message: `Möchtest du wirklich ${this.selectedRows.size} Einträge löschen?`,
+                confirmText: 'Löschen',
+                confirmStyle: 'warning'
+            });
+            if (ok) {
+                for (const rowId of this.selectedRows) {
+                    this.table.dataManager.removeRow(rowId);
+                }
+                this.selectedRows.clear();
+                this._updateBulkBarVisibility();
+            }
+        };
+        
+        return bar;
+    }
+    
+    _updateBulkBarVisibility() {
+        if (!this.bulkBar) return;
+        if (this.selectedRows.size > 0) {
+            this.bulkBar.style.display = 'flex';
+            this.bulkBar.querySelector('.bulk-actions-msg').textContent = `${this.selectedRows.size} ausgewählt`;
+        } else {
+            this.bulkBar.style.display = 'none';
+        }
     }
 }

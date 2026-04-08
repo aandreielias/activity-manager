@@ -13,13 +13,13 @@ export class ContextMenu {
 
         this.element = document.createElement('div');
         this.element.className = 'row-context-menu';
-        
+
         // Ensure menu stays within screen bounds
         const menuWidth = 160;
         const menuHeight = 200;
         const posX = Math.min(x, window.innerWidth - menuWidth);
         const posY = Math.min(y, window.innerHeight - menuHeight);
-        
+
         this.element.style.top = `${posY}px`;
         this.element.style.left = `${posX}px`;
 

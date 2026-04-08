@@ -3,6 +3,7 @@ import { GlobalStateManager } from '../GlobalStateManager.js';
 import { DataService } from '../../services/DataService.js';
 import { SupabaseClient } from '../../services/SupabaseClient.js';
 import { Dialog } from '../../ui/Dialog.js';
+import { BaseDialog } from '../../ui/BaseDialog.js';
 
 /**
  * EventGamesField - Specialized field for selecting multiple games
@@ -43,10 +44,10 @@ export class EventGamesField extends Field {
                 statusClass = 'status-deleted';
                 isDeleted = true;
             }
-            
+
             const tag = document.createElement('span');
             tag.className = `event-game-tag ${statusClass}`;
-            
+
             const nameSpan = document.createElement('span');
             nameSpan.className = 'game-name';
             nameSpan.textContent = item.name;
@@ -70,7 +71,7 @@ export class EventGamesField extends Field {
                     tag.appendChild(respSpan);
                 }
             }
-            
+
             tagsContainer.appendChild(tag);
         });
 
@@ -91,302 +92,301 @@ export class EventGamesField extends Field {
             currentData = rawValue === '—' || !rawValue ? [] : rawValue.split(',').map(t => ({ name: t.trim(), responsible: null })).filter(d => d.name);
         }
         if (!Array.isArray(currentData)) currentData = [];
-        
+
         const globalState = GlobalStateManager.getInstance();
         let availableGames = [...(this.colDef.availableTags || [])];
         const activePeople = (this.peopleData || [])
             .filter(p => (p.Status || '').toLowerCase() !== 'inaktiv')
             .map(p => ({ id: p.id, name: `${p.vorname} ${p.nachname}` }));
 
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'picker-overlay';
+        return BaseDialog.show({
+            overlayClassName: 'picker-overlay',
+            dialogClassName: 'picker-dialog',
+            closeOnEscape: false,
+            closeOnOutsideClick: true,
+            onEscapeValue: null,
+            render: (dialog, overlay, resolve, cleanup) => {
+                dialog.style.maxWidth = '500px';
 
-            const dialog = document.createElement('div');
-            dialog.className = 'picker-dialog';
-            dialog.style.maxWidth = '500px';
+                const header = document.createElement('div');
+                header.className = 'picker-header';
+                header.innerHTML = '<h2>Spiele & Verantwortliche</h2>';
+                dialog.appendChild(header);
 
-            const header = document.createElement('div');
-            header.className = 'picker-header';
-            header.innerHTML = `<h2>Spiele & Verantwortliche</h2>`;
-            dialog.appendChild(header);
+                const content = document.createElement('div');
+                content.className = 'picker-content';
+                dialog.appendChild(content);
 
-            const content = document.createElement('div');
-            content.className = 'picker-content';
-            dialog.appendChild(content);
-
-            let internalSelected = [...currentData];
-            this.selectedRowEls = [];
-            this.availableTagEls = [];
-            this.currentSearchVal = '';
-
-            const _applySearch = (val) => {
-                this.currentSearchVal = (val || '').toLowerCase().trim();
-                const v = this.currentSearchVal;
-
-                const filterItems = (items, showDisplay) => {
-                    items.forEach(item => {
-                        if (!v) {
-                            item.el.style.display = showDisplay;
-                        } else {
-                            const words = item.text.split(/[\s-]+/);
-                            const match = words.some(w => w.startsWith(v)) || item.text.includes(v);
-                            item.el.style.display = match ? showDisplay : 'none';
-                        }
-                    });
-                };
-
-                filterItems(this.availableTagEls, 'inline-flex');
-                filterItems(this.selectedRowEls, 'flex');
-            };
-
-            const refreshSelected = () => {
-                const existingSection = content.querySelector('.selected-section');
-                if (existingSection) existingSection.remove();
+                let internalSelected = [...currentData];
                 this.selectedRowEls = [];
-
-                const section = document.createElement('div');
-                section.className = 'picker-section selected-section';
-                section.innerHTML = `<div class="picker-section-title">Ausgewählte Spiele</div>`;
-
-                const list = document.createElement('div');
-                list.className = 'picker-list';
-                list.style.gap = '10px';
-
-                internalSelected.forEach((item, idx) => {
-                    const itemRow = document.createElement('div');
-                    itemRow.className = 'event-game-picker-row';
-                    itemRow.style.display = 'flex';
-                    itemRow.style.alignItems = 'center';
-                    itemRow.style.gap = '12px';
-                    itemRow.style.padding = '8px';
-                    itemRow.style.borderBottom = '1px solid var(--border-light)';
-
-                    // Drag/Nav controls
-                    const nav = document.createElement('div');
-                    nav.style.display = 'flex';
-                    nav.style.flexDirection = 'column';
-                    nav.style.gap = '2px';
-                    
-                    const up = document.createElement('button');
-                    up.className = 'col-nav-btn';
-                    up.innerHTML = '▲';
-                    up.disabled = idx === 0;
-                    up.onclick = () => {
-                        const itm = internalSelected.splice(idx, 1)[0];
-                        internalSelected.splice(idx - 1, 0, itm);
-                        refreshSelected();
-                    };
-                    
-                    const down = document.createElement('button');
-                    down.className = 'col-nav-btn';
-                    down.innerHTML = '▼';
-                    down.disabled = idx === internalSelected.length - 1;
-                    down.onclick = () => {
-                        const itm = internalSelected.splice(idx, 1)[0];
-                        internalSelected.splice(idx + 1, 0, itm);
-                        refreshSelected();
-                    };
-                    
-                    nav.appendChild(up);
-                    nav.appendChild(down);
-                    itemRow.appendChild(nav);
-
-                    const status = this._getGameStatus(item.name);
-                    const isDeleted = !this._getGameCategory(item.name);
-                    const statusClass = isDeleted ? 'status-deleted' : (status ? 'status-' + status.toLowerCase().replace(/\s+/g, '-') : 'status-to-do');
-
-                    const info = document.createElement('div');
-                    info.style.flex = '1';
-                    info.style.cursor = 'pointer';
-                    info.onclick = () => {
-                        if (!isDeleted) window.dispatchEvent(new CustomEvent('jump-to-game', { detail: { gameName: item.name } }));
-                    };
-
-                    const name = document.createElement('div');
-                    name.className = `event-game-tag-preview ${statusClass}`;
-                    name.style.fontWeight = '600';
-                    name.textContent = item.name;
-                    info.appendChild(name);
-
-                    const cat = document.createElement('div');
-                    cat.style.fontSize = '10px';
-                    cat.style.color = 'var(--text-muted)';
-                    cat.textContent = isDeleted ? 'Eintrag wurde gelöscht' : this._getGameCategory(item.name);
-                    info.appendChild(cat);
-
-                    itemRow.appendChild(info);
-
-                    const sel = document.createElement('select');
-                    sel.className = 'dialog-input';
-                    sel.style.width = '130px';
-                    sel.innerHTML = `<option value="">Verantw...</option>` + 
-                        activePeople.map(p => `<option value="${p.id}" ${item.responsible === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
-                    sel.onchange = (e) => item.responsible = e.target.value;
-                    itemRow.appendChild(sel);
-
-                    const del = document.createElement('button');
-                    del.className = 'picker-btn secondary';
-                    del.textContent = '✕';
-                    del.onclick = () => { internalSelected.splice(idx, 1); refreshSelected(); };
-                    itemRow.appendChild(del);
-
-                    list.appendChild(itemRow);
-                    this.selectedRowEls.push({ text: item.name.toLowerCase(), el: itemRow });
-                });
-
-                if (internalSelected.length === 0) {
-                    const empty = document.createElement('div');
-                    empty.textContent = 'Keine Spiele ausgewählt';
-                    empty.style.padding = '20px';
-                    empty.style.textAlign = 'center';
-                    empty.style.color = 'var(--text-muted)';
-                    list.appendChild(empty);
-                }
-
-                section.appendChild(list);
-                content.prepend(section);
-                _applySearch(this.currentSearchVal);
-            };
-
-            const refreshAvailable = () => {
-                const existing = content.querySelector('.available-section');
-                if (existing) existing.remove();
                 this.availableTagEls = [];
+                this.currentSearchVal = '';
 
-                const section = document.createElement('div');
-                section.className = 'picker-section available-section';
-                
-                const headerRow = document.createElement('div');
-                headerRow.style.display = 'flex';
-                headerRow.style.justifyContent = 'space-between';
-                headerRow.style.alignItems = 'center';
-                headerRow.style.marginBottom = '8px';
-                headerRow.innerHTML = `<div class="picker-section-title" style="margin:0">Verfügbare Spiele</div>`;
+                const _applySearch = (val) => {
+                    this.currentSearchVal = (val || '').toLowerCase().trim();
+                    const v = this.currentSearchVal;
 
-                const search = document.createElement('input');
-                search.className = 'dialog-input';
-                search.placeholder = 'Suchen...';
-                search.style.width = '140px';
-                search.value = this.currentSearchVal;
-                search.oninput = (e) => _applySearch(e.target.value);
-                search.onkeydown = async (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const sVal = search.value.trim();
-                        if (!sVal) return;
-                        if (availableGames.find(g => g.toLowerCase() === sVal.toLowerCase())) {
-                            internalSelected.push({ name: availableGames.find(g => g.toLowerCase() === sVal.toLowerCase()), responsible: null });
-                            refreshSelected();
-                            search.value = '';
-                            _applySearch('');
-                            return;
-                        }
-                        // Trigger Quick Add
-                        await handleQuickAdd(sVal, search);
-                    }
-                };
-
-                headerRow.appendChild(search);
-                section.appendChild(headerRow);
-
-                const list = document.createElement('div');
-                list.className = 'picker-list';
-                list.style.flexDirection = 'row';
-                list.style.flexWrap = 'wrap';
-                list.style.gap = '6px';
-
-                availableGames.forEach(game => {
-                    const tag = document.createElement('div');
-                    tag.className = 'inventory-tag available';
-                    tag.style.display = 'inline-flex';
-                    tag.style.flexDirection = 'column';
-                    tag.style.padding = '6px 10px';
-                    tag.style.cursor = 'pointer';
-                    tag.innerHTML = `<span style="font-weight:500">${game}</span><span style="font-size:8px; opacity:0.6">${this._getGameCategory(game) || ''}</span>`;
-                    tag.onclick = () => { internalSelected.push({ name: game, responsible: null }); refreshSelected(); };
-                    tag.ondblclick = (e) => {
-                        e.stopPropagation();
-                        window.dispatchEvent(new CustomEvent('jump-to-game', { detail: { gameName: game } }));
+                    const filterItems = (items, showDisplay) => {
+                        items.forEach(item => {
+                            if (!v) {
+                                item.el.style.display = showDisplay;
+                            } else {
+                                const words = item.text.split(/[\s-]+/);
+                                const match = words.some(w => w.startsWith(v)) || item.text.includes(v);
+                                item.el.style.display = match ? showDisplay : 'none';
+                            }
+                        });
                     };
-                    list.appendChild(tag);
-                    this.availableTagEls.push({ text: game.toLowerCase(), el: tag });
-                });
 
-                section.appendChild(list);
-                content.appendChild(section);
-                _applySearch(this.currentSearchVal);
-            };
-
-            const handleQuickAdd = async (sVal, searchInput) => {
-                const configs = GlobalStateManager.getInstance().getAllTableConfigs();
-                const cats = configs
-                    .filter(c => c.category === 'spiele' || c.category === 'sportarten')
-                    .map(c => ({ id: c.id, label: c.title, table: c.category === 'sportarten' ? 'sport_venues' : 'activities', dbCat: c.id.replace('tbl_activities_', '').replace('tbl_sport_', '') }));
-                
-                if (cats.length === 0) cats.push({ id: 'sonstige', label: 'Sonstige', table: 'activities', dbCat: 'sonstige' });
-
-                const overlay = document.createElement('div');
-                overlay.className = 'custom-dialog-overlay';
-                overlay.style.zIndex = '20000';
-                const diag = document.createElement('div');
-                diag.className = 'custom-dialog picker-dialog';
-                diag.style.display = 'block'; diag.style.background = 'var(--bg)'; diag.style.padding = '24px'; diag.style.width = '360px';
-                diag.innerHTML = `<div class="picker-header" style="padding:0; border:none; margin-bottom:16px;"><h2>Kategorie wählen</h2></div>
-                    <div style="margin-bottom:12px; font-size:0.9rem;">In welche Tabelle gehört "${sVal}"?</div>
-                    <select class="dialog-input" style="width:100%; margin-bottom:20px; height:38px;">${cats.map(c => `<option value="${c.id}">${c.label}</option>`).join('')}</select>
-                    <div style="display:flex; justify-content:flex-end; gap:10px;"><button class="picker-btn secondary">Abbrechen</button><button class="picker-btn primary">Erstellen</button></div>`;
-                
-                overlay.appendChild(diag);
-                document.body.appendChild(overlay);
-
-                const select = diag.querySelector('select');
-                diag.querySelector('.secondary').onclick = () => overlay.remove();
-                diag.querySelector('.primary').onclick = async () => {
-                    const c = cats.find(x => x.id === select.value);
-                    overlay.remove();
-                    searchInput.disabled = true;
-                    try {
-                        const payload = { name: sVal, status: 'To Do', created_at: new Date().toISOString() };
-                        if (c.table === 'sport_venues') payload.sport_type = c.dbCat; else payload.category = c.dbCat;
-                        const res = await SupabaseClient.post(c.table, payload, { 'Prefer': 'return=representation' });
-                        if (!res.ok) throw new Error();
-                        const inserted = await res.json();
-                        const newGame = inserted[0];
-                        GlobalStateManager.getInstance().trackSessionGame(newGame.name, c.label);
-                        internalSelected.push({ name: newGame.name, responsible: null });
-                        availableGames.push(newGame.name);
-                        refreshSelected();
-                        refreshAvailable();
-                        window.dispatchEvent(new CustomEvent('refresh-data'));
-                    } catch (e) { alert('Fehler'); }
-                    searchInput.disabled = false;
-                    searchInput.value = '';
-                    _applySearch('');
+                    filterItems(this.availableTagEls, 'inline-flex');
+                    filterItems(this.selectedRowEls, 'flex');
                 };
-            };
 
-            refreshSelected();
-            refreshAvailable();
+                const refreshSelected = () => {
+                    const existingSection = content.querySelector('.selected-section');
+                    if (existingSection) existingSection.remove();
+                    this.selectedRowEls = [];
 
-            const footer = document.createElement('div');
-            footer.className = 'picker-footer';
-            const cBtn = document.createElement('button'); cBtn.className = 'picker-btn secondary'; cBtn.textContent = 'Abbrechen';
-            const sBtn = document.createElement('button'); sBtn.className = 'picker-btn primary'; sBtn.textContent = 'Speichern';
-            footer.appendChild(cBtn); footer.appendChild(sBtn);
-            dialog.appendChild(footer);
-            overlay.appendChild(dialog);
-            document.body.appendChild(overlay);
+                    const section = document.createElement('div');
+                    section.className = 'picker-section selected-section';
+                    section.innerHTML = '<div class="picker-section-title">Ausgewählte Spiele</div>';
 
-            cBtn.onclick = () => overlay.remove();
-            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-            sBtn.onclick = () => {
-                const val = JSON.stringify(internalSelected);
-                this.onChange?.(this.colDef.id, val);
-                this.value = val;
-                this.updateDisplay();
-                overlay.remove();
-            };
+                    const list = document.createElement('div');
+                    list.className = 'picker-list';
+                    list.style.gap = '10px';
+
+                    internalSelected.forEach((item, idx) => {
+                        const itemRow = document.createElement('div');
+                        itemRow.className = 'event-game-picker-row';
+                        itemRow.style.display = 'flex';
+                        itemRow.style.alignItems = 'center';
+                        itemRow.style.gap = '12px';
+                        itemRow.style.padding = '8px';
+                        itemRow.style.borderBottom = '1px solid var(--border-light)';
+
+                        // Drag/Nav controls
+                        const nav = document.createElement('div');
+                        nav.style.display = 'flex';
+                        nav.style.flexDirection = 'column';
+                        nav.style.gap = '2px';
+
+                        const up = document.createElement('button');
+                        up.className = 'col-nav-btn';
+                        up.innerHTML = '▲';
+                        up.disabled = idx === 0;
+                        up.onclick = () => {
+                            const itm = internalSelected.splice(idx, 1)[0];
+                            internalSelected.splice(idx - 1, 0, itm);
+                            refreshSelected();
+                        };
+
+                        const down = document.createElement('button');
+                        down.className = 'col-nav-btn';
+                        down.innerHTML = '▼';
+                        down.disabled = idx === internalSelected.length - 1;
+                        down.onclick = () => {
+                            const itm = internalSelected.splice(idx, 1)[0];
+                            internalSelected.splice(idx + 1, 0, itm);
+                            refreshSelected();
+                        };
+
+                        nav.appendChild(up);
+                        nav.appendChild(down);
+                        itemRow.appendChild(nav);
+
+                        const status = this._getGameStatus(item.name);
+                        const isDeleted = !this._getGameCategory(item.name);
+                        const statusClass = isDeleted ? 'status-deleted' : (status ? 'status-' + status.toLowerCase().replace(/\\s+/g, '-') : 'status-to-do');
+
+                        const info = document.createElement('div');
+                        info.style.flex = '1';
+                        info.style.cursor = 'pointer';
+                        info.onclick = () => {
+                            if (!isDeleted) window.dispatchEvent(new CustomEvent('jump-to-game', { detail: { gameName: item.name } }));
+                        };
+
+                        const name = document.createElement('div');
+                        name.className = `event-game-tag-preview ${statusClass}`;
+                        name.style.fontWeight = '600';
+                        name.textContent = item.name;
+                        info.appendChild(name);
+
+                        const cat = document.createElement('div');
+                        cat.style.fontSize = '10px';
+                        cat.style.color = 'var(--text-muted)';
+                        cat.textContent = isDeleted ? 'Eintrag wurde gelöscht' : this._getGameCategory(item.name);
+                        info.appendChild(cat);
+
+                        itemRow.appendChild(info);
+
+                        const sel = document.createElement('select');
+                        sel.className = 'dialog-input';
+                        sel.style.width = '130px';
+                        sel.innerHTML = '<option value="">Verantw...</option>' +
+                            activePeople.map(p => `<option value="${p.id}" ${item.responsible === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
+                        sel.onchange = (e) => item.responsible = e.target.value;
+                        itemRow.appendChild(sel);
+
+                        const del = document.createElement('button');
+                        del.className = 'picker-btn secondary';
+                        del.textContent = '✕';
+                        del.onclick = () => { internalSelected.splice(idx, 1); refreshSelected(); };
+                        itemRow.appendChild(del);
+
+                        list.appendChild(itemRow);
+                        this.selectedRowEls.push({ text: item.name.toLowerCase(), el: itemRow });
+                    });
+
+                    if (internalSelected.length === 0) {
+                        const empty = document.createElement('div');
+                        empty.textContent = 'Keine Spiele ausgewählt';
+                        empty.style.padding = '20px';
+                        empty.style.textAlign = 'center';
+                        empty.style.color = 'var(--text-muted)';
+                        list.appendChild(empty);
+                    }
+
+                    section.appendChild(list);
+                    content.prepend(section);
+                    _applySearch(this.currentSearchVal);
+                };
+
+                const refreshAvailable = () => {
+                    const existing = content.querySelector('.available-section');
+                    if (existing) existing.remove();
+                    this.availableTagEls = [];
+
+                    const section = document.createElement('div');
+                    section.className = 'picker-section available-section';
+
+                    const headerRow = document.createElement('div');
+                    headerRow.style.display = 'flex';
+                    headerRow.style.justifyContent = 'space-between';
+                    headerRow.style.alignItems = 'center';
+                    headerRow.style.marginBottom = '8px';
+                    headerRow.innerHTML = '<div class="picker-section-title" style="margin:0">Verfügbare Spiele</div>';
+
+                    const search = document.createElement('input');
+                    search.className = 'dialog-input';
+                    search.placeholder = 'Suchen...';
+                    search.style.width = '140px';
+                    search.value = this.currentSearchVal;
+                    search.oninput = (e) => _applySearch(e.target.value);
+                    search.onkeydown = async (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const sVal = search.value.trim();
+                            if (!sVal) return;
+                            if (availableGames.find(g => g.toLowerCase() === sVal.toLowerCase())) {
+                                internalSelected.push({ name: availableGames.find(g => g.toLowerCase() === sVal.toLowerCase()), responsible: null });
+                                refreshSelected();
+                                search.value = '';
+                                _applySearch('');
+                                return;
+                            }
+                            // Trigger Quick Add
+                            await handleQuickAdd(sVal, search);
+                        }
+                    };
+
+                    headerRow.appendChild(search);
+                    section.appendChild(headerRow);
+
+                    const list = document.createElement('div');
+                    list.className = 'picker-list';
+                    list.style.flexDirection = 'row';
+                    list.style.flexWrap = 'wrap';
+                    list.style.gap = '6px';
+
+                    availableGames.forEach(game => {
+                        const tag = document.createElement('div');
+                        tag.className = 'inventory-tag available';
+                        tag.style.display = 'inline-flex';
+                        tag.style.flexDirection = 'column';
+                        tag.style.padding = '6px 10px';
+                        tag.style.cursor = 'pointer';
+                        tag.innerHTML = `<span style="font-weight:500">${game}</span><span style="font-size:8px; opacity:0.6">${this._getGameCategory(game) || ''}</span>`;
+                        tag.onclick = () => { internalSelected.push({ name: game, responsible: null }); refreshSelected(); };
+                        tag.ondblclick = (e) => {
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent('jump-to-game', { detail: { gameName: game } }));
+                        };
+                        list.appendChild(tag);
+                        this.availableTagEls.push({ text: game.toLowerCase(), el: tag });
+                    });
+
+                    section.appendChild(list);
+                    content.appendChild(section);
+                    _applySearch(this.currentSearchVal);
+                };
+
+                const handleQuickAdd = async (sVal, searchInput) => {
+                    const configs = GlobalStateManager.getInstance().getAllTableConfigs();
+                    const cats = configs
+                        .filter(c => c.category === 'spiele' || c.category === 'sportarten')
+                        .map(c => ({ id: c.id, label: c.title, table: c.category === 'sportarten' ? 'sport_venues' : 'activities', dbCat: c.id.replace('tbl_activities_', '').replace('tbl_sport_', '') }));
+
+                    if (cats.length === 0) cats.push({ id: 'sonstige', label: 'Sonstige', table: 'activities', dbCat: 'sonstige' });
+
+                    const overlayDiag = document.createElement('div');
+                    overlayDiag.className = 'custom-dialog-overlay';
+                    overlayDiag.style.zIndex = '20000';
+                    const diag = document.createElement('div');
+                    diag.className = 'custom-dialog picker-dialog';
+                    diag.style.display = 'block'; diag.style.background = 'var(--bg)'; diag.style.padding = '24px'; diag.style.width = '360px';
+                    diag.innerHTML = `<div class="picker-header" style="padding:0; border:none; margin-bottom:16px;"><h2>Kategorie wählen</h2></div>
+                        <div style="margin-bottom:12px; font-size:0.9rem;">In welche Tabelle gehört "${sVal}"?</div>
+                        <select class="dialog-input" style="width:100%; margin-bottom:20px; height:38px;">${cats.map(c => `<option value="${c.id}">${c.label}</option>`).join('')}</select>
+                        <div style="display:flex; justify-content:flex-end; gap:10px;"><button class="picker-btn secondary">Abbrechen</button><button class="picker-btn primary">Erstellen</button></div>`;
+
+                    overlayDiag.appendChild(diag);
+                    document.body.appendChild(overlayDiag);
+
+                    const select = diag.querySelector('select');
+                    diag.querySelector('.secondary').onclick = () => overlayDiag.remove();
+                    diag.querySelector('.primary').onclick = async () => {
+                        const c = cats.find(x => x.id === select.value);
+                        overlayDiag.remove();
+                        searchInput.disabled = true;
+                        try {
+                            const payload = { name: sVal, status: 'To Do', created_at: new Date().toISOString() };
+                            if (c.table === 'sport_venues') payload.sport_type = c.dbCat; else payload.category = c.dbCat;
+                            const res = await SupabaseClient.post(c.table, payload, { 'Prefer': 'return=representation' });
+                            if (!res.ok) throw new Error();
+                            const inserted = await res.json();
+                            const newGame = inserted[0];
+                            GlobalStateManager.getInstance().trackSessionGame(newGame.name, c.label);
+                            internalSelected.push({ name: newGame.name, responsible: null });
+                            availableGames.push(newGame.name);
+                            refreshSelected();
+                            refreshAvailable();
+                            window.dispatchEvent(new CustomEvent('refresh-data'));
+                        } catch (e) { alert('Fehler'); }
+                        searchInput.disabled = false;
+                        searchInput.value = '';
+                        _applySearch('');
+                    };
+                };
+
+                refreshSelected();
+                refreshAvailable();
+
+                const footer = document.createElement('div');
+                footer.className = 'picker-footer';
+                const cBtn = document.createElement('button'); cBtn.className = 'picker-btn secondary'; cBtn.textContent = 'Abbrechen';
+                const sBtn = document.createElement('button'); sBtn.className = 'picker-btn primary'; sBtn.textContent = 'Speichern';
+                footer.appendChild(cBtn); footer.appendChild(sBtn);
+                dialog.appendChild(footer);
+
+                cBtn.onclick = cleanup;
+                sBtn.onclick = () => {
+                    const val = JSON.stringify(internalSelected);
+                    this.onChange?.(this.colDef.id, val);
+                    this.value = val;
+                    this.updateDisplay();
+                    cleanup();
+                };
+            }
         });
     }
 

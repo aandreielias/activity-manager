@@ -10,7 +10,7 @@ export class Field {
         this.tableId = tableId;
         this.onChange = onChange;
         this.onEditStart = onEditStart;
-        this.onTab = onTab; 
+        this.onTab = onTab;
 
         this.td = null;
         this.contentWrap = null;
@@ -108,7 +108,7 @@ export class Field {
                 this.saveEdit(editor);
             }
             this.finishEditing(editor);
-            
+
             if (advance && this.onTab) {
                 this.onTab(this.colDef.id);
             }
@@ -130,8 +130,8 @@ export class Field {
     }
 
     saveEdit(editorOrValue) {
-        const newVal = (editorOrValue?.tagName || editorOrValue?.nodeName) 
-            ? this.extractValue(editorOrValue) 
+        const newVal = (editorOrValue?.tagName || editorOrValue?.nodeName)
+            ? this.extractValue(editorOrValue)
             : editorOrValue;
 
         if (newVal === this.value) {

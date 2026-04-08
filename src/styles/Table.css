@@ -1053,3 +1053,49 @@ th:hover .col-edit-controls {
     color: #c53030;
     border: 1px solid #feb2b2;
 }
+
+/* ── Bulk Operations ───────────────────────────────── */
+.bulk-cell, .bulk-col-header {
+    text-align: center !important;
+    vertical-align: middle !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    padding: 8px !important;
+}
+
+.bulk-checkbox, .bulk-col-header input[type="checkbox"] {
+    appearance: none;
+    background-color: var(--bg-secondary);
+    margin: 0;
+    font: inherit;
+    color: currentColor;
+    width: 1.15em;
+    height: 1.15em;
+    border: 1px solid var(--border);
+    border-radius: 0.15em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.bulk-checkbox::before, .bulk-col-header input[type="checkbox"]::before {
+    content: "";
+    width: 0.65em;
+    height: 0.65em;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    box-shadow: inset 1em 1em var(--accent);
+    background-color: transparent;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.bulk-checkbox:checked::before, .bulk-col-header input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+.bulk-checkbox:focus, .bulk-col-header input[type="checkbox"]:focus {
+    outline: max(2px, 0.15em) solid var(--accent-light);
+    outline-offset: max(2px, 0.15em);
+}

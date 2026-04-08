@@ -66,7 +66,7 @@ export class TableDataManager {
         });
 
         this.table.rows.push(row);
-        
+
         const addTr = this.table._tbody?.querySelector('.add-row-tr');
         if (addTr) {
             this.table._tbody.insertBefore(row.render(), addTr);

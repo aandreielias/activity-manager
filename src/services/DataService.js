@@ -79,6 +79,10 @@ export class DataService {
     static async saveTable(tableId, _filename, rows) {
         const { supaTable, category } = this._resolveTable(tableId);
 
+        if (supaTable === 'events') {
+            await this._checkConflicts(rows);
+        }
+
         const dbRows = rows.map(row => {
             const plain = row.toJSON ? row.toJSON() : row;
             return this._toDb(supaTable, plain, category);
@@ -110,8 +114,66 @@ export class DataService {
                 }
             }
         }
+        
+        await this.logAudit('UPSERT', supaTable, { affected: dbRows.length, category: category || 'none' });
 
         return { success: true, message: `Table ${tableId} saved` };
+    }
+
+    static async _checkConflicts(rows) {
+        const userToTime = {};
+        const conflicts = [];
+
+        for (const row of rows) {
+            const data = row.toJSON ? row.toJSON() : row;
+            if (!data.date || !data.time || !data.games) continue;
+            
+            try {
+                const games = JSON.parse(data.games);
+                games.forEach(g => {
+                    if (g.responsible) {
+                        const key = `${data.date}_${data.time}`;
+                        if (!userToTime[key]) userToTime[key] = [];
+                        if (userToTime[key].includes(g.responsible)) {
+                            conflicts.push(`Person ID ${g.responsible} ist mehrfach gebucht am ${data.date} um ${data.time} für ${g.name}`);
+                        } else {
+                            userToTime[key].push(g.responsible);
+                        }
+                    }
+                });
+            } catch(e) {}
+        }
+        
+        if (conflicts.length > 0) {
+            const { Dialog } = await import('../ui/Dialog.js');
+            const ok = await Dialog.confirm({
+                title: 'Konflikte erkannt',
+                message: `Es gibt zeitliche Überschneidungen:\n\n${conflicts.join('\\n')}\n\nTrotzdem speichern?`,
+                confirmText: 'Speichern erzwingen',
+                confirmStyle: 'warning'
+            });
+            if (!ok) {
+                throw new Error('Speichern durch Benutzer abgebrochen (Konflikt).');
+            }
+        }
+    }
+
+    static async logAudit(action, tableName, details) {
+        try {
+            const { GlobalStateManager } = await import('../core/GlobalStateManager.js');
+            const user = GlobalStateManager.getInstance().getCurrentUser();
+            const payload = {
+                action,
+                table_name: tableName,
+                user_name: user,
+                details: typeof details === 'string' ? details : JSON.stringify(details),
+                created_at: new Date().toISOString()
+            };
+            const res = await SupabaseClient.post('audit_logs', [payload]);
+            if (!res.ok) console.warn('[AuditService] Audit_logs table likely missing.');
+        } catch(e) {
+            console.warn('[AuditService] Skipping audit log:', e.message);
+        }
     }
 
     /**
@@ -140,102 +202,102 @@ export class DataService {
 
     static _toDb(supaTable, row, category) {
         switch (supaTable) {
-            case 'people':
-                return {
-                    id: row.id,
-                    vorname: row.vorname || '',
-                    nachname: row.nachname || '',
-                    telefon: row['Tel.'] || row.telefon || '',
-                    status: (row.Status || row.status || 'Aktiv').toLowerCase(),
-                    rolle: this._capitalizeFirst(row.role || row.rolle || 'User'),
-                    responsibility_1: row.responsibility_1 ? row.responsibility_1.toLowerCase() : null,
-                    responsibility_2: row.responsibility_2 ? row.responsibility_2.toLowerCase() : null,
-                    spez_zustaendigkeit: row['Spez. Zuständigkeit'] || row.spez_zustaendigkeit || '',
-                    created_by: row.createdBy || null,
-                    created_at: row.createdAt || new Date().toISOString()
-                };
+        case 'people':
+            return {
+                id: row.id,
+                vorname: row.vorname || '',
+                nachname: row.nachname || '',
+                telefon: row['Tel.'] || row.telefon || '',
+                status: (row.Status || row.status || 'Aktiv').toLowerCase(),
+                rolle: this._capitalizeFirst(row.role || row.rolle || 'User'),
+                responsibility_1: row.responsibility_1 ? row.responsibility_1.toLowerCase() : null,
+                responsibility_2: row.responsibility_2 ? row.responsibility_2.toLowerCase() : null,
+                spez_zustaendigkeit: row['Spez. Zuständigkeit'] || row.spez_zustaendigkeit || '',
+                created_by: row.createdBy || null,
+                created_at: row.createdAt || new Date().toISOString()
+            };
 
-            case 'activities':
-                return {
-                    id: row.id,
-                    name: row.name || '',
-                    category,
-                    short_description: row.short_description || '',
-                    rules: row.rules || '',
-                    duration_minutes: this._parseIntOrNull(row.duration_minutes),
-                    preparation_minutes: this._parseIntOrNull(row.preparation_minutes),
-                    location: row.location || null,
-                    location_notes: row.location_notes || '',
-                    min_players: this._parseIntOrNull(row.min_players),
-                    max_players: this._parseIntOrNull(row.max_players),
-                    cost: row.cost || '',
-                    link: row.link || '',
-                    team_tasks: row.team_tasks || '',
-                    responsible_id: row.responsible || row.responsible_id || null,
-                    status: row.status || 'To Do',
-                    created_by: row.createdBy || null,
-                    created_at: row.createdAt || new Date().toISOString()
-                };
+        case 'activities':
+            return {
+                id: row.id,
+                name: row.name || '',
+                category,
+                short_description: row.short_description || '',
+                rules: row.rules || '',
+                duration_minutes: this._parseIntOrNull(row.duration_minutes),
+                preparation_minutes: this._parseIntOrNull(row.preparation_minutes),
+                location: row.location || null,
+                location_notes: row.location_notes || '',
+                min_players: this._parseIntOrNull(row.min_players),
+                max_players: this._parseIntOrNull(row.max_players),
+                cost: row.cost || '',
+                link: row.link || '',
+                team_tasks: row.team_tasks || '',
+                responsible_id: row.responsible || row.responsible_id || null,
+                status: row.status || 'To Do',
+                created_by: row.createdBy || null,
+                created_at: row.createdAt || new Date().toISOString()
+            };
 
-            case 'inventory':
-                return {
-                    id: row.id,
-                    name: row.name || '',
-                    quantity: row.quantity ? parseInt(row.quantity, 10) || 0 : 0,
-                    storage_location: row.storage_location || '',
-                    condition: row.condition || 'Gut',
-                    last_checked: row.last_checked || null,
-                    notes: row.notes || '',
-                    created_by: row.createdBy || null,
-                    created_at: row.createdAt || new Date().toISOString()
-                };
+        case 'inventory':
+            return {
+                id: row.id,
+                name: row.name || '',
+                quantity: row.quantity ? parseInt(row.quantity, 10) || 0 : 0,
+                storage_location: row.storage_location || '',
+                condition: row.condition || 'Gut',
+                last_checked: row.last_checked || null,
+                notes: row.notes || '',
+                created_by: row.createdBy || null,
+                created_at: row.createdAt || new Date().toISOString()
+            };
 
-            case 'sport_venues':
-                return {
-                    id: row.id,
-                    sport_type: row.category || null,
-                    name: row.name || '',
-                    address: row.address?.id || null,
-                    phone: row.phone || '',
-                    venue_type: row.type || row.venue_type || null,
-                    indoor_outdoor: row.indoor_outdoor || null,
-                    cost: row.cost || '',
-                    notes: row.notes || '',
-                    created_by: row.createdBy || null,
-                    created_at: row.createdAt || new Date().toISOString()
-                };
+        case 'sport_venues':
+            return {
+                id: row.id,
+                sport_type: row.category || null,
+                name: row.name || '',
+                address: row.address?.id || null,
+                phone: row.phone || '',
+                venue_type: row.type || row.venue_type || null,
+                indoor_outdoor: row.indoor_outdoor || null,
+                cost: row.cost || '',
+                notes: row.notes || '',
+                created_by: row.createdBy || null,
+                created_at: row.createdAt || new Date().toISOString()
+            };
 
-            case 'events':
-                return {
-                    id: row.id,
-                    name: row.name || '',
-                    date: row.date || null,
-                    time: row.time || '18:30',
-                    location: row.location?.id || null,
-                    games: row.games || '',
-                    status: row.status || 'To Do',
-                    responsible_id: row.responsible || row.responsible_id || null,
-                    notes: row.notes || '',
-                    created_by: row.createdBy || null,
-                    created_at: row.createdAt || new Date().toISOString()
-                };
+        case 'events':
+            return {
+                id: row.id,
+                name: row.name || '',
+                date: row.date || null,
+                time: row.time || '18:30',
+                location: row.location?.id || null,
+                games: row.games || '',
+                status: row.status || 'To Do',
+                responsible_id: row.responsible || row.responsible_id || null,
+                notes: row.notes || '',
+                created_by: row.createdBy || null,
+                created_at: row.createdAt || new Date().toISOString()
+            };
 
-            case 'ort':
-                return {
-                    id: row.id,
-                    title: row.title || '',
-                    street: row.street || '',
-                    address_extra: row.address_extra || '',
-                    zip_code: row.zip_code || '',
-                    city: row.city || '',
-                    link: row.link || '',
-                    notes: row.notes || '',
-                    created_by: row.createdBy || null,
-                    created_at: row.createdAt || new Date().toISOString()
-                };
+        case 'ort':
+            return {
+                id: row.id,
+                title: row.title || '',
+                street: row.street || '',
+                address_extra: row.address_extra || '',
+                zip_code: row.zip_code || '',
+                city: row.city || '',
+                link: row.link || '',
+                notes: row.notes || '',
+                created_by: row.createdBy || null,
+                created_at: row.createdAt || new Date().toISOString()
+            };
 
-            default:
-                return row;
+        default:
+            return row;
         }
     }
 
@@ -243,105 +305,105 @@ export class DataService {
 
     static _fromDb(supaTable, row) {
         switch (supaTable) {
-            case 'people':
-                return {
-                    id: row.id,
-                    vorname: row.vorname || '',
-                    nachname: row.nachname || '',
-                    'Tel.': row.telefon || '',
-                    Status: row.status ? this._capitalizeFirst(row.status) : 'Aktiv',
-                    role: row.rolle || 'User',
-                    responsibility_1: row.responsibility_1 ? this._capitalizeFirst(row.responsibility_1) : '',
-                    responsibility_2: row.responsibility_2 ? this._capitalizeFirst(row.responsibility_2) : '',
-                    'Spez. Zuständigkeit': row.spez_zustaendigkeit || '',
-                    Team: (row.person_teams || []).map(pt => pt.teams?.name).filter(Boolean).join(', '),
-                    createdBy: row.created_by || 'Unbekannt',
-                    createdAt: row.created_at || null,
-                };
+        case 'people':
+            return {
+                id: row.id,
+                vorname: row.vorname || '',
+                nachname: row.nachname || '',
+                'Tel.': row.telefon || '',
+                Status: row.status ? this._capitalizeFirst(row.status) : 'Aktiv',
+                role: row.rolle || 'User',
+                responsibility_1: row.responsibility_1 ? this._capitalizeFirst(row.responsibility_1) : '',
+                responsibility_2: row.responsibility_2 ? this._capitalizeFirst(row.responsibility_2) : '',
+                'Spez. Zuständigkeit': row.spez_zustaendigkeit || '',
+                Team: (row.person_teams || []).map(pt => pt.teams?.name).filter(Boolean).join(', '),
+                createdBy: row.created_by || 'Unbekannt',
+                createdAt: row.created_at || null,
+            };
 
-            case 'activities':
-                return {
-                    id: row.id,
-                    name: row.name || '',
-                    required_items: (row.activity_required_items || [])
-                        .map(ari => ari.quantity_needed ? `${ari.inventory?.name} (${ari.quantity_needed})` : ari.inventory?.name)
-                        .filter(Boolean)
-                        .join(', '),
-                    short_description: row.short_description || '',
-                    rules: row.rules || '',
-                    duration_minutes: row.duration_minutes ?? '',
-                    preparation_minutes: row.preparation_minutes ?? '',
-                    location: row.location || '',
-                    location_notes: row.location_notes || '',
-                    min_players: row.min_players ?? '',
-                    max_players: row.max_players ?? '',
-                    cost: row.cost || '',
-                    link: row.link || '',
-                    team_tasks: row.team_tasks || '',
-                    responsible: row.responsible_id || '',
-                    status: row.status || 'To Do',
-                    createdBy: row.created_by || 'Unbekannt',
-                    createdAt: row.created_at || null,
-                };
+        case 'activities':
+            return {
+                id: row.id,
+                name: row.name || '',
+                required_items: (row.activity_required_items || [])
+                    .map(ari => ari.quantity_needed ? `${ari.inventory?.name} (${ari.quantity_needed})` : ari.inventory?.name)
+                    .filter(Boolean)
+                    .join(', '),
+                short_description: row.short_description || '',
+                rules: row.rules || '',
+                duration_minutes: row.duration_minutes ?? '',
+                preparation_minutes: row.preparation_minutes ?? '',
+                location: row.location || '',
+                location_notes: row.location_notes || '',
+                min_players: row.min_players ?? '',
+                max_players: row.max_players ?? '',
+                cost: row.cost || '',
+                link: row.link || '',
+                team_tasks: row.team_tasks || '',
+                responsible: row.responsible_id || '',
+                status: row.status || 'To Do',
+                createdBy: row.created_by || 'Unbekannt',
+                createdAt: row.created_at || null,
+            };
 
-            case 'inventory':
-                return {
-                    id: row.id,
-                    name: row.name || '',
-                    quantity: row.quantity ?? '',
-                    storage_location: row.storage_location || '',
-                    condition: row.condition || 'gut',
-                    last_checked: row.last_checked || '',
-                    notes: row.notes || '',
-                    createdBy: row.created_by || 'Unbekannt',
-                    createdAt: row.created_at || null,
-                };
+        case 'inventory':
+            return {
+                id: row.id,
+                name: row.name || '',
+                quantity: row.quantity ?? '',
+                storage_location: row.storage_location || '',
+                condition: row.condition || 'gut',
+                last_checked: row.last_checked || '',
+                notes: row.notes || '',
+                createdBy: row.created_by || 'Unbekannt',
+                createdAt: row.created_at || null,
+            };
 
-            case 'sport_venues':
-                return {
-                    id: row.id,
-                    name: row.name || '',
-                    address: row.address || '',
-                    phone: row.phone || '',
-                    type: row.venue_type || '',
-                    indoor_outdoor: row.indoor_outdoor || '',
-                    cost: row.cost || '',
-                    notes: row.notes || '',
-                    createdBy: row.created_by || 'Unbekannt',
-                    createdAt: row.created_at || null,
-                };
+        case 'sport_venues':
+            return {
+                id: row.id,
+                name: row.name || '',
+                address: row.address || '',
+                phone: row.phone || '',
+                type: row.venue_type || '',
+                indoor_outdoor: row.indoor_outdoor || '',
+                cost: row.cost || '',
+                notes: row.notes || '',
+                createdBy: row.created_by || 'Unbekannt',
+                createdAt: row.created_at || null,
+            };
 
-            case 'events':
-                return {
-                    id: row.id,
-                    name: row.name || '',
-                    date: row.date || '',
-                    time: row.time || '',
-                    location: row.location || '',
-                    games: row.games || '',
-                    status: row.status || 'To Do',
-                    responsible: row.responsible_id || '',
-                    notes: row.notes || '',
-                    createdBy: row.created_by || 'Unbekannt',
-                    createdAt: row.created_at || null,
-                };
+        case 'events':
+            return {
+                id: row.id,
+                name: row.name || '',
+                date: row.date || '',
+                time: row.time || '',
+                location: row.location || '',
+                games: row.games || '',
+                status: row.status || 'To Do',
+                responsible: row.responsible_id || '',
+                notes: row.notes || '',
+                createdBy: row.created_by || 'Unbekannt',
+                createdAt: row.created_at || null,
+            };
 
-            case 'ort':
-                return {
-                    id: row.id,
-                    title: row.title || '',
-                    street: row.street || '',
-                    address_extra: row.address_extra || '',
-                    zip_code: row.zip_code || '',
-                    city: row.city || '',
-                    link: row.link || '',
-                    notes: row.notes || '',
-                    createdBy: row.created_by || 'Unbekannt',
-                    createdAt: row.created_at || null,
-                };
+        case 'ort':
+            return {
+                id: row.id,
+                title: row.title || '',
+                street: row.street || '',
+                address_extra: row.address_extra || '',
+                zip_code: row.zip_code || '',
+                city: row.city || '',
+                link: row.link || '',
+                notes: row.notes || '',
+                createdBy: row.created_by || 'Unbekannt',
+                createdAt: row.created_at || null,
+            };
 
-            default:
-                return row;
+        default:
+            return row;
         }
     }
 
@@ -372,7 +434,11 @@ export class DataService {
         if (!teamsRes.ok) return;
         const teams = await teamsRes.json();
 
-        const junctionRows = teams.map(t => ({ person_id: personId, team_id: t.id }));
+        const junctionRows = teams.map(t => ({
+            person_id: personId,
+            team_id: t.id
+        }));
+
         if (junctionRows.length > 0) {
             const res = await SupabaseClient.post('person_teams', junctionRows);
             if (!res.ok) console.error('[DataService] Sync PersonTeams failed:', await res.text());

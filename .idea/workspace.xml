@@ -5,20 +5,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/public/data/tables.json" beforeDir="false" afterPath="$PROJECT_DIR$/public/data/tables.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/ui/BaseDialog.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/ButtonBuilder.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/DataFormatter.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/EventManager.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/FormFieldFactory.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/GridLayoutFactory.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/UserContextManager.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/copilotDiffState.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/.nojekyll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index-B69q9-Tl.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index-DQ6cWn2J.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/data/tables.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/dist/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/App.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/App.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/GlobalStateManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/GlobalStateManager.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/TableRenderer.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableRenderer.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/UIManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/UIManager.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/fields/EnumField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/EnumField.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/fields/LocationField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/LocationField.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/fields/TagField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/TagField.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/AuthService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/AuthService.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/PermissionService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/PermissionService.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/Dialog.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/Dialog.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/Table.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/Table.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/DataService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/DataService.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/styles/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/main.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/ui/Dialog.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Dialog.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/Header.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Header.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/UserInfoPage.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/UserInfoPage.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -106,11 +117,6 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
-      <module name="activity-manager" />
-      <option name="filePath" />
-      <method v="2" />
-    </configuration>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
@@ -141,6 +147,7 @@
       <workItem from="1774862056598" duration="4988000" />
       <workItem from="1774868581720" duration="7560000" />
       <workItem from="1775481803922" duration="1967000" />
+      <workItem from="1775650753329" duration="5181000" />
     </task>
     <servers />
   </component>

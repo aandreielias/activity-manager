@@ -4,7 +4,7 @@ export class StatusField extends EnumField {
     updateDisplay() {
         if (!this.contentWrap) return;
         this.contentWrap.innerHTML = '';
-        
+
         const value = this.getRawValue();
         if (!value || value === '—') {
             this.contentWrap.textContent = '—';
@@ -16,7 +16,7 @@ export class StatusField extends EnumField {
         tag.className = `inventory-tag status-${sanitizedValue}`;
         tag.textContent = value;
         this.contentWrap.appendChild(tag);
-        
+
         if (this.td) {
             // Clear existing status-cell classes
             this.td.classList.forEach(cls => {

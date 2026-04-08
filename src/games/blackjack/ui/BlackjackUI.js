@@ -117,7 +117,7 @@ export class BlackjackUI {
         // Player Hands
         const pContainer = this.#container.querySelector('.player-section-container');
         const currentHandCount = pContainer.querySelectorAll('.player-section').length;
-        
+
         // Reset player container if hand count changed (split) or resetting
         if (currentHandCount !== state.playerHands.length || state.phase === 'IDLE') {
             pContainer.innerHTML = '';
@@ -127,7 +127,7 @@ export class BlackjackUI {
             let handEl = pContainer.querySelector(`.player-section[data-hand-idx="${idx}"]`);
             if (!handEl) {
                 handEl = document.createElement('div');
-                handEl.className = `hand-section player-section`;
+                handEl.className = 'hand-section player-section';
                 handEl.dataset.handIdx = idx;
                 handEl.innerHTML = `
                     <div class="hand-label">Hand ${state.playerHands.length > 1 ? idx + 1 : ''} <span class="player-score"></span></div>
@@ -135,15 +135,15 @@ export class BlackjackUI {
                 `;
                 pContainer.appendChild(handEl);
             }
-            
+
             handEl.style.display = 'flex';
-            
+
             handEl.classList.toggle('active', state.activeHandIndex === idx);
             const score = state.playerScores[idx];
             const scoreEl = handEl.querySelector('.player-score');
             scoreEl.textContent = score;
             scoreEl.classList.toggle('bust', score > 21);
-            
+
             this.#syncHand(handEl.querySelector('.cards-container'), hand);
         });
 
@@ -167,23 +167,23 @@ export class BlackjackUI {
         hitBtn.disabled = !isPlayerTurn;
         standBtn.style.display = (isPlayerTurn || (isIdle && state.playerHands[0].length === 0)) ? 'block' : 'none';
         standBtn.disabled = !isPlayerTurn;
-        
+
         doubleBtn.style.display = (isPlayerTurn && state.canDouble) ? 'block' : 'none';
         doubleBtn.disabled = !state.canDouble;
 
         splitBtn.style.display = (isPlayerTurn && state.canSplit) ? 'block' : 'none';
         splitBtn.disabled = !state.canSplit;
-        
+
         insuranceBtn.style.display = (isPlayerTurn && state.canInsurance) ? 'block' : 'none';
         insuranceBtn.disabled = !state.canInsurance;
-        
+
         cntBtn.style.display = isResult ? 'block' : 'none';
 
         if (isResult && state.lastResults && state.lastResults.length > 0) {
             this.#loadAllTimeStats(); // Refresh to show new totals
             resOverlay.style.display = 'block';
             resText.innerHTML = state.lastResults.join('<br>');
-            resText.className = `result-text result-summary`;
+            resText.className = 'result-text result-summary';
         } else {
             resOverlay.style.display = 'none';
         }
@@ -212,7 +212,7 @@ export class BlackjackUI {
                     newEl.classList.add('flipping');
                     // We can't actually 'animate' the flip easily without CSS that supports it.
                     // But we can prevent the 'cardDeal' animation from playing again.
-                    newEl.style.animation = 'none'; 
+                    newEl.style.animation = 'none';
                     container.replaceChild(newEl, cardEl);
                 }
             }
@@ -223,7 +223,7 @@ export class BlackjackUI {
         const el = document.createElement('div');
         el.className = `card-item ${card.isRed ? 'red' : ''} ${card.isHidden ? 'hidden' : ''}`;
         el.title = card.fullName;
-        
+
         if (card.isHidden) {
             el.innerHTML = '';
         } else {
@@ -239,7 +239,7 @@ export class BlackjackUI {
                 </div>
             `;
         }
-        
+
         return el;
     }
 
@@ -258,7 +258,7 @@ export class BlackjackUI {
             this.#game.action('stand');
             this.update();
         });
-        
+
         this.#container.querySelector('.double-btn').addEventListener('click', () => {
             this.#game.action('double');
             this.update();
@@ -268,7 +268,7 @@ export class BlackjackUI {
             this.#game.action('split');
             this.update();
         });
-        
+
         this.#container.querySelector('.insurance-btn').addEventListener('click', () => {
             this.#game.action('insurance');
             this.update();

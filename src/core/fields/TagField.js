@@ -13,7 +13,7 @@ export class TagField extends Field {
         }
 
         const tags = rawValue.split(',').map(t => t.trim()).filter(t => t);
-        
+
         tags.forEach(text => {
             const tag = document.createElement('span');
             tag.className = 'inventory-tag available'; // Style like available inventory items
@@ -30,10 +30,10 @@ export class TagField extends Field {
     async _showPicker() {
         const rawValue = this.getRawValue();
         const currentTags = rawValue === '—' || !rawValue ? [] : rawValue.split(',').map(t => t.trim()).filter(t => t);
-        
+
         const globalState = GlobalStateManager.getInstance();
         let availableTags = this.colDef.availableTags || [];
-        
+
         // If no categories are defined, try to find a matching Postgres Enum or specific table list
         if (availableTags.length === 0) {
             const globalEnums = globalState.getEnumOptionsForColumn(this.colDef.id, this.tableId);
@@ -138,7 +138,7 @@ export class TagField extends Field {
                 suggSection = document.createElement('div');
                 suggSection.className = 'picker-section';
                 suggSection.innerHTML = `<div class="picker-section-title">Verfügbare ${displayLabelPlural}</div>`;
-                
+
                 suggestionList = document.createElement('div');
                 suggestionList.className = 'picker-list';
                 suggestionList.style.flexDirection = 'row';
@@ -183,7 +183,7 @@ export class TagField extends Field {
                 const addSection = document.createElement('div');
                 addSection.className = 'picker-section';
                 addSection.innerHTML = `<div class="picker-section-title">${addPrefix} ${displayLabelSingular} hinzufügen</div>`;
-                
+
                 const inputGroup = document.createElement('div');
                 inputGroup.style.display = 'flex';
                 inputGroup.style.gap = '8px';
@@ -213,11 +213,11 @@ export class TagField extends Field {
                 };
                 addBtn.onclick = addTag;
                 input.oninput = (e) => filterSuggestions(e.target.value);
-                input.onkeydown = (e) => { 
-                    if (e.key === 'Enter') { 
-                        e.preventDefault(); 
-                        addTag(); 
-                    } 
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addTag();
+                    }
                 };
             }
 

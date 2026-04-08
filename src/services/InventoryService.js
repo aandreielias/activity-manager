@@ -42,7 +42,7 @@ export class InventoryService {
     static validateAvailability(requestedName, requestedQuantity) {
         const inventory = GlobalStateManager.getInstance().getInventory();
         const invRow = inventory.find(r => (r.data?.name || '').toLowerCase() === requestedName.toLowerCase());
-        
+
         if (!invRow) {
             return { status: 'unavailable', message: '! Nicht im Inventar' };
         }

@@ -30,24 +30,24 @@ export class PermissionService {
         }
 
         switch (permissions.type) {
-            case this.TYPES.ALL:
-                return true;
-            case this.TYPES.EXCEPT_PEOPLE:
-                return tableId !== 'tbl_people' && tableId !== 'people_table';
-            case this.TYPES.EXCEPT_INVENTORY:
-                return tableId !== 'tbl_inventory';
-            case this.TYPES.SPECIFIC:
-            case this.TYPES.READONLY:
-                const views = Array.isArray(permissions.viewTables) ? permissions.viewTables : (Array.isArray(permissions.tables) ? permissions.tables : []);
-                if (views.includes(tableId)) return true;
-                
-                // If you can edit, you can see
-                const edits = Array.isArray(permissions.editTables) ? permissions.editTables : (Array.isArray(permissions.tables) ? permissions.tables : []);
-                return edits.includes(tableId);
-            case this.TYPES.NONE:
-                return false;
-            default:
-                return true;
+        case this.TYPES.ALL:
+            return true;
+        case this.TYPES.EXCEPT_PEOPLE:
+            return tableId !== 'tbl_people' && tableId !== 'people_table';
+        case this.TYPES.EXCEPT_INVENTORY:
+            return tableId !== 'tbl_inventory';
+        case this.TYPES.SPECIFIC:
+        case this.TYPES.READONLY:
+            const views = Array.isArray(permissions.viewTables) ? permissions.viewTables : (Array.isArray(permissions.tables) ? permissions.tables : []);
+            if (views.includes(tableId)) return true;
+
+            // If you can edit, you can see
+            const edits = Array.isArray(permissions.editTables) ? permissions.editTables : (Array.isArray(permissions.tables) ? permissions.tables : []);
+            return edits.includes(tableId);
+        case this.TYPES.NONE:
+            return false;
+        default:
+            return true;
         }
     }
 
@@ -70,19 +70,19 @@ export class PermissionService {
         if (permissions.type === this.TYPES.READONLY) return false;
 
         switch (permissions.type) {
-            case this.TYPES.ALL:
-                return true;
-            case this.TYPES.EXCEPT_PEOPLE:
-                return tableId !== 'tbl_people' && tableId !== 'people_table';
-            case this.TYPES.EXCEPT_INVENTORY:
-                return tableId !== 'tbl_inventory';
-            case this.TYPES.SPECIFIC:
-                if (Array.isArray(permissions.editTables)) return permissions.editTables.includes(tableId);
-                return Array.isArray(permissions.tables) && permissions.tables.includes(tableId);
-            case this.TYPES.NONE:
-                return false;
-            default:
-                return true;
+        case this.TYPES.ALL:
+            return true;
+        case this.TYPES.EXCEPT_PEOPLE:
+            return tableId !== 'tbl_people' && tableId !== 'people_table';
+        case this.TYPES.EXCEPT_INVENTORY:
+            return tableId !== 'tbl_inventory';
+        case this.TYPES.SPECIFIC:
+            if (Array.isArray(permissions.editTables)) return permissions.editTables.includes(tableId);
+            return Array.isArray(permissions.tables) && permissions.tables.includes(tableId);
+        case this.TYPES.NONE:
+            return false;
+        default:
+            return true;
         }
     }
 
@@ -99,8 +99,8 @@ export class PermissionService {
      */
     static canSeeStats(context) {
         if ((context.role || '').toLowerCase() === 'superadmin') return true;
-        return context.permissions?.canManageUsers || 
-               context.permissions?.managementAccess === this.MGMT_ACCESS.STATS_ONLY || 
+        return context.permissions?.canManageUsers ||
+               context.permissions?.managementAccess === this.MGMT_ACCESS.STATS_ONLY ||
                context.permissions?.managementAccess === this.MGMT_ACCESS.STATS_PERMS;
     }
 
@@ -129,6 +129,14 @@ export class PermissionService {
     }
 
     /**
+     * Determines if a user can view audit logs.
+     */
+    static canViewLogs(context) {
+        if ((context.role || '').toLowerCase() === 'superadmin') return true;
+        return context.permissions?.canViewLogs === true;
+    }
+
+    /**
      * Returns the default permission object for a specific role.
      */
     static getPermissionsForRole(role) {
@@ -138,7 +146,8 @@ export class PermissionService {
                 type: this.TYPES.ALL,
                 managementAccess: this.MGMT_ACCESS.STATS_PERMS,
                 canEditRoles: true,
-                canUseEditMode: true
+                canUseEditMode: true,
+                canViewLogs: true
             };
         }
         if (r === 'admin') {
@@ -146,7 +155,8 @@ export class PermissionService {
                 type: this.TYPES.ALL,
                 managementAccess: this.MGMT_ACCESS.STATS_PERMS,
                 canEditRoles: false,
-                canUseEditMode: false // Admins don't get it by default anymore
+                canUseEditMode: false,
+                canViewLogs: true
             };
         }
         if (r === 'supervisor') {
@@ -173,7 +183,8 @@ export class PermissionService {
             viewTables: [],
             editTables: [],
             managementAccess: this.MGMT_ACCESS.NONE,
-            canUseEditMode: false
+            canUseEditMode: false,
+            canViewLogs: false
         };
     }
 }

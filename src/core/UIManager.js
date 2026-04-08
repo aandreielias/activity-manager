@@ -5,6 +5,8 @@ import { GlobalStateManager } from './GlobalStateManager.js';
 import { UserInfoPage } from '../ui/UserInfoPage.js';
 import { TableLoader } from './TableLoader.js';
 import { CalendarView } from '../ui/CalendarView.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const PEOPLE_SCHEMA = Object.freeze([
     { id: 'vorname', label: 'Vorname', type: 'text' },
@@ -62,6 +64,7 @@ export class UIManager {
         this.header.onSaveAll = () => this.app._handleSaveAll();
         this.header.onDiscardAll = () => this.app._handleDiscardAll();
         this.header.onFavoritesToggle = (active) => this._handleFavoritesToggle(active);
+        this.header.onCategoryExport = (categoryId) => this._exportCategoryPDF(categoryId);
         this.header.onEditModeToggle = (active) => {
             this.globalState.setEditModeActive(active);
             this.reloadTables();
@@ -394,6 +397,96 @@ export class UIManager {
             window.location.reload();
         } catch (err) {
             alert(`Fehler: ${err.message}`);
+        }
+    }
+
+    async _exportCategoryPDF(categoryId) {
+        try {
+            // A3 Landscape provides maximum width for large tables
+            const doc = new jsPDF({ orientation: 'landscape', format: 'a3' });
+            let isFirst = true;
+
+            // Columns to ignore for a cleaner "cheat sheet" PDF
+            const ignoreCols = ['Erstellt von', 'Erstellt am', 'createdAt', 'createdBy', 'Link/Video/Lied'];
+
+            let tablesToExport = [];
+            let exportFileName = 'Export';
+
+            if (categoryId === 'all-people') {
+                exportFileName = 'Personen';
+                if (this.personsTable) tablesToExport.push(this.personsTable);
+                if (this.inactivePersonsTable) tablesToExport.push(this.inactivePersonsTable);
+            } else {
+                const categoryName = categoryId === 'all-spiele' ? 'Spiele' : 'Sportarten';
+                exportFileName = categoryName;
+                const categoryFilter = categoryId === 'all-spiele' ? 'spiele' : 'sportarten';
+                const configs = this.app.tableConfigs.filter(c => c.category === categoryFilter);
+                configs.forEach(config => {
+                    const tableWrap = this.tables[config.id];
+                    if (tableWrap && tableWrap.instance) tablesToExport.push(tableWrap.instance);
+                });
+            }
+
+            for (const tableInstance of tablesToExport) {
+                if (!isFirst) {
+                    doc.addPage();
+                }
+                isFirst = false;
+
+                doc.setFontSize(18);
+                try { doc.text(tableInstance.title || '', 14, 20); } catch(e){}
+
+                const exportSchema = tableInstance.schema.filter(col => !ignoreCols.includes(col.label) && !ignoreCols.includes(col.id));
+
+                const head = [exportSchema.map(col => col.label)];
+                const body = tableInstance.rows.map(row => {
+                    return exportSchema.map(col => {
+                        let val = row.data[col.id];
+                        if (val === null || val === undefined) return '';
+                        
+                        let strVal = '';
+                        if (typeof val === 'object') {
+                            if (Array.isArray(val)) {
+                                strVal = val.map(v => typeof v === 'object' ? v.name || v.id : v).join(', ');
+                            } else if (val.title || val.name) {
+                                strVal = val.title || val.name;
+                            } else {
+                                strVal = JSON.stringify(val);
+                            }
+                        } else {
+                            strVal = String(val);
+                        }
+
+                        // Truncate extremely long paragraphs to prevent taking up huge vertical space
+                        if (strVal.length > 250) {
+                            return strVal.substring(0, 247) + '...';
+                        }
+                        return strVal;
+                    });
+                });
+
+                autoTable(doc, {
+                    head,
+                    body,
+                    startY: 28,
+                    styles: { 
+                        fontSize: 8, 
+                        cellPadding: 3, 
+                        overflow: 'linebreak',
+                        valign: 'middle'
+                    },
+                    headStyles: { fillColor: [0, 132, 255], fontSize: 9 }
+                });
+            }
+
+            if (!isFirst) {
+                doc.save(`Export_${exportFileName}.pdf`);
+            } else {
+                alert('Keine Tabellen zum Exportieren gefunden.');
+            }
+        } catch (e) {
+            console.error('PDF export failed', e);
+            alert('Fehler beim PDF Export.');
         }
     }
 

@@ -14,8 +14,8 @@ export class AGame extends IGame {
 
     /**
      * Dispatches an action type to the game.
-     * @param {string} type 
-     * @param {Object} payload 
+     * @param {string} type
+     * @param {Object} payload
      */
     action(type, payload = {}) {
         throw new Error('Not implemented');

@@ -176,7 +176,7 @@ export class UserStatsService {
             update.blackjack_current_streak = 0;
         }
         // Result === 'PUSH' is not recorded as the column 'blackjack_pushes' is missing in DB.
-        
+
         await this._updateStats(userId, update);
     }
 
@@ -190,7 +190,7 @@ export class UserStatsService {
      */
     static async resetAllStats(userId) {
         if (!userId) return;
-        
+
         // 1. Reset user_stats fields
         await this._updateStats(userId, {
             blackjack_wins: 0,

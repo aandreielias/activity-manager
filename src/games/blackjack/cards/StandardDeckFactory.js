@@ -16,11 +16,11 @@ export class StandardDeckFactory {
         for (const suitKey in Suit) {
             const suit = Suit[suitKey];
             if (suit === Suit.NONE) continue;
-            
+
             for (const rankKey in Rank) {
                 const rank = Rank[rankKey];
                 if (rank === Rank.JOKER) continue;
-                
+
                 cards.push(new Card(rank, suit));
             }
         }
@@ -40,7 +40,7 @@ export class StandardDeckFactory {
 
     /**
      * Builds a shoe containing n standard 52-card decks.
-     * @param {number} n 
+     * @param {number} n
      * @returns {Card[]}
      */
     static buildShoe(n) {

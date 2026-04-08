@@ -39,7 +39,7 @@ export class CalendarView {
 
         this.element.querySelector('.prev-month').addEventListener('click', () => this.changeMonth(-1));
         this.element.querySelector('.next-month').addEventListener('click', () => this.changeMonth(1));
-        
+
         // Handle event clicks
         this.element.querySelectorAll('.calendar-event-main').forEach(el => {
             el.onclick = (e) => {
@@ -54,7 +54,7 @@ export class CalendarView {
             wrapper.oncontextmenu = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                
+
                 const eventId = wrapper.dataset.eventId;
                 const row = this.eventsTable.rows.find(r => r.id === eventId);
                 if (!row) return;
@@ -66,7 +66,7 @@ export class CalendarView {
                     isFavorite: globalState.isFavorite(row.id),
                     onToggleFavorite: () => {
                         row.toggleFavorite();
-                        this._updateUI(); 
+                        this._updateUI();
                     },
                     onEdit: canEdit ? () => {
                         row.fields.name?.startEditing();
@@ -108,10 +108,10 @@ export class CalendarView {
             day.ondrop = async (e) => {
                 e.preventDefault();
                 day.classList.remove('drag-over');
-                
+
                 const eventId = e.dataTransfer.getData('text/plain');
                 const newDate = day.querySelector('.calendar-add-btn')?.dataset.date;
-                
+
                 if (eventId && newDate) {
                     const row = this.eventsTable.rows.find(r => r.id === eventId);
                     if (row && row.data.date !== newDate) {
@@ -144,13 +144,13 @@ export class CalendarView {
     _generateDaysHTML() {
         const year = this.currentDate.getFullYear();
         const month = this.currentDate.getMonth();
-        
+
         const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 is Sunday
         const offset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
-        
+
         const startDate = new Date(year, month, 1);
         startDate.setDate(startDate.getDate() - offset);
-        
+
         let html = '';
         const events = this.eventsTable?.rows || [];
         const today = new Date();
@@ -159,12 +159,12 @@ export class CalendarView {
         for (let i = 0; i < 42; i++) {
             const currentCellDate = new Date(startDate);
             currentCellDate.setDate(startDate.getDate() + i);
-            
+
             const isOtherMonth = currentCellDate.getMonth() !== month;
             const isToday = currentCellDate.getTime() === today.getTime();
             const dateStr = `${currentCellDate.getFullYear()}-${String(currentCellDate.getMonth() + 1).padStart(2, '0')}-${String(currentCellDate.getDate()).padStart(2, '0')}`;
             const isPast = currentCellDate < today;
-            
+
             const isMonday = i % 7 === 0;
             let kwHtml = '';
             if (isMonday) {
@@ -193,21 +193,21 @@ export class CalendarView {
                     </div>
                     <div class="calendar-events-list">
                         ${dayEvents.map(e => {
-                            let games = [];
-                            try {
-                                const parsed = JSON.parse(e.data.games || '[]');
-                                games = Array.isArray(parsed) ? parsed.map(g => (typeof g === 'string' ? g : g.name)) : [];
-                            } catch (err) {
-                                games = (e.data.games || '').split(',').map(g => g.trim()).filter(g => g);
-                            }
+        let games = [];
+        try {
+            const parsed = JSON.parse(e.data.games || '[]');
+            games = Array.isArray(parsed) ? parsed.map(g => (typeof g === 'string' ? g : g.name)) : [];
+        } catch (err) {
+            games = (e.data.games || '').split(',').map(g => g.trim()).filter(g => g);
+        }
 
-                            const isFav = GlobalStateManager.getInstance().isFavorite(e.id);
-                            const locationName = e.data.location?.title || (typeof e.data.location === 'string' ? e.data.location : '');
-                            
-                            const statusClass = (e.data.status || '').toLowerCase().replace(/\s+/g, '-');
-                            const pastClass = isPast ? 'is-past' : '';
+        const isFav = GlobalStateManager.getInstance().isFavorite(e.id);
+        const locationName = e.data.location?.title || (typeof e.data.location === 'string' ? e.data.location : '');
 
-                            return `
+        const statusClass = (e.data.status || '').toLowerCase().replace(/\s+/g, '-');
+        const pastClass = isPast ? 'is-past' : '';
+
+        return `
                                 <div class="calendar-event-wrapper" data-event-id="${e.id}" draggable="true">
                                     <button class="calendar-event-main ${statusClass ? 'status-' + statusClass : ''} ${pastClass}" title="${e.data.name}${locationName ? ' @ ' + locationName : ''}">
                                         <span class="calendar-event-name">${isFav ? '❤️ ' : ''}${e.data.name}</span>
@@ -215,23 +215,23 @@ export class CalendarView {
                                     </button>
                                     <div class="calendar-event-games">
                                         ${games.map(g => {
-                                            const gameStatus = this._getGameStatus(g);
-                                            const gameStatusClass = gameStatus ? 'status-' + gameStatus.toLowerCase().replace(/\s+/g, '-') : '';
-                                            return `
+        const gameStatus = this._getGameStatus(g);
+        const gameStatusClass = gameStatus ? 'status-' + gameStatus.toLowerCase().replace(/\s+/g, '-') : '';
+        return `
                                                 <button class="calendar-event-game-btn ${gameStatusClass}" title="Spiel ${g} anzeigen (Status: ${gameStatus || '?'})">
                                                     ${g}
                                                 </button>
                                             `;
-                                        }).join('')}
+    }).join('')}
                                     </div>
                                 </div>
                             `;
-                        }).join('')}
+    }).join('')}
                     </div>
                 </div>`;
             }
         }
-        
+
         return html;
     }
 

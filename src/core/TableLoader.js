@@ -47,7 +47,7 @@ export class TableLoader {
                 gamesCol.availableTags = [...new Set(allGames.map(g => g.name))].sort();
             }
         }
- 
+
         return tables;
     }
 
@@ -70,7 +70,7 @@ export class TableLoader {
                     .filter(p => {
                         const status = (p.Status || '').toLowerCase();
                         if (status === 'inaktiv') return false;
-                        
+
                         // Only "Events" main column requires Supervisor+
                         if (isEventTable) {
                             const role = (p.role || '').toLowerCase();

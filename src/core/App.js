@@ -67,9 +67,9 @@ export class App {
 
     _setFavicon() {
         const logoChar = '⬡';
-        const color = '#0084ff'; 
+        const color = '#0084ff';
         const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='50%' font-size='120' fill='${color}' dominant-baseline='central' text-anchor='middle' font-weight='bold'>${logoChar}</text></svg>`;
-        
+
         let link = document.querySelector("link[rel*='icon']");
         if (!link) {
             link = document.createElement('link');
@@ -82,7 +82,7 @@ export class App {
 
     async _loadInitialData() {
         const base = import.meta.env.BASE_URL;
-        
+
         try {
             const res = await SupabaseClient.get('app_config', '?id=eq.tables_config');
             if (res.ok) {
@@ -98,17 +98,12 @@ export class App {
             }
         } catch (e) {
             console.warn('[App] Falling back to check local tables.json:', e.message);
-            
+
             try {
                 const localRes = await fetch(`${base}data/tables.json`);
                 if (localRes.ok) {
-                    const ct = localRes.headers.get('content-type');
-                    if (ct && ct.includes('application/json')) {
-                        this.tableConfigs = await localRes.json();
-                        console.log('[App] Falling back to local tables.json.');
-                    } else {
-                        throw new Error('Local tables.json not found or invalid.');
-                    }
+                    console.log('[App] Falling back to local tables.json.');
+                    this.tableConfigs = await localRes.json();
                 } else {
                     throw new Error('Local tables.json not found or invalid.');
                 }
@@ -174,7 +169,7 @@ export class App {
             } else {
                 authRole = person.role || authRole || 'User';
             }
-            
+
             let perms = null;
             if (authRole === 'Inaktiv') {
                 perms = PermissionService.getPermissionsForRole('Inaktiv');
@@ -182,7 +177,7 @@ export class App {
                 const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
                 perms = permissionsMap[authUser];
             }
-            
+
             this.globalState.setCurrentUser(authUser, authRole, perms);
         }
 

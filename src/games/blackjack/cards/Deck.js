@@ -14,7 +14,7 @@ export class Deck {
 
     /**
      * Resets the deck with a new set of cards.
-     * @param {Card[]} cards 
+     * @param {Card[]} cards
      */
     reset(cards = []) {
         this.#cards = [...cards];
@@ -37,7 +37,7 @@ export class Deck {
     cut() {
         const size = this.#cards.length;
         if (size < 2) return;
-        
+
         const midpoint = Math.floor(Math.random() * (size - 1)) + 1; // Between 1 and size-1
         const firstHalf = this.#cards.slice(0, midpoint);
         const secondHalf = this.#cards.slice(midpoint);
@@ -57,13 +57,13 @@ export class Deck {
 
     /**
      * Draws n cards from the deck.
-     * @param {number} n 
+     * @param {number} n
      * @returns {Card[]}
      */
     drawN(n) {
         if (n < 1) throw new Error('Cannot draw less than 1 card');
         if (this.#cards.length < n) throw new Error('Not enough cards in deck');
-        
+
         const result = [];
         for (let i = 0; i < n; i++) {
             result.push(this.draw());
@@ -81,7 +81,7 @@ export class Deck {
 
     /**
      * Peeks at the n-th card.
-     * @param {number} n 
+     * @param {number} n
      * @returns {Card}
      */
     peekN(n) {

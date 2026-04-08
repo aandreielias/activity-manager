@@ -64,9 +64,9 @@ export class EnumField extends Field {
             addBtn.innerHTML = '<span style="color:var(--warning)">+ Option hinzufügen</span>';
             addBtn.style.fontStyle = 'italic';
             addBtn.onclick = async (e) => {
-                 e.stopPropagation();
-                 const newValue = prompt(`Neue Auswahl für '${this.colDef.label}' (${globalEnumName}):`);
-                 if (newValue && newValue.trim()) {
+                e.stopPropagation();
+                const newValue = prompt(`Neue Auswahl für '${this.colDef.label}' (${globalEnumName}):`);
+                if (newValue && newValue.trim()) {
                     try {
                         await globalState.addEnumOption(globalEnumName, newValue.trim());
                         container.closeMenu();
@@ -166,7 +166,7 @@ export class EnumField extends Field {
                 if (e.target.closest('.enum-dropdown-menu')) {
                     clickedMenu = true;
                 }
-                
+
                 if (!clickedMenu) {
                     document.removeEventListener('click', handleOutsideClick);
                     document.removeEventListener('keydown', handleKeyDown);

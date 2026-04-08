@@ -23,51 +23,51 @@ export class FieldFactory {
 
     static createField(params) {
         const { colDef, tableId } = params;
-        
+
         // Handle specific known columns that require customized logic
         switch (colDef.id) {
-            case 'location':
-                if (tableId === 'tbl_events') {
-                    return new LocationField(params);
-                }
-                break;
-            case 'games':
-                if (tableId === 'tbl_events') {
-                    return new EventGamesField(params);
-                }
-                break;
-            case 'address':
-                if (tableId.startsWith('tbl_sport_')) {
-                    return new LocationField(params);
-                }
-                break;
-            case 'responsible':
-                return new PersonField(params);
-            case 'Status':
-            case 'status':
-                return new StatusField(params);
-            case 'link':
-                return new LinkField(params);
-            case 'required_items':
-                return new InventoryField(params);
-            case 'Team':
-                return new TagField(params);
+        case 'location':
+            if (tableId === 'tbl_events') {
+                return new LocationField(params);
+            }
+            break;
+        case 'games':
+            if (tableId === 'tbl_events') {
+                return new EventGamesField(params);
+            }
+            break;
+        case 'address':
+            if (tableId.startsWith('tbl_sport_')) {
+                return new LocationField(params);
+            }
+            break;
+        case 'responsible':
+            return new PersonField(params);
+        case 'Status':
+        case 'status':
+            return new StatusField(params);
+        case 'link':
+            return new LinkField(params);
+        case 'required_items':
+            return new InventoryField(params);
+        case 'Team':
+            return new TagField(params);
         }
 
         // Fallback to general data structures
         switch (colDef.type) {
-            case 'number':
-                return new NumberField(params);
-            case 'enum':
-                return new EnumField(params);
-            case 'tag':
-                return new TagField(params);
-            case 'date':
-                return new DateField(params);
-            case 'time':
-                return new TimeField(params);
-            default:
-                return new TextField(params);
+        case 'number':
+            return new NumberField(params);
+        case 'enum':
+            return new EnumField(params);
+        case 'tag':
+            return new TagField(params);
+        case 'date':
+            return new DateField(params);
+        case 'time':
+            return new TimeField(params);
+        default:
+            return new TextField(params);
         }
     }
 }

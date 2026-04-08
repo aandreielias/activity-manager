@@ -21,7 +21,7 @@ export const Rank = Object.freeze({
 
 /**
  * Returns true if the rank is a face card (JACK, QUEEN, KING).
- * @param {Object} rank 
+ * @param {Object} rank
  * @returns {boolean}
  */
 export function isFaceCard(rank) {
@@ -30,7 +30,7 @@ export function isFaceCard(rank) {
 
 /**
  * Returns true if the rank is a JOKER.
- * @param {Object} rank 
+ * @param {Object} rank
  * @returns {boolean}
  */
 export function isJoker(rank) {

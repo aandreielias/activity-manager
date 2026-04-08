@@ -12,7 +12,7 @@ export const Suit = Object.freeze({
 
 /**
  * Returns true if the suit is NONE.
- * @param {Object} suit 
+ * @param {Object} suit
  * @returns {boolean}
  */
 export function isNone(suit) {

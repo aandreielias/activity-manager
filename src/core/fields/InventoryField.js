@@ -25,7 +25,6 @@ export class InventoryField extends Field {
 
     // Helper methods moved to InventoryService ──────────────────────
 
-
     startEditing() {
         this.onEditStart?.();
         this._showPicker();
@@ -46,7 +45,7 @@ export class InventoryField extends Field {
 
             const header = document.createElement('div');
             header.className = 'picker-header';
-            header.innerHTML = `<h2>Gegenstände auswählen</h2>`;
+            header.innerHTML = '<h2>Gegenstände auswählen</h2>';
             dialog.appendChild(header);
 
             const content = document.createElement('div');
@@ -69,7 +68,6 @@ export class InventoryField extends Field {
 
                 const list = document.createElement('div');
                 list.className = 'picker-list';
-
 
                 internalSelected.forEach((item, idx) => {
                     const row = document.createElement('div');
@@ -150,7 +148,7 @@ export class InventoryField extends Field {
             // Add Section
             const addSection = document.createElement('div');
             addSection.className = 'picker-section';
-            addSection.innerHTML = `<div class="picker-section-title">Gegenstand hinzufügen</div>`;
+            addSection.innerHTML = '<div class="picker-section-title">Gegenstand hinzufügen</div>';
 
             const inputGroup = document.createElement('div');
             inputGroup.style.display = 'flex';
@@ -174,7 +172,7 @@ export class InventoryField extends Field {
             // Inventory List Section
             const invSection = document.createElement('div');
             invSection.className = 'picker-section';
-            invSection.innerHTML = `<div class="picker-section-title">Vorschläge aus Inventar</div>`;
+            invSection.innerHTML = '<div class="picker-section-title">Vorschläge aus Inventar</div>';
 
             const invList = document.createElement('div');
             invList.className = 'picker-list';

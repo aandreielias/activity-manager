@@ -1,5 +1,6 @@
 import '../styles/Header.css';
 import { GlobalStateManager } from '../core/GlobalStateManager.js';
+import { AuditLogsDialog } from './AuditLogsDialog.js';
 
 /**
  * Header - Main application header with navigation and theme toggle
@@ -70,7 +71,7 @@ export class Header {
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v2.0.5</span>
+                    <span class="header-version">v2.0.6</span>
                 </div>
             </div>
             <nav class="header-nav">
@@ -109,9 +110,14 @@ export class Header {
                 </div>
             </div>
             <div class="header-right">
+                ${globalState.canViewLogs() ? `
+                    <button class="nav-btn audit-logs-btn" title="Audit Logs ansehen" style="border-color:var(--text-secondary); color:var(--text-secondary)">
+                        Logs
+                    </button>
+                ` : ''}
                 ${globalState.canSeeStats() ? `
-                    <button class="nav-btn user-info-btn" title="Nutzer verwalten">
-                        Nutzer
+                    <button class="nav-btn user-info-btn" title="System-Stats und Berechtigungen">
+                        Stats
                     </button>
                 ` : ''}
                 ${globalState.isEditModeActive() ? `
@@ -172,6 +178,52 @@ export class Header {
 
     _attachEventListeners() {
         if (!this.element) return;
+
+        this.element.addEventListener('contextmenu', (e) => {
+            let exportTableId = null;
+            const splitBtn = e.target.closest('.split-main-btn');
+            const personsBtn = e.target.closest('.persons-toggle-btn');
+
+            if (splitBtn && splitBtn.dataset.table && splitBtn.dataset.table.startsWith('all-')) {
+                exportTableId = splitBtn.dataset.table;
+            } else if (personsBtn) {
+                exportTableId = 'all-people';
+            }
+
+            if (exportTableId) {
+                e.preventDefault();
+                this._closeAllDropdowns();
+
+                const existingMenu = document.querySelector('.category-context-menu');
+                if (existingMenu) existingMenu.remove();
+
+                const menu = document.createElement('div');
+                menu.className = 'row-context-menu category-context-menu';
+                menu.style.left = `${e.clientX}px`;
+                menu.style.top = `${e.clientY}px`;
+                menu.style.position = 'fixed';
+                menu.style.zIndex = '100000';
+
+                const exportBtn = document.createElement('button');
+                exportBtn.className = 'context-menu-item';
+                exportBtn.textContent = '📄 Alle Tabellen als PDF exportieren';
+                exportBtn.onclick = () => {
+                    this.onCategoryExport?.(exportTableId);
+                    menu.remove();
+                };
+
+                menu.appendChild(exportBtn);
+                document.body.appendChild(menu);
+
+                const closeMenu = (ev) => {
+                    if (!menu.contains(ev.target)) {
+                        menu.remove();
+                        document.removeEventListener('click', closeMenu);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', closeMenu), 0);
+            }
+        });
 
         this.element.addEventListener('click', async (e) => {
             const btn = e.target.closest('.nav-btn, .dropdown-item');
@@ -254,6 +306,10 @@ export class Header {
                 this.favoritesActive = !this.favoritesActive;
                 e.target.closest('.favorites-toggle-btn').classList.toggle('active', this.favoritesActive);
                 this.onFavoritesToggle?.(this.favoritesActive);
+            }
+
+            if (e.target.closest('.audit-logs-btn')) {
+                await AuditLogsDialog.show();
             }
 
             // Dropdown toggles

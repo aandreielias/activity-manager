@@ -100,7 +100,7 @@ export class GlobalStateManager {
      */
     canEditColumn(tableId, colId) {
         if (this.isSuperAdmin()) return true;
-        
+
         // Prevent editing of metadata columns
         if (colId === 'createdBy' || colId === 'createdAt') {
             return false;
@@ -137,6 +137,14 @@ export class GlobalStateManager {
     canUseEditMode() {
         const context = { role: this.#currentRole, permissions: this.#permissions };
         return PermissionService.canUseEditMode(context);
+    }
+
+    /**
+     * Right to view Audit Logs.
+     */
+    canViewLogs() {
+        const context = { role: this.#currentRole, permissions: this.#permissions };
+        return PermissionService.canViewLogs(context);
     }
 
     /**
@@ -202,7 +210,7 @@ export class GlobalStateManager {
      */
     getEnumOptionsForColumn(colId, tableId) {
         const id = colId.toLowerCase();
-        
+
         // Match specific common mappings
         if (id === 'status') {
             if (tableId === 'tbl_people') return this.getEnumOptions('status_enum');
@@ -259,7 +267,7 @@ export class GlobalStateManager {
     async addColumn(tableId, colData) {
         if (!this.isEditModeActive()) return;
         const { name, type, newEnum } = colData;
-        
+
         try {
             const { DataService } = await import('../services/DataService.js');
             const { supaTable } = DataService._resolveTable(tableId);
@@ -297,12 +305,12 @@ export class GlobalStateManager {
             if (cfg) {
                 const newCol = { id: name, label: name, type: type === 'number' ? 'number' : (type === 'int' ? 'number' : type) };
                 if (newEnum) newCol.type = 'enum'; // Or custom enum handling
-                
+
                 // Add before audit columns if they exist
                 const auditIdx = cfg.schema.findIndex(c => c.id === 'createdBy' || c.id === 'createdAt');
                 if (auditIdx !== -1) cfg.schema.splice(auditIdx, 0, newCol);
                 else cfg.schema.push(newCol);
-                
+
                 await this.saveTableConfigs();
             }
 
@@ -408,8 +416,8 @@ export class GlobalStateManager {
 
     // ── Edit Mode ─────────────────────────────────────────────
 
-    setEditModeActive(active) { 
-        this.#editModeActive = active; 
+    setEditModeActive(active) {
+        this.#editModeActive = active;
         document.body.classList.toggle('edit-mode-active', active);
         localStorage.setItem('edit_mode_active', active);
     }

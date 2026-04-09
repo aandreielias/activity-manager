@@ -1,5 +1,6 @@
 import '../styles/CalendarView.css';
 import { contextMenu } from './ContextMenu.js';
+import { CalendarExport } from '../utils/CalendarExport.js';
 import { Dialog } from './Dialog.js';
 import { GlobalStateManager } from '../core/GlobalStateManager.js';
 
@@ -68,6 +69,7 @@ export class CalendarView {
                         row.toggleFavorite();
                         this._updateUI();
                     },
+                    onExportToCalendar: () => CalendarExport.exportEvent(row.data, this.allTables),
                     onEdit: canEdit ? () => {
                         row.fields.name?.startEditing();
                     } : null,

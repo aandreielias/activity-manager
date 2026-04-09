@@ -29,7 +29,13 @@ export class Table {
             defaultIndex: i
         }));
         this.element = null;
-        this.tableConfig = json.tableConfig; // Store config for saving
+        this.tableConfig = json.tableConfig;
+
+        this.localFilters = {
+            active: false,
+            groupBy: null,
+            filters: [{ attrId: null, mode: null, value: [], quantityMode: 'any', quantityValue: '', availability: [] }]
+        };
 
         // Compose with smaller classes
         this.renderer = new TableRenderer(this);

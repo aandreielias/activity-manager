@@ -52,6 +52,8 @@ export class FieldFactory {
             return new InventoryField(params);
         case 'Team':
             return new TagField(params);
+        case 'time':
+            return new TimeField(params);
         }
 
         // Fallback to general data structures

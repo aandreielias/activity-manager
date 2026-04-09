@@ -105,8 +105,9 @@ html, body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    padding: 20px 24px;
+    overflow: visible;
+
+    padding-bottom: 20px;
 }
 
 .tables-scroll-container {
@@ -190,7 +191,8 @@ html, body {
     flex-direction: row !important;
     gap: 0;
     flex: 1;
-    overflow: hidden;
+    overflow: visible;
+
 }
 
 .tables-container {
@@ -199,8 +201,26 @@ html, body {
     gap: 20px;
     flex: 1;
     overflow-y: auto;
+    overflow-x: visible; 
     min-width: 400px;
+    padding: 20px 24px 0 24px;
 }
+
+
+.side-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    overflow: visible; /* Restore visibility for dropdowns */
+}
+
+
+.split-container-inner {
+    padding: 20px 24px 0 24px;
+    overflow: visible;
+}
+
 
 .split-resizer {
     width: 8px;
@@ -225,11 +245,9 @@ html, body {
 .persons-split-container {
     flex: 1;
     border-left: 1px solid var(--border-light);
-    padding-left: 20px;
     overflow-y: auto;
     display: none;
     flex-direction: column;
-    gap: 20px;
     min-width: 0;
     height: 100%;
 }

@@ -8,8 +8,11 @@ import { CalendarView } from '../ui/CalendarView.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { UserStatsService } from '../services/UserStatsService.js';
+import { FilterEngine } from '../utils/FilterEngine.js';import { FilterBar } from '../ui/FilterBar.js';
+
 
 const PEOPLE_SCHEMA = Object.freeze([
+
     { id: 'vorname', label: 'Vorname', type: 'text' },
     { id: 'nachname', label: 'Nachname', type: 'text' },
     { id: 'Tel.', label: 'Telefon', type: 'text' },
@@ -21,6 +24,14 @@ const PEOPLE_SCHEMA = Object.freeze([
     { id: 'Team', label: 'Team', type: 'tag' },
     { id: 'createdBy', label: 'Erstellt von', type: 'text' },
     { id: 'createdAt', label: 'Erstellt am', type: 'date' },
+]);
+
+const INVENTORY_SCHEMA = Object.freeze([
+    { id: 'name', label: 'Name', type: 'text' },
+    { id: 'Menge', label: 'Menge', type: 'number' },
+    { id: 'Kategorie', label: 'Kategorie', type: 'enum', options: ['Spiele', 'Zubehör', 'Technik', 'Möbel', 'Sonstiges'] },
+    { id: 'Status', label: 'Status', type: 'enum', options: ['O.K.', 'Defekt', 'Vermisst'] },
+    { id: 'Lagerort', label: 'Lagerort', type: 'text' },
 ]);
 
 /**
@@ -41,6 +52,9 @@ export class UIManager {
         this.inventoryTable = null;
         this.calendarView = null;
         this.tables = {};
+        
+        this.filterBarMain = null;
+        this.filterBarSplit = null;
     }
 
     setupLayout(tableConfigs) {
@@ -69,9 +83,6 @@ export class UIManager {
         this.header.onEditModeToggle = (active) => {
             this.globalState.setEditModeActive(active);
             this.reloadTables();
-            // Replacing the header in the DOM is a bit heavy, but Header.js is mostly static HTML
-            // so we can just update its internal state or find the buttons.
-            // For now, let's just reload the whole app state to be safe.
             window.location.reload(); 
         };
         this.header.onCalendarToggle = () => this._handleCalendarToggle();
@@ -84,9 +95,13 @@ export class UIManager {
         this.mainElement.className = 'main-container layout-row';
         appElement.appendChild(this.mainElement);
 
+        this.mainContent = document.createElement('div');
+        this.mainContent.className = 'side-content-wrapper';
+        this.mainElement.appendChild(this.mainContent);
+
         this.tablesContainer = document.createElement('div');
         this.tablesContainer.className = 'tables-container';
-        this.mainElement.appendChild(this.tablesContainer);
+        this.mainContent.appendChild(this.tablesContainer);
 
         this.resizer = document.createElement('div');
         this.resizer.className = 'split-resizer';
@@ -94,9 +109,110 @@ export class UIManager {
         this._setupResizer();
         this.mainElement.appendChild(this.resizer);
 
+        this.splitSideWrapper = document.createElement('div');
+        this.splitSideWrapper.className = 'persons-split-container';
+        this.mainElement.appendChild(this.splitSideWrapper);
+
         this.splitSideContainer = document.createElement('div');
-        this.splitSideContainer.className = 'persons-split-container';
-        this.mainElement.appendChild(this.splitSideContainer);
+        this.splitSideContainer.className = 'split-container-inner';
+        this.splitSideContainer.style.flex = '1';
+        this.splitSideContainer.style.overflowY = 'auto';
+        this.splitSideWrapper.appendChild(this.splitSideContainer);
+
+        this._initFilterBars();
+    }
+
+    _initFilterBars() {
+        const gs = GlobalStateManager.getInstance();
+        
+        this.filterBarMain = new FilterBar({
+            schema: [],
+            state: gs.getGlobalFilterState('main', 'default'),
+            onUpdate: () => this._updateAllTables('main'),
+            isGlobal: true
+        });
+
+        this.filterBarSplit = new FilterBar({
+            schema: [],
+            state: gs.getGlobalFilterState('split', 'default'),
+            onUpdate: () => this._updateAllTables('split'),
+            isGlobal: true
+        });
+
+
+        this.mainContent.prepend(this.filterBarMain.render());
+        this.splitSideWrapper.prepend(this.filterBarSplit.render());
+    }
+
+    _updateAllTables(side) {
+        Object.values(this.tables).forEach(t => {
+            if (t.instance && t.instance.renderer) {
+                const isSplit = t.instance.renderer.element?.closest('.split-container-inner') !== null;
+                if ((side === 'split' && isSplit) || (side === 'main' && !isSplit)) {
+                    t.instance.renderer.update();
+                }
+            }
+        });
+    }
+
+    _populateFilterBar(side) {
+        const bar = side === 'split' ? this.filterBarSplit : this.filterBarMain;
+        if (!bar) return;
+
+        const gs = GlobalStateManager.getInstance();
+        const tableId = side === 'main' ? this.currentTableId : (this.header.personsSplitOpen ? 'tbl_people' : (this.header.inventorySplitOpen ? 'tbl_inventory' : 'default'));
+        
+        bar.state = gs.getGlobalFilterState(side, tableId);
+        
+        // Resolve schema for the current table
+        let schema = [];
+        if (tableId === 'tbl_people') schema = PEOPLE_SCHEMA;
+        else if (tableId === 'tbl_inventory') schema = INVENTORY_SCHEMA;
+        else {
+            let targetTableId = tableId;
+            // Virtual IDs like 'all-spiele'
+            if (tableId.startsWith('all-')) {
+                const category = tableId.replace('all-', '');
+                const found = Object.values(this.tables).find(t => t.config.category === category);
+                if (found) targetTableId = found.config.id;
+            }
+
+            const tableWrap = this.tables[targetTableId];
+            schema = tableWrap?.instance?.schema || tableWrap?.config?.schema || [];
+        }
+
+        // Hardcoded localized types for specific columns if not in schema
+        schema = schema.map(c => {
+            let globalOptions = gs.getEnumOptionsForColumn(c.id, tableId);
+            const isInventory = c.id === 'required_items' || c.id === 'benötigte_gegenstände' || c.label === 'Benötigte Gegenstände' || c.type === 'inventory';
+            if (isInventory) {
+                const inventory = gs.getInventory();
+                globalOptions = inventory.map(i => ({ id: i.data?.name || i.name, label: i.data?.name || i.name }));
+            }
+            return {
+                ...c,
+                label: c.label || c.header || c.name || c.id,
+                type: c.type || 'text',
+                options: (c.options && c.options.length > 0) ? c.options : (globalOptions || [])
+            };
+        });
+
+        // Gather consolidated rows for the global filter bar to enable faceted search
+        let consolidatedRows = [];
+        if (tableId === 'tbl_people') consolidatedRows = this.app.peopleData;
+        else if (tableId === 'tbl_inventory') consolidatedRows = this.inventoryTable?.rows || [];
+        else if (tableId.startsWith('all-')) {
+            const category = tableId.replace('all-', '');
+            this.app.tableConfigs.filter(c => c.category === category).forEach(config => {
+                const tw = this.tables[config.id];
+                if (tw && tw.instance) consolidatedRows.push(...tw.instance.rows);
+            });
+        }
+
+        bar.updateSchema(schema);
+        bar.updateRows(consolidatedRows); // DERIVE DYNAMIC OPTIONS
+        bar.refresh();
+
     }
 
     async loadTables(tables, peopleData) {
@@ -106,9 +222,15 @@ export class UIManager {
 
         if (tables['tbl_inventory']) {
             this.globalState.setInventory(tables['tbl_inventory'].instance.rows);
+            // After setting inventory, we MUST refresh schemas of all tables that might have inventory filters
+            Object.values(this.tables).forEach(tw => {
+                if (tw.instance && tw.instance.renderer && tw.instance.renderer.filterBar) {
+                    tw.instance.renderer.filterBar.refresh();
+                }
+            });
         }
 
-        // Initialize Calendar
+
         if (tables['tbl_events']) {
             this.calendarView = new CalendarView({ 
                 eventsTable: tables['tbl_events'].instance,
@@ -140,10 +262,8 @@ export class UIManager {
                     createdAt: new Date().toISOString()
                 });
 
-                // Small delay to let the table render the new row
                 setTimeout(() => {
                     this._highlightRow(newRow.id);
-                    // Find the name cell and start editing
                     const rowEl = document.querySelector(`tr[data-row-id="${newRow.id}"]`);
                     const nameCell = rowEl?.querySelector('[data-col-id="name"]');
                     nameCell?.click();
@@ -151,7 +271,6 @@ export class UIManager {
             };
 
             this.calendarView.onGameClick = (name) => {
-                // Search for the game across all spiele tables
                 for (const [tableId, tableInfo] of Object.entries(this.tables)) {
                     if (tableInfo.config.category !== 'spiele') continue;
                     const row = tableInfo.instance.rows.find(r => r.data.name === name);
@@ -165,7 +284,6 @@ export class UIManager {
         }
 
         let renderedCount = 0;
-
         Object.entries(tables).forEach(([tableId, { instance, config }]) => {
             if (!this.globalState.canView(tableId)) return;
 
@@ -175,19 +293,14 @@ export class UIManager {
 
             if (tableId === 'tbl_people') {
                 const { activeRows, inactiveRows } = this._splitPeopleByStatus(peopleData);
-
                 const activeTable = this._createPeopleTable(config, 'Aktive Mitglieder', activeRows, { Status: 'Aktiv' });
                 const inactiveTable = this._createPeopleTable(config, 'Inaktive Mitglieder', inactiveRows, { Status: 'Inaktiv' });
-
                 const inactiveEl = inactiveTable.render();
                 inactiveEl.classList.add('inactive-members-table');
-
                 wrapper.appendChild(activeTable.render());
                 wrapper.appendChild(inactiveEl);
-
                 activeTable.editor.showUnsavedChange = () => instance.editor.showUnsavedChange();
                 inactiveTable.editor.showUnsavedChange = () => instance.editor.showUnsavedChange();
-
                 tables[tableId].instances = [activeTable, inactiveTable];
             } else {
                 wrapper.appendChild(instance.render());
@@ -201,7 +314,6 @@ export class UIManager {
         if (renderedCount === 0) {
             this.tablesContainer.innerHTML = `<div class="empty-state-container"><h2>Kein Zugriff</h2><p>Sie haben keine Berechtigung, Tabellen in diesem Bereich anzuzeigen.</p></div>`;
         }
-
         this._initSplitViewTables(tables, peopleData);
     }
 
@@ -213,15 +325,10 @@ export class UIManager {
     setupEventListeners() {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                // Remove all common overlays
                 document.querySelectorAll('.custom-dialog-overlay, .permission-overlay, .user-info-overlay, .blackjack-overlay, .picker-overlay').forEach(el => el.remove());
-                
-                // Close split views
                 if (this.header.personsSplitOpen) this._handlePersonsToggle();
                 if (this.header.inventorySplitOpen) this._handleInventoryToggle();
                 if (this.header.calendarSplitOpen) this._handleCalendarToggle();
-
-                // Clear expanded table states
                 document.querySelectorAll('.expanded-row, .data-cell.expanded').forEach(el => el.classList.remove('expanded-row', 'expanded'));
             }
         });
@@ -233,9 +340,26 @@ export class UIManager {
         this.globalState.onUnsavedChangeCallback((hasUnsaved) => {
             hasUnsaved ? this.header.showUnsavedBanner() : this.header.hideUnsavedBanner();
         });
-    }
 
-    // Private methods
+        window.addEventListener('toggle-filter-bar', (e) => {
+            const side = e.detail.side;
+            const bar = side === 'split' ? this.filterBarSplit : this.filterBarMain;
+            if (bar) {
+                bar.state.active = !bar.state.active;
+                bar.refresh();
+                if (bar.state.active) this._populateFilterBar(side);
+                this._updateAllTables(side);
+            }
+        });
+
+        window.addEventListener('export-category-pdf', (e) => {
+            this._exportCategoryPDF(e.detail.categoryId);
+        });
+
+        window.addEventListener('click', () => {
+            document.querySelectorAll('.dropdown-container.show').forEach(c => c.classList.remove('show'));
+        });
+    }
 
     _splitPeopleByStatus(peopleData) {
         const activeRows = peopleData.filter(p => {
@@ -298,6 +422,9 @@ export class UIManager {
         this.currentTableId = tableId;
         this.tablesContainer.style.display = 'flex';
 
+        this._populateFilterBar('main');
+        this._populateFilterBar('split');
+
         if (this.splitSideContainer.classList.contains('full-view')) {
             this.splitSideContainer.classList.remove('full-view');
             const open = this.header.personsSplitOpen || this.header.inventorySplitOpen || this.header.calendarSplitOpen;
@@ -315,10 +442,11 @@ export class UIManager {
             }
         });
 
-        const calBtn = this.header.element.querySelector('.calendar-toggle-btn');
-        calBtn?.classList.toggle('active', tableId === 'calendar');
+        const headerEl = this.header.element;
+        headerEl.querySelector('.persons-toggle-btn')?.classList.toggle('active', tableId === 'tbl_people' || this.header.personsSplitOpen);
+        headerEl.querySelector('.inventory-toggle-btn')?.classList.toggle('active', tableId === 'tbl_inventory' || this.header.inventorySplitOpen);
+        headerEl.querySelector('.calendar-toggle-btn')?.classList.toggle('active', tableId === 'calendar' || this.header.calendarSplitOpen);
 
-        // Manage Add Category button Visibility
         this._updateAddCategoryButton(tableId);
 
         if (rowId) {
@@ -335,40 +463,12 @@ export class UIManager {
             btn = document.createElement('button');
             btn.id = 'add-category-footer-btn';
             btn.className = 'add-category-footer-btn';
-            btn.innerHTML = `
-                <div class="add-cat-plus">+</div>
-                <div class="add-cat-text">Neue Kategorie hinzufügen...</div>
-            `;
+            btn.innerHTML = `<div class="add-cat-plus">+</div><div class="add-cat-text">Neue Kategorie hinzufügen...</div>`;
             btn.onclick = () => this._handleCreateNewCategory(tableId);
             this.tablesContainer.appendChild(btn);
 
-            // Add CSS for this button dynamically if not in Table.css
             const style = document.createElement('style');
-            style.textContent = `
-                .add-category-footer-btn {
-                    width: 100%;
-                    padding: 24px;
-                    background: var(--bg-secondary);
-                    border: 2px dashed var(--warning);
-                    border-radius: var(--radius);
-                    color: var(--warning);
-                    cursor: pointer;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 12px;
-                    margin-top: 24px;
-                    margin-bottom: 48px;
-                    transition: all 0.2s;
-                }
-                .add-category-footer-btn:hover {
-                    background: var(--warning-light);
-                    border-style: solid;
-                }
-                .add-cat-plus { font-size: 32px; font-weight: bold; }
-                .add-cat-text { font-size: 14px; font-weight: 600; }
-            `;
+            style.textContent = `.add-category-footer-btn { width: 100%; padding: 24px; background: var(--bg-secondary); border: 2px dashed var(--warning); border-radius: var(--radius); color: var(--warning); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; margin-top: 24px; margin-bottom: 48px; transition: all 0.2s; } .add-category-footer-btn:hover { background: var(--warning-light); border-style: solid; } .add-cat-plus { font-size: 32px; font-weight: bold; } .add-cat-text { font-size: 14px; font-weight: 600; }`;
             document.head.appendChild(style);
         }
 
@@ -387,23 +487,15 @@ export class UIManager {
         try {
             const slug = name.toLowerCase().replace(/\s+/g, '_');
             const enumName = viewId === 'all-spiele' ? 'activity_category_enum' : 'sport_type_enum';
-            
-            // 1. Database level (Enum)
             await this.globalState.addEnumOption(enumName, slug);
-            
-            // 2. Client alert with JSON snippet
             const schemaSnippet = viewId === 'all-spiele' ? 'ACTIVITIES_SCHEMA' : 'SPORTS_SCHEMA';
             alert(`✅ Kategorie '${name}' in der DB erstellt!\n\nBitte füge dies zu tables.json hinzu:\n\n{ "id": "tbl_activities_${slug}", "title": "${name}", "category": "${viewId === 'all-spiele' ? 'spiele' : 'sportarten'}", "schema": ${schemaSnippet} }`);
-            
             window.location.reload();
-        } catch (err) {
-            alert(`Fehler: ${err.message}`);
-        }
+        } catch (err) { alert(`Fehler: ${err.message}`); }
     }
 
     async _exportCategoryPDF(categoryId) {
         try {
-            // Portrait for people/inventory/stats, A3 landscape for game/sport tables
             const usePortrait = ['all-people', 'all-inventory', 'all-stats'].includes(categoryId);
             const doc = usePortrait 
                 ? new jsPDF({ orientation: 'portrait', format: 'a4' })
@@ -416,7 +508,7 @@ export class UIManager {
             if (categoryId === 'all-stats') {
                 exportFileName = 'Stats_Report';
                 await this._exportStatsPDF(doc, ignoreCols);
-                doc.save(`Export_${exportFileName}.pdf`);
+                window.open(doc.output('bloburl'), '_blank');
                 return;
             } else if (categoryId === 'all-people') {
                 exportFileName = 'Personen';
@@ -429,75 +521,127 @@ export class UIManager {
             } else {
                 const categoryName = categoryId === 'all-spiele' ? 'Spiele' : 'Sportarten';
                 exportFileName = categoryName;
-                const categoryFilter = categoryId === 'all-spiele' ? 'spiele' : 'sportarten';
-                const configs = this.app.tableConfigs.filter(c => c.category === categoryFilter);
+                const configs = this.app.tableConfigs.filter(c => c.category === (categoryId === 'all-spiele' ? 'spiele' : 'sportarten'));
                 configs.forEach(config => {
                     const tableWrap = this.tables[config.id];
                     if (tableWrap && tableWrap.instance) tablesToExport.push(tableWrap.instance);
                 });
             }
 
+            const gs = GlobalStateManager.getInstance();
+            const globalFilter = gs.getGlobalFilterState('main', categoryId);
+
+            const isFiltered = (globalFilter && globalFilter.active) || gs.isFavoritesFilterActive();
+
+            if (isFiltered) {
+                const proceed = await Dialog.confirm({
+                    title: 'Export-Bestätigung',
+                    message: 'Der Export beinhaltet nur die aktuell gefilterten Ergebnisse. Fortfahren?',
+                    confirmText: 'Exportieren'
+                });
+                if (!proceed) return;
+            }
+
             let currentY = 15;
+
+            // Render Global Filter Info at the very top
+            if (isFiltered) {
+                doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
+                let filterSummary = 'Aktive Filter: ';
+                const criteria = [];
+                if (gs.isFavoritesFilterActive()) criteria.push('Nur Favoriten');
+                if (globalFilter && globalFilter.active) {
+                    globalFilter.filters.forEach(f => {
+                        if (f.attrId) {
+                            const criteriaParts = [];
+                            
+                            // 1. Value filter
+                            const val = Array.isArray(f.value) ? f.value.join(', ') : f.value;
+                            if (val) criteriaParts.push(`${f.attrId} ${f.mode || 'ist'} ${val}`);
+                            
+                            // 2. Quantity filter
+                            if (f.quantityMode && f.quantityMode !== 'any' && f.quantityValue) {
+                                criteriaParts.push(`Anzahl ${f.quantityMode} ${f.quantityValue}`);
+                            }
+                            
+                            // 3. Availability filter
+                            if (Array.isArray(f.availability) && f.availability.length > 0) {
+                                criteriaParts.push(`Verfügbarkeit: ${f.availability.join(', ')}`);
+                            }
+
+                            if (criteriaParts.length > 0) {
+                                criteria.push(criteriaParts.join(' & '));
+                            }
+                        }
+                    });
+                }
+
+                doc.text(filterSummary + criteria.join(' | '), 14, currentY);
+                currentY += 12;
+                doc.setTextColor(0);
+            }
 
             for (const tableInstance of tablesToExport) {
                 const pageHeight = doc.internal.pageSize.getHeight();
-                // If less than 60pt left, go to next page
-                if (currentY > pageHeight - 60) {
-                    doc.addPage();
-                    currentY = 15;
-                }
-
-                doc.setFontSize(14);
-                doc.setFont(undefined, 'bold');
+                if (currentY > pageHeight - 60) { doc.addPage(); currentY = 15; }
+                
+                doc.setFontSize(14); doc.setFont(undefined, 'bold');
                 try { doc.text(tableInstance.title || '', 14, currentY); } catch(e){}
-                doc.setFont(undefined, 'normal');
-                currentY += 6;
+                doc.setFont(undefined, 'normal'); currentY += 6;
+
+                // Render Local Filter Info for this specific table
+                const localFilter = tableInstance.localFilters;
+                if (localFilter && localFilter.active) {
+                    doc.setFontSize(8); doc.setTextColor(120);
+                    const localCriteria = [];
+                    localFilter.filters.forEach(f => {
+                        if (f.attrId) {
+                            const p = [];
+                            const val = Array.isArray(f.value) ? f.value.join(', ') : f.value;
+                            if (val) p.push(`${f.attrId} ${f.mode || 'ist'} ${val}`);
+                            if (f.quantityMode && f.quantityMode !== 'any' && f.quantityValue) p.push(`Anzahl ${f.quantityMode} ${f.quantityValue}`);
+                            if (Array.isArray(f.availability) && f.availability.length > 0) p.push(`Verfügbarkeit: ${f.availability.join(', ')}`);
+                            if (p.length > 0) localCriteria.push(p.join(' & '));
+                        }
+                    });
+                    if (localCriteria.length > 0) {
+                        doc.text(`Lokale Filter: ${localCriteria.join(' | ')}`, 14, currentY);
+                        currentY += 6;
+                    }
+                    doc.setTextColor(0);
+                }
 
                 const exportSchema = tableInstance.schema.filter(col => !ignoreCols.includes(col.label) && !ignoreCols.includes(col.id));
                 const head = [exportSchema.map(col => col.label)];
-                const body = tableInstance.rows.map(row => {
-                    return exportSchema.map(col => {
-                        let val = row.data[col.id];
-                        if (val === null || val === undefined) return '';
-                        let strVal = '';
-                        if (typeof val === 'object') {
-                            if (Array.isArray(val)) {
-                                strVal = val.map(v => typeof v === 'object' ? v.name || v.id : v).join(', ');
-                            } else if (val.title || val.name) {
-                                strVal = val.title || val.name;
-                            } else {
-                                strVal = JSON.stringify(val);
-                            }
-                        } else {
-                            strVal = String(val);
-                        }
-                        if (strVal.length > 250) return strVal.substring(0, 247) + '...';
-                        return strVal;
-                    });
-                });
 
-                autoTable(doc, {
-                    head,
-                    body,
-                    startY: currentY,
-                    styles: { 
-                        fontSize: usePortrait ? 7 : 8, 
-                        cellPadding: 2, 
-                        overflow: 'linebreak',
-                        valign: 'middle'
-                    },
-                    headStyles: { fillColor: [0, 132, 255], fontSize: usePortrait ? 8 : 9 },
-                    margin: { left: 14, right: 14 }
-                });
+                // Filter rows for this specific table instance
+                let rowsToExport = tableInstance.rows;
+                if (gs.isFavoritesFilterActive()) rowsToExport = rowsToExport.filter(r => gs.isFavorite(r.id));
+                if (globalFilter && globalFilter.active) {
+                    rowsToExport = rowsToExport.filter(row => FilterEngine.matchesFilters(row, globalFilter.filters));
+                }
 
+                const body = rowsToExport.map(row => exportSchema.map(col => {
+                    let val = row.data[col.id];
+                    if (val === null || val === undefined) return '';
+                    let strVal = typeof val === 'object' ? (Array.isArray(val) ? val.map(v => typeof v === 'object' ? v.name || v.id : v).join(', ') : (val.title || val.name || JSON.stringify(val))) : String(val);
+                    return strVal.length > 250 ? strVal.substring(0, 247) + '...' : strVal;
+                }));
+
+                autoTable(doc, { 
+                    head, 
+                    body, 
+                    startY: currentY, 
+                    styles: { fontSize: usePortrait ? 7 : 8, cellPadding: 2, overflow: 'linebreak', valign: 'middle' }, 
+                    headStyles: { fillColor: [0, 132, 255], fontSize: usePortrait ? 8 : 9 }, 
+                    margin: { left: 14, right: 14 } 
+                });
+                
                 currentY = doc.lastAutoTable.finalY + 16;
             }
 
-            if (tablesToExport.length > 0) {
-                doc.save(`Export_${exportFileName}.pdf`);
-            } else {
-                alert('Keine Tabellen zum Exportieren gefunden.');
-            }
+            if (tablesToExport.length > 0) window.open(doc.output('bloburl'), '_blank');
+            else alert('Keine Tabellen zum Exportieren gefunden.');
         } catch (e) {
             console.error('PDF export failed', e);
             alert('Fehler beim PDF Export.');
@@ -507,16 +651,9 @@ export class UIManager {
     async _exportStatsPDF(doc, ignoreCols) {
         const allTables = this.tables;
         const peopleData = this.app.peopleData || [];
-
-        // Fetch user stats from DB
         let userStatsMap = {};
-        try {
-            userStatsMap = await UserStatsService.getStats();
-        } catch (e) {
-            console.error('[Stats PDF] Failed to load user stats:', e);
-        }
+        try { userStatsMap = await UserStatsService.getStats(); } catch (e) { console.error('[Stats PDF] Failed to load user stats:', e); }
 
-        // Gather stats
         let totalGames = 0, totalSports = 0;
         let totalEvents = allTables['tbl_events']?.instance?.rows.length || 0;
         let totalInventory = allTables['tbl_inventory']?.instance?.rows.length || 0;
@@ -525,150 +662,100 @@ export class UIManager {
         let globalTodo = 0, globalInProgress = 0, globalDone = 0;
 
         const tableStats = [];
-
         Object.values(allTables).forEach(tWrap => {
             if (!tWrap.config || !tWrap.instance) return;
             const rows = tWrap.instance.rows;
             if (tWrap.config.category === 'spiele') totalGames += rows.length;
             if (tWrap.config.category === 'sportarten') totalSports += rows.length;
-
-            let todo = 0, inProg = 0, done = 0;
             rows.forEach(row => {
                 const s = String(row.data.Status || row.data.status || '').toLowerCase().replace(/\s+/g, '-');
-                if (s === 'to-do' || s === 'todo') { globalTodo++; todo++; }
-                else if (s === 'in-progress') { globalInProgress++; inProg++; }
-                else if (s === 'done') { globalDone++; done++; }
+                if (s === 'to-do' || s === 'todo') globalTodo++;
+                else if (s === 'in-progress') globalInProgress++;
+                else if (s === 'done') globalDone++;
             });
-            tableStats.push({ name: tWrap.instance.title || tWrap.config.title, count: rows.length, todo, inProg, done });
         });
 
         let y = 20;
-
-        // Title
-        doc.setFontSize(20);
-        doc.setFont(undefined, 'bold');
-        doc.text('System-Stats Report', 14, y);
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(120);
-        doc.text(`Generiert am ${new Date().toLocaleString('de-DE')}`, 14, y + 7);
-        doc.setTextColor(0);
-        y += 18;
-
-        // KPI overview table
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text('\u00dcbersicht', 14, y);
-        doc.setFont(undefined, 'normal');
+        doc.setFontSize(20); doc.setFont(undefined, 'bold'); doc.text('System-Stats Report', 14, y);
+        doc.setFont(undefined, 'normal'); doc.setFontSize(10); doc.setTextColor(120); doc.text(`Generiert am ${new Date().toLocaleString('de-DE')}`, 14, y + 7);
+        doc.setTextColor(0); y += 18;
+        doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('\u00dcbersicht', 14, y);
         y += 4;
-
-        autoTable(doc, {
-            head: [['Kennzahl', 'Wert']],
-            body: [
-                ['Aktive Personen', String(activePeople)],
-                ['Inaktive Personen', String(inactivePeople)],
-                ['Spiele (Gesamt)', String(totalGames)],
-                ['Sportarten (Gesamt)', String(totalSports)],
-                ['Events', String(totalEvents)],
-                ['Inventar', String(totalInventory)],
-            ],
-            startY: y,
-            styles: { fontSize: 9, cellPadding: 3 },
-            headStyles: { fillColor: [0, 132, 255] },
-            theme: 'grid',
-            margin: { left: 14, right: 14 }
-        });
+        autoTable(doc, { head: [['Kennzahl', 'Wert']], body: [['Aktive Personen', String(activePeople)], ['Inaktive Personen', String(inactivePeople)], ['Spiele (Gesamt)', String(totalGames)], ['Sportarten (Gesamt)', String(totalSports)], ['Events', String(totalEvents)], ['Inventar', String(totalInventory)]], startY: y, styles: { fontSize: 9, cellPadding: 3 }, headStyles: { fillColor: [0, 132, 255] }, theme: 'grid', margin: { left: 14, right: 14 } });
         y = doc.lastAutoTable.finalY + 12;
-
-        // Status summary
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text('Aufgaben-Status', 14, y);
-        doc.setFont(undefined, 'normal');
+        doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('Aufgaben-Status', 14, y);
         y += 4;
+        autoTable(doc, { head: [['Status', 'Gesamtzahl']], body: [['To-Do', String(globalTodo)], ['In Progress', String(globalInProgress)], ['Done', String(globalDone)]], startY: y, styles: { fontSize: 9 }, headStyles: { fillColor: [0, 132, 255] }, theme: 'grid', margin: { left: 14, right: 14 } });
+    }
 
-        autoTable(doc, {
-            head: [['To Do', 'In Progress', 'Done']],
-            body: [[String(globalTodo), String(globalInProgress), String(globalDone)]],
-            startY: y,
-            styles: { fontSize: 10, cellPadding: 4, halign: 'center', fontStyle: 'bold' },
-            headStyles: { fillColor: [0, 132, 255] },
-            theme: 'grid',
-            margin: { left: 14, right: 14 }
-        });
-        y = doc.lastAutoTable.finalY + 12;
+    _highlightRow(rowId, colId) {
+        setTimeout(() => {
+            const rowEls = document.querySelectorAll(`tr[data-row-id="${rowId}"]`);
+            if (rowEls.length > 0) {
+                const firstEl = rowEls[0];
+                firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                rowEls.forEach(el => {
+                    el.classList.add('search-highlight-flash');
+                    if (colId) {
+                        const cell = el.querySelector(`.data-cell[data-col-id="${colId}"]`);
+                        if (cell) {
+                            cell.classList.add('cell-highlight-flash');
+                            setTimeout(() => cell.classList.remove('cell-highlight-flash'), 2500);
+                        }
+                    }
+                    setTimeout(() => el.classList.remove('search-highlight-flash'), 2500);
+                });
+            }
+        }, 150);
+    }
 
-        // Per-table breakdown
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text('Eintr\u00e4ge pro Tabelle', 14, y);
-        doc.setFont(undefined, 'normal');
-        y += 4;
+    _handleJumpToGame(gameName) {
+        if (!gameName) return;
+        const tables = this.globalState.getTables();
+        for (const [id, tableInfo] of Object.entries(tables)) {
+            if (tableInfo.config.category !== 'spiele') continue;
+            const row = tableInfo.instance.rows.find(r => (r.data.name || '').toLowerCase() === gameName.toLowerCase());
+            if (row) {
+                document.querySelectorAll('.picker-overlay, .custom-dialog-overlay').forEach(el => el.remove());
+                this._handleTableSwitch(id);
+                this._highlightRow(row.id, 'name');
+                break;
+            }
+        }
+    }
 
-        autoTable(doc, {
-            head: [['Tabelle', 'Eintr\u00e4ge', 'To Do', 'In Progress', 'Done']],
-            body: tableStats.map(t => [t.name, String(t.count), String(t.todo), String(t.inProg), String(t.done)]),
-            startY: y,
-            styles: { fontSize: 8, cellPadding: 3 },
-            headStyles: { fillColor: [0, 132, 255] },
-            theme: 'grid',
-            margin: { left: 14, right: 14 }
-        });
-        y = doc.lastAutoTable.finalY + 16;
+    _handlePersonsToggle() {
+        if (this.splitSideWrapper.classList.contains('full-view')) {
+            this.splitSideWrapper.classList.remove('full-view');
+            this.tablesContainer.style.display = 'flex';
+        } else {
+            this.header.personsSplitOpen = !this.header.personsSplitOpen;
+            if (this.header.personsSplitOpen) { this.header.inventorySplitOpen = false; this._setSplitContent('people'); }
+        }
+        this._updateSplitVisibility();
+    }
 
-        // User data - all people with individual stats
-        const pageHeight = doc.internal.pageSize.getHeight();
-        if (y > pageHeight - 60) { doc.addPage(); y = 15; }
-
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text('Personen & Individuelle Stats', 14, y);
-        doc.setFont(undefined, 'normal');
-        y += 4;
-
-        const peopleHead = [['Name', 'Rolle', 'Status', 'Team', 'Aktivit\u00e4t', 'Letzter Login', 'Eintr\u00e4ge', 'BJ Wins', 'BJ Losses', 'Winrate', 'Top Kategorie']];
-        const peopleBody = peopleData.map(p => {
-            const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
-            const uStats = userStatsMap[name] || {};
-            const lastLogin = uStats.lastLogin ? new Date(uStats.lastLogin).toLocaleDateString('de-DE') : '-';
-            const totalGames = (uStats.wins || 0) + (uStats.losses || 0);
-            const winRate = totalGames > 0 ? `${uStats.winRate || 0}%` : '-';
-            return [
-                name,
-                p.role || '',
-                p.Status || '',
-                Array.isArray(p.Team) ? p.Team.join(', ') : (p.Team || ''),
-                uStats.activityLevel || 'Idle',
-                lastLogin,
-                String(uStats.entryCount || 0),
-                String(uStats.wins || 0),
-                String(uStats.losses || 0),
-                winRate,
-                uStats.topCategory || '-'
-            ];
-        });
-
-        autoTable(doc, {
-            head: peopleHead,
-            body: peopleBody,
-            startY: y,
-            styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
-            headStyles: { fillColor: [0, 132, 255], fontSize: 7 },
-            theme: 'grid',
-            margin: { left: 14, right: 14 }
-        });
+    _handleInventoryToggle() {
+        if (this.splitSideWrapper.classList.contains('full-view')) {
+            this.splitSideWrapper.classList.remove('full-view');
+            this.tablesContainer.style.display = 'flex';
+        } else {
+            this.header.inventorySplitOpen = !this.header.inventorySplitOpen;
+            if (this.header.inventorySplitOpen) { this.header.personsSplitOpen = false; this._setSplitContent('inventory'); }
+        }
+        this._updateSplitVisibility();
     }
 
     _handleCalendarToggle() {
-        if (this.splitSideContainer.classList.contains('full-view')) {
-            this.splitSideContainer.classList.remove('full-view');
+        if (this.splitSideWrapper.classList.contains('full-view')) {
+            this.splitSideWrapper.classList.remove('full-view');
             this.tablesContainer.style.display = 'flex';
         } else {
             this.header.calendarSplitOpen = !this.header.calendarSplitOpen;
-            if (this.header.calendarSplitOpen) {
-                this.header.personsSplitOpen = false;
-                this.header.inventorySplitOpen = false;
-                this._setSplitContent('calendar');
+            if (this.header.calendarSplitOpen) { 
+                this.header.personsSplitOpen = false; 
+                this.header.inventorySplitOpen = false; 
+                this._setSplitContent('calendar'); 
             }
         }
         this._updateSplitVisibility();
@@ -680,98 +767,16 @@ export class UIManager {
         this.splitSideContainer.style.display = 'flex';
         this.resizer.style.display = 'none';
         this.splitSideContainer.classList.add('full-view');
-        this.header.calendarSplitOpen = true;
-        this.header.personsSplitOpen = false;
+        this.header.calendarSplitOpen = true; 
+        this.header.personsSplitOpen = false; 
         this.header.inventorySplitOpen = false;
-        this._updateSplitVisibility();
-    }
-
-    _highlightRow(rowId, colId) {
-        // Small timeout to ensure table is rendered and visible
-        setTimeout(() => {
-            const rowEls = document.querySelectorAll(`tr[data-row-id="${rowId}"]`);
-            if (rowEls.length > 0) {
-                const firstEl = rowEls[0];
-                firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                rowEls.forEach(el => {
-                    el.classList.add('search-highlight-flash');
-                    
-                    if (colId) {
-                        const cell = el.querySelector(`.data-cell[data-col-id="${colId}"]`);
-                        if (cell) {
-                            cell.classList.add('cell-highlight-flash');
-                            setTimeout(() => cell.classList.remove('cell-highlight-flash'), 2500);
-                        }
-                    }
-
-                    setTimeout(() => el.classList.remove('search-highlight-flash'), 2500);
-                });
-            }
-        }, 150);
-    }
-
-    _handleJumpToGame(gameName) {
-        if (!gameName) return;
-        
-        // Find which table has this game
-        const tables = this.globalState.getTables();
-        let targetTableId = null;
-        let targetRowId = null;
-
-        for (const [id, tableInfo] of Object.entries(tables)) {
-            if (tableInfo.config.category !== 'spiele') continue;
-            const row = tableInfo.instance.rows.find(r => (r.data.name || '').toLowerCase() === gameName.toLowerCase());
-            if (row) {
-                targetTableId = id;
-                targetRowId = row.id;
-                break;
-            }
-        }
-
-        if (targetTableId && targetRowId) {
-            // Close any overlays
-            document.querySelectorAll('.picker-overlay, .custom-dialog-overlay').forEach(el => el.remove());
-            
-            // Switch and highlight
-            this._handleTableSwitch(targetTableId);
-            this._highlightRow(targetRowId, 'name');
-        }
-    }
-
-    _handlePersonsToggle() {
-        if (this.splitSideContainer.classList.contains('full-view')) {
-            this.splitSideContainer.classList.remove('full-view');
-            this.tablesContainer.style.display = 'flex';
-        } else {
-            this.header.personsSplitOpen = !this.header.personsSplitOpen;
-            if (this.header.personsSplitOpen) {
-                this.header.inventorySplitOpen = false;
-                this._setSplitContent('people');
-            }
-        }
-        this._updateSplitVisibility();
-    }
-
-    _handleInventoryToggle() {
-        if (this.splitSideContainer.classList.contains('full-view')) {
-            this.splitSideContainer.classList.remove('full-view');
-            this.tablesContainer.style.display = 'flex';
-        } else {
-            this.header.inventorySplitOpen = !this.header.inventorySplitOpen;
-            if (this.header.inventorySplitOpen) {
-                this.header.personsSplitOpen = false;
-                this._setSplitContent('inventory');
-            }
-        }
         this._updateSplitVisibility();
     }
 
     _updateSplitVisibility() {
         const open = this.header.personsSplitOpen || this.header.inventorySplitOpen || this.header.calendarSplitOpen;
-        this.splitSideContainer.style.display = open ? 'flex' : 'none';
+        this.splitSideWrapper.style.display = open ? 'flex' : 'none';
         this.resizer.style.display = open ? 'block' : 'none';
-
         this.header.element.querySelector('.persons-toggle-btn')?.classList.toggle('active', this.header.personsSplitOpen);
         this.header.element.querySelector('.inventory-toggle-btn')?.classList.toggle('active', this.header.inventorySplitOpen);
         this.header.element.querySelector('.calendar-toggle-btn')?.classList.toggle('active', this.header.calendarSplitOpen);
@@ -779,43 +784,29 @@ export class UIManager {
 
     _setSplitContent(type) {
         this.splitSideContainer.innerHTML = '';
-
+        if (type !== 'calendar') {
+            this._populateFilterBar('split');
+        }
         if (type === 'people' && this.app.peopleData.length > 0) {
             const config = { id: 'people_table', schema: [...PEOPLE_SCHEMA] };
             const { activeRows, inactiveRows } = this._splitPeopleByStatus(this.app.peopleData);
-
             const activeTable = this._createPeopleTable(config, 'Personen (Aktiv)', activeRows, { Status: 'Aktiv' });
             const inactiveTable = this._createPeopleTable(config, 'Personen (Inaktiv)', inactiveRows, { Status: 'Inaktiv' });
-
-            const activeEl = activeTable.render();
-            activeEl.classList.add('persons-table-full');
-            this.splitSideContainer.appendChild(activeEl);
-
-            const inactiveEl = inactiveTable.render();
-            inactiveEl.classList.add('persons-table-full', 'inactive-members-table');
-            this.splitSideContainer.appendChild(inactiveEl);
-
-            this.personsTable = activeTable;
-            this.inactivePersonsTable = inactiveTable;
+            this.splitSideContainer.appendChild(activeTable.render());
+            this.splitSideContainer.appendChild(inactiveTable.render());
         } else {
             const table = type === 'inventory' ? this.inventoryTable : (type === 'calendar' ? this.calendarView : this.personsTable);
-            if (table) {
-                const el = table.render();
-                el.className = type === 'calendar' ? 'calendar-table-full' : 'persons-table-full';
-                this.splitSideContainer.appendChild(el);
-            }
+            if (table) this.splitSideContainer.appendChild(table.render());
         }
     }
 
     _handlePersonsFullView() {
         this.tablesContainer.style.display = 'none';
         this._setSplitContent('people');
-
         this.splitSideContainer.style.display = 'flex';
         this.resizer.style.display = 'none';
         this.splitSideContainer.classList.add('full-view');
-        this.header.personsSplitOpen = true;
-        this.header.inventorySplitOpen = false;
+        this.header.personsSplitOpen = true; this.header.inventorySplitOpen = false;
         this._updateSplitVisibility();
     }
 
@@ -825,8 +816,7 @@ export class UIManager {
         this.splitSideContainer.style.display = 'flex';
         this.resizer.style.display = 'none';
         this.splitSideContainer.classList.add('full-view');
-        this.header.inventorySplitOpen = true;
-        this.header.personsSplitOpen = false;
+        this.header.inventorySplitOpen = true; this.header.personsSplitOpen = false;
         this._updateSplitVisibility();
     }
 
@@ -839,18 +829,12 @@ export class UIManager {
         this.resizer.addEventListener('mousedown', (e) => {
             const startX = e.clientX;
             const startWidth = this.splitSideContainer.offsetWidth;
-
             const onMouseMove = (me) => {
                 const deltaX = me.clientX - startX;
                 const newWidth = Math.max(300, Math.min(window.innerWidth - 400, startWidth - deltaX));
                 this.splitSideContainer.style.flex = `0 0 ${newWidth}px`;
             };
-            const onMouseUp = () => {
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-                document.body.style.cursor = '';
-            };
-
+            const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); document.body.style.cursor = ''; };
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
             document.body.style.cursor = 'col-resize';
@@ -868,50 +852,16 @@ export class UIManager {
         this.tables = await TableLoader.loadAllTables(this.app.peopleData, this.app.tableConfigs);
         this.header.tables = this.tables;
         this.globalState.setTables(this.tables);
-
-        if (this.tables['tbl_inventory']) {
-            this.globalState.setInventory(this.tables['tbl_inventory'].instance.rows);
-        }
-
         this.tablesContainer.innerHTML = '';
-        let renderedCount = 0;
-
-        Object.entries(this.tables).forEach(([tableId, { instance, config }]) => {
+        Object.entries(this.tables).forEach(([tableId, { instance }]) => {
             if (!this.globalState.canView(tableId)) return;
-
             const wrapper = document.createElement('div');
             wrapper.className = 'table-view-wrapper';
             wrapper.dataset.tableId = tableId;
-
-            if (tableId === 'tbl_people') {
-                const { activeRows, inactiveRows } = this._splitPeopleByStatus(this.app.peopleData);
-
-                const activeTable = this._createPeopleTable(config, 'Aktive Mitglieder', activeRows, { Status: 'Aktiv' });
-                const inactiveTable = this._createPeopleTable(config, 'Inaktive Mitglieder', inactiveRows, { Status: 'Inaktiv' });
-
-                const inactiveEl = inactiveTable.render();
-                inactiveEl.classList.add('inactive-members-table');
-
-                wrapper.appendChild(activeTable.render());
-                wrapper.appendChild(inactiveEl);
-
-                activeTable.editor.showUnsavedChange = () => instance.editor.showUnsavedChange();
-                inactiveTable.editor.showUnsavedChange = () => instance.editor.showUnsavedChange();
-
-                this.tables[tableId].instances = [activeTable, inactiveTable];
-            } else {
-                wrapper.appendChild(instance.render());
-            }
-
+            wrapper.appendChild(instance.render());
             this.app.tableElements[tableId] = wrapper;
             this.tablesContainer.appendChild(wrapper);
-            renderedCount++;
         });
-
-        if (renderedCount === 0) {
-            this.tablesContainer.innerHTML = `<div class="empty-state-container"><h2>Kein Zugriff</h2><p>Sie haben keine Berechtigung, Tabellen in diesem Bereich anzuzeigen.</p></div>`;
-        }
-
         this._initSplitViewTables(this.tables, this.app.peopleData);
     }
 }

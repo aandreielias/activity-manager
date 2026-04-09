@@ -17,6 +17,7 @@ export class Header {
         this.element = null;
         this.personsSplitOpen = false;
         this.inventorySplitOpen = false;
+        this.calendarSplitOpen = false;
         this.onFavoritesToggle = null;
         this.onLogoDoubleClick = null;
         this.onCalendarFull = null;
@@ -71,7 +72,7 @@ export class Header {
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v2.1.1</span>
+                    <span class="header-version">v2.3.1</span>
                 </div>
             </div>
             <nav class="header-nav">
@@ -92,7 +93,7 @@ export class Header {
                 </button>` : ''}
 
                 ${globalState.isEditModeActive() ? `
-                <button class="nav-btn orte-btn" title="Orte verwalten">
+                <button class="nav-btn orte-btn" data-table="tbl_ort" title="Orte verwalten">
                     Orte
                 </button>` : ''}
             </nav>
@@ -179,61 +180,6 @@ export class Header {
     _attachEventListeners() {
         if (!this.element) return;
 
-        this.element.addEventListener('contextmenu', (e) => {
-            let exportTableId = null;
-            const splitBtn = e.target.closest('.split-main-btn');
-            const personsBtn = e.target.closest('.persons-toggle-btn');
-            const inventoryBtn = e.target.closest('.inventory-toggle-btn');
-            const statsBtn = e.target.closest('.user-info-btn');
-
-            if (splitBtn && splitBtn.dataset.table && splitBtn.dataset.table.startsWith('all-')) {
-                exportTableId = splitBtn.dataset.table;
-            } else if (personsBtn) {
-                exportTableId = 'all-people';
-            } else if (inventoryBtn) {
-                exportTableId = 'all-inventory';
-            } else if (statsBtn) {
-                exportTableId = 'all-stats';
-            }
-
-            if (exportTableId) {
-                e.preventDefault();
-                this._closeAllDropdowns();
-
-                const existingMenu = document.querySelector('.category-context-menu');
-                if (existingMenu) existingMenu.remove();
-
-                const menu = document.createElement('div');
-                menu.className = 'row-context-menu category-context-menu';
-                menu.style.left = `${e.clientX}px`;
-                menu.style.top = `${e.clientY}px`;
-                menu.style.position = 'fixed';
-                menu.style.zIndex = '100000';
-
-                const label = exportTableId === 'all-stats' 
-                    ? '📄 Stats-Report als PDF exportieren'
-                    : '📄 Als PDF exportieren';
-
-                const exportBtn = document.createElement('button');
-                exportBtn.className = 'context-menu-item';
-                exportBtn.textContent = label;
-                exportBtn.onclick = () => {
-                    this.onCategoryExport?.(exportTableId);
-                    menu.remove();
-                };
-
-                menu.appendChild(exportBtn);
-                document.body.appendChild(menu);
-
-                const closeMenu = (ev) => {
-                    if (!menu.contains(ev.target)) {
-                        menu.remove();
-                        document.removeEventListener('click', closeMenu);
-                    }
-                };
-                setTimeout(() => document.addEventListener('click', closeMenu), 0);
-            }
-        });
 
         this.element.addEventListener('click', async (e) => {
             const btn = e.target.closest('.nav-btn, .dropdown-item');
@@ -555,7 +501,7 @@ export class Header {
 
     switchTo(table) {
         this.currentTable = table;
-        this.element.querySelectorAll('.nav-btn:not(.persons-toggle-btn):not(.inventory-toggle-btn)').forEach(btn => {
+        this.element.querySelectorAll('.nav-btn:not(.persons-toggle-btn):not(.inventory-toggle-btn):not(.calendar-toggle-btn)').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.table === table);
         });
     }

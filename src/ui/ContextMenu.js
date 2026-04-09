@@ -54,6 +54,18 @@ export class ContextMenu {
             this.element.appendChild(infoItem);
         }
 
+        if (options.onExportToCalendar) {
+            const calItem = this._createMenuItem('In Kalender exportieren', () => {
+                this.close();
+                options.onExportToCalendar();
+            });
+            this.element.appendChild(calItem);
+
+            const separator = document.createElement('div');
+            separator.className = 'context-menu-separator';
+            this.element.appendChild(separator);
+        }
+
         if (options.onDelete) {
             const deleteItem = this._createMenuItem('Zeile löschen', async () => {
                 this.close();

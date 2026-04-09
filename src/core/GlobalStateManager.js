@@ -23,6 +23,10 @@ export class GlobalStateManager {
     #sessionNewGames = new Map(); // Track games created this session to prevent 'Deleted' status
 
     #tableConfigs = [];
+    #globalFilters = {
+        main: {}, // tableId -> { active, groupBy, filters }
+        split: {} // tableId -> { active, groupBy, filters }
+    };
 
     constructor() {
         if (GlobalStateManager.#instance) return GlobalStateManager.#instance;
@@ -429,5 +433,21 @@ export class GlobalStateManager {
 
     getSessionGameCategory(name) {
         return this.#sessionNewGames.get(name);
+    }
+
+    getGlobalFilterState(side, tableId) {
+        if (!this.#globalFilters[side][tableId]) {
+            this.#globalFilters[side][tableId] = { 
+                active: false, 
+                groupBy: null, 
+                filters: [{ attrId: null, mode: null, value: [], quantityMode: 'any', quantityValue: '', availability: [] }] 
+
+            };
+        }
+        return this.#globalFilters[side][tableId];
+    }
+
+    setGlobalFilterState(side, tableId, state) {
+        this.#globalFilters[side][tableId] = state;
     }
 }

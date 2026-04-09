@@ -2,8 +2,9 @@
   background: var(--bg);
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow: visible; /* Allow dropdowns to break out */
   box-shadow: var(--shadow-sm);
+
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -56,7 +57,10 @@
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-light);
   background: var(--bg-secondary);
+  position: relative;
+  z-index: 70; /* Above table rows */
 }
+
 
 .table-title {
   font-size: 14px;
@@ -659,7 +663,7 @@ input[type="time"].cell-editor:focus {
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
 
-.context-menu-separator {
+.context-menu-separator, .context-menu-divider {
   height: 1px;
   background: var(--border-light);
   margin: 4px 0;
@@ -1098,4 +1102,66 @@ th:hover .col-edit-controls {
 .bulk-checkbox:focus, .bulk-col-header input[type="checkbox"]:focus {
     outline: max(2px, 0.15em) solid var(--accent-light);
     outline-offset: max(2px, 0.15em);
+}
+
+/* ── Group Headers (Notion-like) ───────────────────── */
+.group-header-row {
+    background: var(--bg-secondary);
+}
+
+.group-header-cell {
+    padding: 8px 16px !important;
+    border-bottom: 1px solid var(--border-light);
+    border-left: 3px solid var(--accent);
+    cursor: pointer;
+    transition: background var(--transition);
+}
+
+.group-header-cell:hover {
+    background: var(--bg-hover);
+}
+
+.group-header-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+}
+
+.group-toggle-icon {
+    font-size: 14px;
+    color: var(--text-muted);
+    width: 16px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.group-header-cell:hover .group-toggle-icon {
+    color: var(--text-primary);
+}
+
+.group-attr-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.group-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.group-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--border-light);
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-left: 4px;
 }

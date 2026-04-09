@@ -1,7 +1,12 @@
 import '../styles/Table.css';
+import '../styles/FilterBar.css';
 import { GlobalStateManager } from './GlobalStateManager.js';
+import { FilterEngine } from '../utils/FilterEngine.js';
+import { Dialog } from '../ui/Dialog.js';
+
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { FilterBar } from '../ui/FilterBar.js';
 
 /**
  * TableRenderer - Handles rendering and updating the table UI
@@ -11,6 +16,7 @@ export class TableRenderer {
         this.table = table;
         this.element = null;
         this.selectedRows = new Set();
+        this.filterBar = null;
     }
 
     render() {
@@ -18,12 +24,47 @@ export class TableRenderer {
         this.element.className = 'table-wrapper';
 
         this.element.appendChild(this._renderHeader());
+        
+        // Local Filter Bar
+        this.filterBar = new FilterBar({
+            schema: this.table.schema,
+            state: this.table.localFilters,
+            tableId: this.table.id,
+            onUpdate: () => this.update()
+        });
+
+        this.element.appendChild(this.filterBar.render());
+
+        // Context menu on the filter bar itself
+        this.filterBar.element.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this._showTableContextMenu(e);
+        });
+
         this.element.appendChild(this._renderTableScroll());
         
         this.bulkBar = this._renderBulkActionsBar();
         this.element.appendChild(this.bulkBar);
 
+        // Auto-collapse if empty
+        if (this.table.rows.length === 0) {
+            this.element.classList.add('collapsed');
+        }
+
         return this.element;
+    }
+
+
+    update() {
+        if (!this.element) return;
+        this.updateMeta();
+        
+        const oldBody = this.element.querySelector('tbody');
+        if (oldBody) {
+            const newBody = this._renderTableBody();
+            oldBody.replaceWith(newBody);
+        }
     }
 
     _renderHeader() {
@@ -83,18 +124,10 @@ export class TableRenderer {
             addColBtn.onclick = async (e) => {
                 e.stopPropagation();
                 const gs = GlobalStateManager.getInstance();
-                const { Dialog } = await import('../ui/Dialog.js');
-
-                // Fetch enums from GS
                 const enums = Object.keys(gs.getEnums());
-
                 const res = await Dialog.showAddColumnDialog(this.table.id, enums);
                 if (res) {
-                    try {
-                        await gs.addColumn(this.table.id, res);
-                    } catch (err) {
-                        // GS handles flash
-                    }
+                    try { await gs.addColumn(this.table.id, res); } catch (err) {}
                 }
             };
             metaGroup.appendChild(addColBtn);
@@ -103,7 +136,12 @@ export class TableRenderer {
         header.appendChild(titleGroup);
         header.appendChild(metaGroup);
 
+        if (this.table.rows.length === 0) {
+            icon.textContent = '▸';
+        }
+
         header.addEventListener('click', () => {
+
             this.element.classList.toggle('collapsed');
             icon.innerHTML = this.element.classList.contains('collapsed') ? '▸' : '▾';
         });
@@ -111,49 +149,79 @@ export class TableRenderer {
         header.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             e.stopPropagation();
-
-            const existingMenu = document.querySelector('.category-context-menu');
-            if (existingMenu) existingMenu.remove();
-
-            const menu = document.createElement('div');
-            menu.className = 'row-context-menu category-context-menu';
-            menu.style.left = `${e.clientX}px`;
-            menu.style.top = `${e.clientY}px`;
-            menu.style.position = 'fixed';
-            menu.style.zIndex = '100000';
-
-            const exportBtn = document.createElement('button');
-            exportBtn.className = 'context-menu-item';
-            exportBtn.textContent = '📄 Als PDF exportieren';
-            exportBtn.onclick = () => {
-                this._exportPDF();
-                menu.remove();
-            };
-            menu.appendChild(exportBtn);
-            document.body.appendChild(menu);
-
-            const closeMenu = (ev) => {
-                if (!menu.contains(ev.target)) {
-                    menu.remove();
-                    document.removeEventListener('click', closeMenu);
-                }
-            };
-            setTimeout(() => document.addEventListener('click', closeMenu), 0);
+            this._showTableContextMenu(e);
         });
 
         return header;
     }
 
+    _showTableContextMenu(e) {
+        const existingMenu = document.querySelector('.category-context-menu');
+        if (existingMenu) existingMenu.remove();
+
+        const menu = document.createElement('div');
+        menu.className = 'row-context-menu category-context-menu';
+        menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
+        menu.style.position = 'fixed'; menu.style.zIndex = '100000';
+
+        const exportBtn = document.createElement('button');
+        exportBtn.className = 'context-menu-item';
+        exportBtn.textContent = 'Als PDF exportieren';
+        exportBtn.onclick = () => { this._exportPDF(); menu.remove(); };
+        menu.appendChild(exportBtn);
+
+        const exportAllBtn = document.createElement('button');
+        exportAllBtn.className = 'context-menu-item';
+        exportAllBtn.textContent = 'Alle als PDF exportieren';
+        exportAllBtn.style.fontStyle = 'italic';
+        exportAllBtn.onclick = () => {
+            const category = this.table.tableConfig?.category;
+            if (category) {
+                const categoryId = `all-${category}`;
+                window.dispatchEvent(new CustomEvent('export-category-pdf', { detail: { categoryId } }));
+            }
+            menu.remove();
+        };
+        menu.appendChild(exportAllBtn);
+
+        const divider = document.createElement('div');
+        divider.className = 'context-menu-divider';
+        menu.appendChild(divider);
+
+        const filterLocalBtn = document.createElement('button');
+        filterLocalBtn.className = 'context-menu-item';
+        filterLocalBtn.textContent = 'Filter für diese Tabelle';
+        filterLocalBtn.onclick = () => {
+            this.table.localFilters.active = !this.table.localFilters.active;
+            this.filterBar.refresh();
+            menu.remove();
+        };
+        menu.appendChild(filterLocalBtn);
+
+        const filterAllBtn = document.createElement('button');
+        filterAllBtn.className = 'context-menu-item';
+        filterAllBtn.textContent = 'Filter für alle Tabellen';
+        filterAllBtn.style.fontStyle = 'italic';
+        filterAllBtn.onclick = () => {
+            const isSplit = this.element.closest('.split-container-inner') !== null;
+            const side = isSplit ? 'split' : 'main';
+            window.dispatchEvent(new CustomEvent('toggle-filter-bar', { detail: { side } }));
+            menu.remove();
+        };
+        menu.appendChild(filterAllBtn);
+
+        document.body.appendChild(menu);
+        const closeMenu = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', closeMenu); } };
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    }
+
     _renderTableScroll() {
         const scroll = document.createElement('div');
         scroll.className = 'table-scroll';
-
         const table = document.createElement('table');
         table.className = 'data-table';
-
         table.appendChild(this._renderTableHead());
         table.appendChild(this._renderTableBody());
-
         scroll.appendChild(table);
         return scroll;
     }
@@ -162,19 +230,15 @@ export class TableRenderer {
         const thead = document.createElement('thead');
         const tr = document.createElement('tr');
 
-        // Checkbox column header
         const chkTh = document.createElement('th');
         chkTh.className = 'bulk-col-header';
         chkTh.style.width = '40px';
-        chkTh.style.minWidth = '40px';
         const chkAll = document.createElement('input');
         chkAll.type = 'checkbox';
-        chkAll.title = 'Alle auswählen';
         chkAll.onchange = (e) => {
             const isChecked = e.target.checked;
             this.selectedRows.clear();
-            const rowEls = this.element.querySelectorAll('tbody tr[data-row-id]');
-            rowEls.forEach(rowEl => {
+            this.element.querySelectorAll('tbody tr[data-row-id]').forEach(rowEl => {
                 const cb = rowEl.querySelector('.bulk-checkbox');
                 if (cb) {
                     cb.checked = isChecked;
@@ -186,19 +250,15 @@ export class TableRenderer {
         chkTh.appendChild(chkAll);
         tr.appendChild(chkTh);
 
-        // Favorite column header
         const favTh = document.createElement('th');
         favTh.className = 'favorite-col-header';
         favTh.textContent = '★';
-        favTh.title = 'Favoriten';
         tr.appendChild(favTh);
 
-        // Column headers
         this.table.schema.forEach((col, index) => {
             const th = document.createElement('th');
             th.dataset.colId = col.id;
             th.onclick = () => this.table.sorter.sortBy(col.id, th);
-
             const content = document.createElement('div');
             content.className = 'th-content';
             const textSpan = document.createElement('span');
@@ -206,78 +266,21 @@ export class TableRenderer {
             content.appendChild(textSpan);
             th.appendChild(content);
 
-            // Edit Mode: Add Rearrange controls
             if (GlobalStateManager.getInstance().isEditModeActive()) {
                 const controls = document.createElement('div');
                 controls.className = 'col-edit-controls';
-                controls.style.display = 'flex';
-                controls.style.gap = '4px';
-                controls.style.marginTop = '4px';
+                const leftBtn = document.createElement('button'); leftBtn.textContent = '←'; leftBtn.onclick = (e) => { e.stopPropagation(); this._moveColumn(index, -1); };
+                const renameBtn = document.createElement('button'); renameBtn.textContent = '✎'; renameBtn.onclick = (e) => { e.stopPropagation(); const l = prompt('Name:', col.label); if (l) { col.label = l.trim(); this.render(); GlobalStateManager.getInstance().saveTableConfigs(); } };
+                const rightBtn = document.createElement('button'); rightBtn.textContent = '→'; rightBtn.onclick = (e) => { e.stopPropagation(); this._moveColumn(index, 1); };
+                    const deleteBtn = document.createElement('button'); deleteBtn.textContent = '✖'; deleteBtn.onclick = async (e) => { e.stopPropagation(); if (await Dialog.confirm({ message: 'Löschen?' })) { try { await GlobalStateManager.getInstance().removeColumn(this.table.id, col.id); } catch(err){} } };
 
-                const leftBtn = document.createElement('button');
-                leftBtn.textContent = '←';
-                leftBtn.className = 'col-nav-btn';
-                leftBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    this._moveColumn(index, -1);
-                };
-
-                const renameBtn = document.createElement('button');
-                renameBtn.textContent = '✎';
-                renameBtn.className = 'col-nav-btn';
-                renameBtn.title = 'Spalte umbenennen';
-                renameBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    const newLabel = prompt(`Neue Beschriftung für '${col.label}':`, col.label);
-                    if (newLabel && newLabel.trim()) {
-                        col.label = newLabel.trim();
-                        this.render();
-                        GlobalStateManager.getInstance().saveTableConfigs();
-                    }
-                };
-
-                const rightBtn = document.createElement('button');
-                rightBtn.textContent = '→';
-                rightBtn.className = 'col-nav-btn';
-                rightBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    this._moveColumn(index, 1);
-                };
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '✖';
-                deleteBtn.className = 'col-nav-btn col-delete-btn';
-                deleteBtn.title = 'Spalte löschen';
-                deleteBtn.onclick = async (e) => {
-                    e.stopPropagation();
-                    const { Dialog } = await import('../ui/Dialog.js');
-                    const ok = await Dialog.confirm({
-                        message: `Möchtest du die Spalte '${col.label}' wirklich löschen? Alle Daten in dieser Spalte gehen verloren!`,
-                        confirmText: 'Löschen',
-                        confirmStyle: 'warning'
-                    });
-                    if (ok) {
-                        try {
-                            const gs = GlobalStateManager.getInstance();
-                            await gs.removeColumn(this.table.id, col.id);
-                        } catch (err) {
-                            // Flash handled by GS
-                        }
-                    }
-                };
-
-                controls.appendChild(leftBtn);
-                controls.appendChild(renameBtn);
-                controls.appendChild(rightBtn);
-                controls.appendChild(deleteBtn);
+                controls.append(leftBtn, renameBtn, rightBtn, deleteBtn);
                 th.appendChild(controls);
             }
-
             const resizer = document.createElement('div');
             resizer.className = 'col-resizer';
             this._setupColumnResizing(th, resizer);
             th.appendChild(resizer);
-
             tr.appendChild(th);
         });
 
@@ -288,158 +291,169 @@ export class TableRenderer {
     _moveColumn(index, delta) {
         const newIdx = index + delta;
         if (newIdx < 0 || newIdx >= this.table.schema.length) return;
-
-        const schema = this.table.schema;
-        const item = schema.splice(index, 1)[0];
-        schema.splice(newIdx, 0, item);
-
-        // UI Refresh
+        const item = this.table.schema.splice(index, 1)[0];
+        this.table.schema.splice(newIdx, 0, item);
         this.render();
         GlobalStateManager.getInstance().saveTableConfigs();
     }
 
     _setupColumnResizing(th, resizer) {
-        let x = 0;
-        let w = 0;
-
-        const onMouseMove = (e) => {
-            const dx = e.clientX - x;
-            th.style.width = `${w + dx}px`;
-            th.style.minWidth = `${w + dx}px`; // Ensure it stays that way
-        };
-
-        const onMouseUp = () => {
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-            resizer.classList.remove('resizing');
-        };
-
-        resizer.addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-            x = e.clientX;
-            w = parseInt(window.getComputedStyle(th).width, 10);
-
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-            resizer.classList.add('resizing');
-        });
-
-        // Double click to auto-size
-        resizer.addEventListener('dblclick', (e) => {
-            e.stopPropagation();
-            this._autoSizeColumn(th);
-        });
-    }
-
-    _autoSizeAllColumns() {
-        const headers = this.element.querySelectorAll('th');
-        headers.forEach(th => this._autoSizeColumn(th));
-    }
-
-    _autoSizeColumn(th) {
-        const colId = th.dataset.colId;
-        if (!colId) return;
-        const colDef = this.table.schema.find(c => c.id === colId);
-        const table = this.element.querySelector('.data-table');
-        const cells = table.querySelectorAll(`td[data-col-id="${colId}"] .cell-content`);
-
-        // Determine cap based on content type
-        const isLongText = ['rules', 'short_description', 'team_tasks', 'rules', 'Spez. Zuständigkeit'].includes(colId) || colDef?.type === 'text';
-        const maxWidthCap = isLongText ? 400 : 600;
-
-        let maxWidth = 80;
-
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        const headerFont = window.getComputedStyle(th).font;
-        context.font = headerFont;
-
-        // Measure header
-        const headerWidth = context.measureText(th.textContent).width + 50;
-        maxWidth = Math.max(maxWidth, headerWidth);
-
-        // Measure cells
-        cells.forEach(cell => {
-            const text = cell.textContent;
-            context.font = window.getComputedStyle(cell).font;
-            const textWidth = context.measureText(text).width + 40;
-            maxWidth = Math.max(maxWidth, textWidth);
-        });
-
-        const finalWidth = Math.min(maxWidthCap, maxWidth);
-        th.style.width = `${finalWidth}px`;
-        th.style.minWidth = `${finalWidth}px`;
+        let x = 0; let w = 0;
+        const mm = (e) => { const dx = e.clientX - x; th.style.width = `${w + dx}px`; th.style.minWidth = `${w + dx}px`; };
+        const mu = () => { document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); resizer.classList.remove('resizing'); };
+        resizer.addEventListener('mousedown', (e) => { e.stopPropagation(); x = e.clientX; w = parseInt(window.getComputedStyle(th).width, 10); document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu); resizer.classList.add('resizing'); });
     }
 
     _renderTableBody() {
         const tbody = document.createElement('tbody');
         this.table._tbody = tbody;
+        const gs = GlobalStateManager.getInstance();
+        // 1. Resolve Filter State
+        const side = this.element?.closest('.split-container-inner') ? 'split' : 'main';
+        
+        // Resolve the correct filter ID:
+        // Priority 1: Check if there's a collective filter for this table's category (e.g., 'all-spiele')
+        const category = this.table.tableConfig?.category;
+        let globalFilterId = this.table.id;
+        
+        if (category) {
+            const catId = `all-${category}`;
+            const catFilter = gs.getGlobalFilterState(side, catId);
+            if (catFilter && catFilter.active) {
+                globalFilterId = catId;
+            }
+        }
+        
+        // Priority 2: Fallback to the explicit wrapper ID if no category match
+        const viewWrapper = this.element?.closest('.table-view-wrapper');
+        if (globalFilterId === this.table.id && viewWrapper && viewWrapper.dataset.tableId && viewWrapper.dataset.tableId.startsWith('all-')) {
+            globalFilterId = viewWrapper.dataset.tableId;
+        }
 
-        if (this.table.rows.length === 0) {
-            this._renderEmptyState(tbody);
+        const globalFilter = gs.getGlobalFilterState(side, globalFilterId);
+
+        const localFilter = this.table.localFilters;
+
+        // 2. Filter Rows (Hierarchical)
+        let filteredRows = this.table.rows;
+        
+        // A) Apply Global Filter
+        if (gs.isFavoritesFilterActive()) {
+            filteredRows = filteredRows.filter(r => gs.isFavorite(r.id));
+        }
+        if (globalFilter.active) {
+            filteredRows = filteredRows.filter(row => FilterEngine.matchesFilters(row, globalFilter.filters));
+        }
+
+        // B) Update Local Filter Bar context
+        // We pass the full global filter object so the local bar can enforce Parent -> Child constraints.
+        if (this.filterBar) {
+            this.filterBar.updateRows(filteredRows, globalFilter);
+        }
+
+
+
+
+        // C) Apply Local Filter
+        if (localFilter.active) {
+            filteredRows = filteredRows.filter(row => FilterEngine.matchesFilters(row, localFilter.filters));
+        }
+
+
+
+        if (filteredRows.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="${this.table.schema.length + 2}" style="text-align:center; padding: 40px; color: var(--text-muted);">Keine Einträge gefunden</td>`;
+            tbody.appendChild(tr);
+            this._renderAddRowButton(tbody);
+            return tbody;
+        }
+
+        // 2. Group Rows
+        // Priority: local grouping, then global grouping if active
+        let groupBy = localFilter.active ? localFilter.groupBy : null;
+        if (!groupBy && globalFilter.active) groupBy = globalFilter.groupBy;
+
+        if (groupBy) {
+            const groups = FilterEngine.groupRows(filteredRows, groupBy);
+            const groupAttr = this.table.schema.find(s => s.id === groupBy);
+            const attrLabel = groupAttr ? groupAttr.label : groupBy;
+
+            Object.entries(groups).forEach(([groupName, rows]) => {
+                // Render Group Header
+                const gtr = document.createElement('tr');
+                gtr.className = 'group-header-row';
+                const gtd = document.createElement('td');
+                gtd.className = 'group-header-cell';
+                gtd.colSpan = this.table.schema.length + 2;
+
+                gtd.innerHTML = `
+                    <div class="group-header-content">
+                        <span class="group-toggle-icon">▾</span>
+                        <span class="group-attr-label">${attrLabel}</span>
+                        <span class="group-name">${groupName}</span>
+                        <span class="group-count">${rows.length}</span>
+                    </div>
+                `;
+
+                // Click to collapse/expand the group
+                gtd.addEventListener('click', () => {
+                    const icon = gtd.querySelector('.group-toggle-icon');
+                    const isCollapsed = gtr.classList.toggle('group-collapsed');
+                    icon.textContent = isCollapsed ? '▸' : '▾';
+                    // Toggle visibility of subsequent rows until next group header
+                    let next = gtr.nextElementSibling;
+                    while (next && !next.classList.contains('group-header-row') && !next.classList.contains('add-row-tr')) {
+                        next.style.display = isCollapsed ? 'none' : '';
+                        next = next.nextElementSibling;
+                    }
+                });
+
+                gtr.appendChild(gtd);
+                tbody.appendChild(gtr);
+
+                // Render Rows for this group
+                rows.forEach(row => {
+                    this._setupRowCallbacks(row);
+                    tbody.appendChild(row.render());
+                });
+            });
         } else {
-            this._renderRows(tbody);
+            // No grouping
+            filteredRows.forEach(row => {
+                this._setupRowCallbacks(row);
+                tbody.appendChild(row.render());
+            });
         }
 
         this._renderAddRowButton(tbody);
-
-        // Auto-size columns after body is populated
-        setTimeout(() => this._autoSizeAllColumns(), 0);
-
         return tbody;
     }
 
-    _renderEmptyState(tbody) {
-        const tr = document.createElement('tr');
-        tr.setAttribute('role', 'row');
-
-        const td = document.createElement('td');
-        td.colSpan = this.table.schema.length + 2;
-        td.className = 'empty-row';
-        td.setAttribute('role', 'cell');
-        td.textContent = 'Keine Einträge vorhanden';
-
-        tr.appendChild(td);
-        tbody.appendChild(tr);
-    }
-
-    _renderRows(tbody) {
-        this.table.rows.forEach(row => {
-            row.setCallbacks({
-                onEditChange: () => this.table.editor.showUnsavedChange(),
-                onDelete:     (rowId) => this.table.dataManager.removeRow(rowId),
-                onSelect:     (rowId, selected) => {
-                    if (selected) this.selectedRows.add(rowId);
-                    else this.selectedRows.delete(rowId);
-                    this._updateBulkBarVisibility();
-                }
-            });
-
-            const rowEl = row.render();
-            rowEl.setAttribute('role', 'row');
-            tbody.appendChild(rowEl);
+    _setupRowCallbacks(row) {
+        row.setCallbacks({
+            onEditChange: () => this.table.editor.showUnsavedChange(),
+            onDelete:     (rowId) => this.table.dataManager.removeRow(rowId),
+            onSelect:     (rowId, s) => { 
+                if (s) this.selectedRows.add(rowId); 
+                else this.selectedRows.delete(rowId); 
+                this._updateBulkBarVisibility(); 
+            }
         });
     }
 
-    _renderAddRowButton(tbody) {
-        if (!GlobalStateManager.getInstance().canEdit(this.table.id)) {
-            return;
-        }
 
+    _renderAddRowButton(tbody) {
+        if (!GlobalStateManager.getInstance().canEdit(this.table.id)) return;
         const tr = document.createElement('tr');
         tr.className = 'add-row-tr';
-        tr.setAttribute('role', 'row');
-
         const td = document.createElement('td');
-        td.colSpan = this.table.schema.length + 3;
+        td.colSpan = this.table.schema.length + 2;
         td.className = 'add-row-cell';
-        td.setAttribute('role', 'cell');
-
         const btn = document.createElement('button');
         btn.className = 'add-row-btn';
         btn.textContent = 'Zeile hinzufügen';
-        btn.addEventListener('click', () => this.table.dataManager.addEmptyRow());
-
+        btn.onclick = () => this.table.dataManager.addEmptyRow();
         td.appendChild(btn);
         tr.appendChild(td);
         tbody.appendChild(tr);
@@ -447,193 +461,142 @@ export class TableRenderer {
 
     updateMeta() {
         const meta = this.element?.querySelector('[data-role="row-count"]');
-        if (meta) {
-            meta.textContent = `${this.table.rows.length} Zeilen`;
-        }
-        
-        // Remove deleted rows from selection
-        const existingRowIds = new Set(this.table.rows.map(r => r.id));
-        for (const id of this.selectedRows) {
-            if (!existingRowIds.has(id)) {
-                this.selectedRows.delete(id);
-            }
-        }
+        if (meta) meta.textContent = `${this.table.rows.length} Zeilen`;
+        const ids = new Set(this.table.rows.map(r => r.id));
+        for (const id of this.selectedRows) if (!ids.has(id)) this.selectedRows.delete(id);
         this._updateBulkBarVisibility();
     }
 
-    reRenderBody() {
-        const tbody = this.element?.querySelector('tbody');
-        if (!tbody) return;
-
-        tbody.innerHTML = '';
-
-        if (this.table.rows.length === 0) {
-            this._renderEmptyState(tbody);
-        } else {
-            this._renderRows(tbody);
-        }
-
-        this._renderAddRowButton(tbody);
-        
-        // Restore checkmarks if row still selected
-        const rowEls = tbody.querySelectorAll('tr[data-row-id]');
-        rowEls.forEach(el => {
-            if (this.selectedRows.has(el.dataset.rowId)) {
-                const cb = el.querySelector('.bulk-checkbox');
-                if (cb) cb.checked = true;
-            }
-        });
-        
-        // Uncheck 'Select All' header if body refreshed and not all are checked
-        if (this.selectedRows.size === 0) {
-           const chkAll = this.element?.querySelector('.bulk-col-header input[type="checkbox"]');
-           if (chkAll) chkAll.checked = false;
-        }
-    }
-
-
-
     async _exportPDF() {
         try {
-            const doc = new jsPDF({ orientation: 'landscape', format: 'a3' });
-            doc.setFontSize(18);
-            doc.text(this.table.title || 'Export', 14, 20);
+            const gs = GlobalStateManager.getInstance();
 
-            const ignoreCols = ['Erstellt von', 'Erstellt am', 'createdAt', 'createdBy', 'Link/Video/Lied'];
-            const exportSchema = this.table.schema.filter(col => !ignoreCols.includes(col.label) && !ignoreCols.includes(col.id));
+            const side = this.element?.closest('.split-container-inner') ? 'split' : 'main';
+            
+            // Resolve Filter State (Global + Local)
+            const category = this.table.tableConfig?.category;
+            let globalFilterId = this.table.id;
+            if (category) {
+                const catId = `all-${category}`;
+                const catFilter = gs.getGlobalFilterState(side, catId);
+                if (catFilter && catFilter.active) globalFilterId = catId;
+            }
+            const viewWrapper = this.element?.closest('.table-view-wrapper');
+            if (globalFilterId === this.table.id && viewWrapper && viewWrapper.dataset.tableId && viewWrapper.dataset.tableId.startsWith('all-')) {
+                globalFilterId = viewWrapper.dataset.tableId;
+            }
 
-            const head = [exportSchema.map(col => col.label)];
-            const body = this.table.rows.map(row => {
-                return exportSchema.map(col => {
-                    let val = row.data[col.id];
-                    if (val === null || val === undefined) return '';
-                    
-                    let strVal = '';
-                    if (typeof val === 'object') {
-                        if (Array.isArray(val)) {
-                            strVal = val.map(v => typeof v === 'object' ? v.name || v.id : v).join(', ');
-                        } else if (val.title || val.name) {
-                            strVal = val.title || val.name;
-                        } else {
-                            strVal = JSON.stringify(val);
-                        }
-                    } else {
-                        strVal = String(val);
-                    }
+            const globalFilter = gs.getGlobalFilterState(side, globalFilterId);
+            const localFilter = this.table.localFilters;
 
-                    if (strVal.length > 250) {
-                        return strVal.substring(0, 247) + '...';
-                    }
-                    return strVal;
+            const isFiltered = (globalFilter && globalFilter.active) || (localFilter && localFilter.active) || gs.isFavoritesFilterActive();
+
+            if (isFiltered) {
+                const proceed = await Dialog.confirm({
+                    title: 'Export-Bestätigung',
+                    message: 'Der Export beinhaltet nur die aktuell gefilterten Ergebnisse. Fortfahren?',
+                    confirmText: 'Exportieren'
                 });
-            });
+                if (!proceed) return;
+            }
 
-            autoTable(doc, {
-                head,
-                body,
-                startY: 28,
-                styles: { 
-                    fontSize: 8, 
-                    cellPadding: 3, 
-                    overflow: 'linebreak',
-                    valign: 'middle'
-                },
-                headStyles: { fillColor: [0, 132, 255], fontSize: 9 }
-            });
+            const doc = new jsPDF({ orientation: 'landscape', format: 'a3' });
+            let currentY = 20;
+            
+            doc.setFontSize(18); doc.setFont(undefined, 'bold');
+            doc.text(this.table.title || 'Export', 14, currentY);
+            currentY += 8;
 
-            doc.save(`${this.table.title || 'export'}.pdf`);
+            // Render Filter Info in Header
+            if (isFiltered) {
+                doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
+                let filterText = 'Aktive Filter: ';
+                const activeCriteria = [];
+                
+                if (gs.isFavoritesFilterActive()) activeCriteria.push('Nur Favoriten');
+                
+                if (globalFilter.active) {
+                    globalFilter.filters.forEach(f => {
+                        if (f.attrId) {
+                            const p = [];
+                            const val = Array.isArray(f.value) ? f.value.join(', ') : f.value;
+                            if (val) p.push(`${f.attrId} ${f.mode || 'ist'} ${val}`);
+                            if (f.quantityMode && f.quantityMode !== 'any' && f.quantityValue) p.push(`Anzahl ${f.quantityMode} ${f.quantityValue}`);
+                            if (Array.isArray(f.availability) && f.availability.length > 0) p.push(`Verfügbarkeit: ${f.availability.join(', ')}`);
+                            if (p.length > 0) activeCriteria.push(`[Global] ${p.join(' & ')}`);
+                        }
+                    });
+                }
+                
+                if (localFilter.active) {
+                    localFilter.filters.forEach(f => {
+                        if (f.attrId) {
+                            const p = [];
+                            const val = Array.isArray(f.value) ? f.value.join(', ') : f.value;
+                            if (val) p.push(`${f.attrId} ${f.mode || 'ist'} ${val}`);
+                            if (f.quantityMode && f.quantityMode !== 'any' && f.quantityValue) p.push(`Anzahl ${f.quantityMode} ${f.quantityValue}`);
+                            if (Array.isArray(f.availability) && f.availability.length > 0) p.push(`Verfügbarkeit: ${f.availability.join(', ')}`);
+                            if (p.length > 0) activeCriteria.push(`[Lokal] ${p.join(' & ')}`);
+                        }
+                    });
+                }
+
+                
+                doc.text(filterText + activeCriteria.join(' | '), 14, currentY);
+                currentY += 10;
+                doc.setTextColor(0);
+            } else {
+                currentY += 2;
+            }
+
+            const ignore = ['Erstellt von', 'Erstellt am', 'createdAt', 'createdBy', 'Link/Video/Lied'];
+            const schema = this.table.schema.filter(c => !ignore.includes(c.label) && !ignore.includes(c.id));
+            const head = [schema.map(c => c.label)];
+
+            // Filter Rows logic
+            let filteredRows = this.table.rows;
+            if (gs.isFavoritesFilterActive()) filteredRows = filteredRows.filter(r => gs.isFavorite(r.id));
+            if (globalFilter.active) filteredRows = filteredRows.filter(row => FilterEngine.matchesFilters(row, globalFilter.filters));
+            if (localFilter.active) filteredRows = filteredRows.filter(row => FilterEngine.matchesFilters(row, localFilter.filters));
+
+            const body = filteredRows.map(row => schema.map(c => {
+                let v = row.data[c.id]; if (v === null || v === undefined) return '';
+                let s = typeof v === 'object' ? (Array.isArray(v) ? v.map(i => typeof i === 'object' ? i.name || i.id : i).join(', ') : (v.title || v.name || JSON.stringify(v))) : String(v);
+                return s.length > 250 ? s.substring(0, 247) + '...' : s;
+            }));
+
+            autoTable(doc, { 
+                head, 
+                body, 
+                startY: currentY, 
+                styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' }, 
+                headStyles: { fillColor: [0, 132, 255] } 
+            });
+            
+            window.open(doc.output('bloburl'), '_blank');
         } catch (e) {
             console.error('PDF export failed', e);
-            alert('Fehler beim PDF Export. Bitte versuche es erneut.');
+            alert('Fehler beim PDF Export: ' + e.message);
         }
     }
-    
+
     _renderBulkActionsBar() {
         const bar = document.createElement('div');
         bar.className = 'bulk-actions-bar';
-        bar.style.display = 'none';
-        bar.style.position = 'fixed';
-        bar.style.bottom = '20px';
-        bar.style.left = '50%';
-        bar.style.transform = 'translateX(-50%)';
-        bar.style.background = 'var(--bg)';
-        bar.style.padding = '12px 24px';
-        bar.style.borderRadius = 'var(--radius)';
-        bar.style.boxShadow = 'var(--shadow-lg)';
-        bar.style.border = '1px solid var(--border)';
-        bar.style.zIndex = '1000';
-        bar.style.alignItems = 'center';
-        bar.style.gap = '16px';
-        bar.style.color = 'var(--text-primary)';
-        
-        const msg = document.createElement('span');
-        msg.className = 'bulk-actions-msg';
-        msg.style.fontWeight = '600';
-        bar.appendChild(msg);
-        
-        // Let's add a bulk field selector
-        const actionGroup = document.createElement('div');
-        actionGroup.style.display = 'flex';
-        actionGroup.style.gap = '8px';
-        
-        const applyBtn = document.createElement('button');
-        applyBtn.className = 'header-btn';
-        applyBtn.textContent = 'Löschen (Bulk)';
-        applyBtn.style.color = '#ff4d4d';
-        applyBtn.style.padding = '6px 16px';
-        applyBtn.style.borderRadius = 'var(--radius)';
-        applyBtn.style.border = '1px solid #ff4d4d';
-        applyBtn.style.background = 'transparent';
-        applyBtn.style.cursor = 'pointer';
-        applyBtn.style.fontWeight = 'bold';
-        
-        actionGroup.appendChild(applyBtn);
-        
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'header-btn no-icon';
-        closeBtn.textContent = '✕';
-        closeBtn.style.padding = '6px 10px';
-        closeBtn.style.borderRadius = 'var(--radius)';
-        closeBtn.style.border = 'none';
-        closeBtn.style.background = 'transparent';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.style.color = 'var(--text-secondary)';
-        closeBtn.onclick = () => {
-            this.selectedRows.clear();
-            const checkboxes = this.element.querySelectorAll('.bulk-checkbox, .bulk-col-header input[type="checkbox"]');
-            checkboxes.forEach(cb => cb.checked = false);
-            this._updateBulkBarVisibility();
-        };
-        
-        bar.appendChild(actionGroup);
-        bar.appendChild(closeBtn);
-        
-        applyBtn.onclick = async () => {
-            const { Dialog } = await import('../ui/Dialog.js');
-            const ok = await Dialog.confirm({
-                message: `Möchtest du wirklich ${this.selectedRows.size} Einträge löschen?`,
-                confirmText: 'Löschen',
-                confirmStyle: 'warning'
-            });
-            if (ok) {
-                for (const rowId of this.selectedRows) {
-                    this.table.dataManager.removeRow(rowId);
-                }
-                this.selectedRows.clear();
-                this._updateBulkBarVisibility();
-            }
-        };
-        
+        bar.style.cssText = 'display:none; position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--bg); padding:12px 24px; border-radius:var(--radius); box-shadow:var(--shadow-lg); border:1px solid var(--border); z-index:1000; align-items:center; gap:16px;';
+        const msg = document.createElement('span'); msg.className = 'bulk-actions-msg'; bar.appendChild(msg);
+        const btn = document.createElement('button'); btn.textContent = 'Löschen (Bulk)'; btn.style.color = '#ff4d4d'; btn.onclick = async () => { if (await Dialog.confirm({ message: 'Löschen?' })) { for (const id of this.selectedRows) this.table.dataManager.removeRow(id); this.selectedRows.clear(); this._updateBulkBarVisibility(); } };
+
+        const close = document.createElement('button'); close.textContent = '✕'; close.onclick = () => { this.selectedRows.clear(); this.element.querySelectorAll('.bulk-checkbox').forEach(c => c.checked = false); this._updateBulkBarVisibility(); };
+        bar.append(btn, close);
         return bar;
     }
-    
+
     _updateBulkBarVisibility() {
         if (!this.bulkBar) return;
         if (this.selectedRows.size > 0) {
             this.bulkBar.style.display = 'flex';
             this.bulkBar.querySelector('.bulk-actions-msg').textContent = `${this.selectedRows.size} ausgewählt`;
-        } else {
-            this.bulkBar.style.display = 'none';
-        }
+        } else { this.bulkBar.style.display = 'none'; }
     }
 }

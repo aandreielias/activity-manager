@@ -26,7 +26,7 @@ export class TableDataManager {
 
         this.table.schema.forEach(col => {
             if (data[col.id] === undefined) {
-                data[col.id] = '';
+                data[col.id] = col.defaultValue !== undefined ? col.defaultValue : '';
             }
         });
 

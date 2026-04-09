@@ -2,6 +2,7 @@ import { FieldFactory } from './fields/FieldFactory.js';
 import { Dialog } from '../ui/Dialog.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
 import { contextMenu } from '../ui/ContextMenu.js';
+import { CalendarExport } from '../utils/CalendarExport.js';
 
 /**
  * Row - Represents a single table row serving as a container for Field variants
@@ -131,6 +132,7 @@ export class Row {
                 onEdit: onEdit,
                 onToggleFavorite: () => this.toggleFavorite(),
                 isFavorite: GlobalStateManager.getInstance().isFavorite(this.id),
+                onExportToCalendar: this.tableId === 'tbl_events' ? () => CalendarExport.exportEvent(this.data, GlobalStateManager.getInstance().getTables()) : null,
                 onShowInfo: () => {
                     const dateStr = this.createdAt ? new Date(this.createdAt).toLocaleString('de-DE') : 'Unbekannt';
                     Dialog.alert({

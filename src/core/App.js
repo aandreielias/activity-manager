@@ -45,9 +45,7 @@ export class App {
             window.addEventListener('refresh-data', async () => {
                 console.log('[App] Refreshing data...');
                 try {
-                    this.peopleData = await DataService.loadRows('tbl_people');
-                    this.tables = await TableLoader.loadAllTables(this.peopleData, this.tableConfigs);
-                    await this.uiManager.loadTables(this.tables, this.peopleData);
+                    await this._refreshApp(true);
                 } catch (e) {
                     console.error('[App] Refresh failed:', e);
                 }
@@ -208,6 +206,7 @@ export class App {
         const unsavedIds = this.globalState.getUnsavedTableIds();
         if (unsavedIds.length === 0) return;
 
+        document.body.classList.add('global-loading');
         this.uiManager.header.setLoading(true);
         try {
             for (const id of unsavedIds) {
@@ -241,19 +240,41 @@ export class App {
                 this.globalState.markTableAsSaved(id);
             }
             this.uiManager.header.hideUnsavedBanner();
-            if (unsavedIds.includes('tbl_people') || unsavedIds.includes('people_table')) {
-                this.peopleData = await DataService.loadPeople();
-            }
+            
+            // Full refresh to ensure all derived data/views are in sync
+            await this._refreshApp(true);
+            
         } catch (e) {
             alert(`Fehler beim Speichern: ${e.message}`);
         } finally {
             this.uiManager.header.setLoading(false);
+            document.body.classList.remove('global-loading');
         }
+    }
+
+    async _refreshApp(preserveState = true) {
+        this.peopleData = await DataService.loadRows('tbl_people');
+        this.tables = await TableLoader.loadAllTables(this.peopleData, this.tableConfigs);
+        await this.uiManager.loadTables(this.tables, this.peopleData, preserveState);
     }
 
     async _handleDiscardAll() {
         if (await Dialog.confirm({ message: 'Änderungen verwerfen?', confirmText: 'Verwerfen', confirmStyle: 'warning' })) {
-            window.location.reload();
+            document.body.classList.add('global-loading');
+            this.uiManager.header.setLoading(true);
+            try {
+                this.globalState.clearAllUnsaved();
+                // Ensure loading bar is visible
+                await new Promise(r => setTimeout(r, 50)); 
+                await this._refreshApp(true);
+                this.uiManager.header.hideUnsavedBanner();
+            } catch (e) {
+                console.error('[App] Discard failed:', e);
+                window.location.reload(); 
+            } finally {
+                this.uiManager.header.setLoading(false);
+                document.body.classList.remove('global-loading');
+            }
         }
     }
 

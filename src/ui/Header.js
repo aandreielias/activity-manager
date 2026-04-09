@@ -72,7 +72,7 @@ export class Header {
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v2.3.1</span>
+                    <span class="header-version">v2.3.2</span>
                 </div>
             </div>
             <nav class="header-nav">
@@ -271,6 +271,7 @@ export class Header {
             // Dropdown toggles
             const dropdownBtn = e.target.closest('.dropdown-btn, .user-menu-btn');
             if (dropdownBtn) {
+                e.stopPropagation(); // Prevent global window click from closing it immediately
                 const container = dropdownBtn.closest('.dropdown-container');
                 const isShowing = container.classList.contains('show');
                 this._closeAllDropdowns();
@@ -531,7 +532,7 @@ export class Header {
         const bar = banner.querySelector('.save-loading-bar');
 
         if (isLoading) {
-            document.body.style.cursor = 'wait';
+            document.body.classList.add('global-loading');
             if (msg) msg.textContent = 'Speichere...';
             if (saveBtn) {
                 saveBtn.disabled = true;
@@ -540,7 +541,7 @@ export class Header {
             if (discardBtn) discardBtn.disabled = true;
             if (bar) bar.style.display = 'block';
         } else {
-            document.body.style.cursor = 'default';
+            document.body.classList.remove('global-loading');
             if (msg) msg.textContent = 'Ungespeicherte Änderungen vorhanden';
             if (saveBtn) {
                 saveBtn.disabled = false;

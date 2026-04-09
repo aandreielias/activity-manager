@@ -176,8 +176,11 @@ export class TableRenderer {
         exportAllBtn.style.fontStyle = 'italic';
         exportAllBtn.onclick = () => {
             const category = this.table.tableConfig?.category;
-            if (category) {
-                const categoryId = `all-${category}`;
+            let categoryId = category ? `all-${category}` : null;
+            if (this.table.id === 'tbl_people' || this.table.id === 'people_table') categoryId = 'all-people';
+            if (this.table.id === 'tbl_inventory') categoryId = 'all-inventory';
+            
+            if (categoryId) {
                 window.dispatchEvent(new CustomEvent('export-category-pdf', { detail: { categoryId } }));
             }
             menu.remove();
@@ -258,6 +261,7 @@ export class TableRenderer {
         this.table.schema.forEach((col, index) => {
             const th = document.createElement('th');
             th.dataset.colId = col.id;
+            th.dataset.type = col.type || 'text';
             th.onclick = () => this.table.sorter.sortBy(col.id, th);
             const content = document.createElement('div');
             content.className = 'th-content';

@@ -24,6 +24,10 @@ export class CalendarView {
         return this.element;
     }
 
+    refresh() {
+        this._updateUI();
+    }
+
     _updateUI() {
         if (!this.element) return;
         this.element.innerHTML = `
@@ -205,13 +209,18 @@ export class CalendarView {
 
         const isFav = GlobalStateManager.getInstance().isFavorite(e.id);
         const locationName = e.data.location?.title || (typeof e.data.location === 'string' ? e.data.location : '');
+        const responsibleName = this._resolveResponsibleName(e.data.responsible);
 
         const statusClass = (e.data.status || '').toLowerCase().replace(/\s+/g, '-');
         const pastClass = isPast ? 'is-past' : '';
 
+        let tooltip = e.data.name;
+        if (locationName) tooltip += ` @ ${locationName}`;
+        if (responsibleName) tooltip += ` w/ ${responsibleName}`;
+
         return `
                                 <div class="calendar-event-wrapper" data-event-id="${e.id}" draggable="true">
-                                    <button class="calendar-event-main ${statusClass ? 'status-' + statusClass : ''} ${pastClass}" title="${e.data.name}${locationName ? ' @ ' + locationName : ''}">
+                                    <button class="calendar-event-main ${statusClass ? 'status-' + statusClass : ''} ${pastClass}" title="${tooltip}">
                                         <span class="calendar-event-name">${isFav ? '❤️ ' : ''}${e.data.name}</span>
                                         ${locationName ? `<span class="calendar-event-location">${locationName}</span>` : ''}
                                     </button>
@@ -260,5 +269,25 @@ export class CalendarView {
     changeMonth(delta) {
         this.currentDate.setMonth(this.currentDate.getMonth() + delta);
         this._updateUI();
+    }
+
+    _resolveResponsibleName(responsible) {
+        if (!responsible) return '';
+        // If it's already a formatted object from some previous logic
+        if (typeof responsible === 'object') {
+            if (responsible.label) return responsible.label;
+            if (responsible.name) return responsible.name;
+            if (responsible.vorname) return `${responsible.vorname} ${(responsible.nachname || '').charAt(0)}.`;
+        }
+        
+        // Lookup by ID in peopleData
+        const people = this.eventsTable?.peopleData || [];
+        const person = people.find(p => p.id === responsible || p.uuid === responsible);
+        if (person) {
+            return `${person.vorname} ${(person.nachname || '').charAt(0)}.`;
+        }
+
+        // Fallback to string
+        return String(responsible);
     }
 }

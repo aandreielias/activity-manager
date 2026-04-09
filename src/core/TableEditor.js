@@ -31,6 +31,7 @@ export class TableEditor {
 
     showUnsavedChange() {
         this.globalState.markTableAsUnsaved(this.table.id);
+        this.table.notifyDataChange();
     }
 
     hideUnsavedChange() {

@@ -241,7 +241,20 @@
   -webkit-box-orient: vertical;
   line-height: 1.2 !important;
   color: var(--text-primary);
-  word-wrap: break-word;
+  word-wrap: normal;
+  overflow: hidden;
+}
+
+/* Specific types and IDs should definitely NOT wrap to ensure "right size" on load */
+.data-cell[data-type="enum"] .cell-content,
+.data-cell[data-type="date"] .cell-content,
+.data-cell[data-type="time"] .cell-content,
+.data-cell[data-col-id="Tel."] .cell-content,
+.data-cell[data-col-id="Telefon"] .cell-content,
+.data-cell[data-col-id="phone"] .cell-content {
+  white-space: nowrap;
+  width: max-content;
+  min-width: 100%;
 }
 
 .data-cell.expanded .cell-content {

@@ -44,6 +44,15 @@ export class Table {
         this.dataManager = new TableDataManager(this);
 
         this._tbody = null; // Will be set by renderer
+        this.onDataChangeCallbacks = [];
+    }
+
+    onDataChange(cb) {
+        this.onDataChangeCallbacks.push(cb);
+    }
+
+    notifyDataChange() {
+        this.onDataChangeCallbacks.forEach(cb => cb());
     }
 
     render() {

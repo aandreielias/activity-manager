@@ -90,8 +90,19 @@ html, body {
     font-size: 14px;
     line-height: 1.6;
     transition: background var(--transition), color var(--transition);
-    -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+/* Global Loading State: Force wait cursor over everything */
+body.global-loading::after {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: transparent;
+    cursor: wait !important;
+    pointer-events: all !important;
+    z-index: 2147483647; /* Intentionally absolute maximum Z-index */
+    display: block;
 }
 
 /* ── Layout ──────────────────────────────────────────── */

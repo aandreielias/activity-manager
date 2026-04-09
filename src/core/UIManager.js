@@ -83,6 +83,7 @@ export class UIManager {
         this.header.onEditModeToggle = (active) => {
             this.globalState.setEditModeActive(active);
             this.reloadTables();
+            document.body.classList.add('global-loading');
             window.location.reload(); 
         };
         this.header.onCalendarToggle = () => this._handleCalendarToggle();
@@ -215,10 +216,18 @@ export class UIManager {
 
     }
 
-    async loadTables(tables, peopleData) {
+    async loadTables(tables, peopleData, preserveState = false) {
+        const previousTableId = this.currentTableId;
+        const previousSplitActive = this.splitActive;
+        const previousSplitType = this.splitType;
+        const previousFullView = this.fullView;
+
         this.tables = tables;
         this.header.tables = tables;
         this.globalState.setTables(tables);
+
+        const fragment = document.createDocumentFragment();
+        this.app.tableElements = {};
 
         if (tables['tbl_inventory']) {
             this.globalState.setInventory(tables['tbl_inventory'].instance.rows);
@@ -236,12 +245,13 @@ export class UIManager {
                 eventsTable: tables['tbl_events'].instance,
                 allTables: tables 
             });
+            tables['tbl_events'].instance.onDataChange(() => this.calendarView.refresh());
             const wrapper = document.createElement('div');
             wrapper.className = 'table-view-wrapper calendar-view-wrapper';
             wrapper.dataset.tableId = 'calendar';
             wrapper.appendChild(this.calendarView.render());
             this.app.tableElements['calendar'] = wrapper;
-            this.tablesContainer.appendChild(wrapper);
+            fragment.appendChild(wrapper);
             
             this.calendarView.onEventClick = (id) => {
                 this.header.switchTo('tbl_events');
@@ -295,6 +305,8 @@ export class UIManager {
                 const { activeRows, inactiveRows } = this._splitPeopleByStatus(peopleData);
                 const activeTable = this._createPeopleTable(config, 'Aktive Mitglieder', activeRows, { Status: 'Aktiv' });
                 const inactiveTable = this._createPeopleTable(config, 'Inaktive Mitglieder', inactiveRows, { Status: 'Inaktiv' });
+                this.personsTable = activeTable;
+                this.inactivePersonsTable = inactiveTable;
                 const inactiveEl = inactiveTable.render();
                 inactiveEl.classList.add('inactive-members-table');
                 wrapper.appendChild(activeTable.render());
@@ -307,14 +319,34 @@ export class UIManager {
             }
 
             this.app.tableElements[tableId] = wrapper;
-            this.tablesContainer.appendChild(wrapper);
+            fragment.appendChild(wrapper);
             renderedCount++;
         });
 
         if (renderedCount === 0) {
-            this.tablesContainer.innerHTML = `<div class="empty-state-container"><h2>Kein Zugriff</h2><p>Sie haben keine Berechtigung, Tabellen in diesem Bereich anzuzeigen.</p></div>`;
+            const empty = document.createElement('div');
+            empty.className = 'empty-state-container';
+            empty.innerHTML = '<h2>Kein Zugriff</h2><p>Sie haben keine Berechtigung, Tabellen in diesem Bereich anzuzeigen.</p>';
+            fragment.appendChild(empty);
         }
+
+        this.tablesContainer.replaceChildren(fragment);
         this._initSplitViewTables(tables, peopleData);
+
+        if (preserveState && previousTableId) {
+            this.header.switchTo(previousTableId);
+            this._handleTableSwitch(previousTableId);
+            
+            if (previousSplitActive) {
+                if (previousSplitType === 'people') this._handlePersonsToggle();
+                else if (previousSplitType === 'inventory') this._handleInventoryToggle();
+                else if (previousSplitType === 'calendar') this._handleCalendarToggle();
+                
+                if (previousFullView && !this.fullView) {
+                    this._toggleSplitFullView();
+                }
+            }
+        }
     }
 
     showInitialView() {
@@ -425,11 +457,12 @@ export class UIManager {
         this._populateFilterBar('main');
         this._populateFilterBar('split');
 
-        if (this.splitSideContainer.classList.contains('full-view')) {
-            this.splitSideContainer.classList.remove('full-view');
-            const open = this.header.personsSplitOpen || this.header.inventorySplitOpen || this.header.calendarSplitOpen;
-            this.splitSideContainer.style.display = open ? 'flex' : 'none';
-            this.resizer.style.display = open ? 'block' : 'none';
+        if (this.splitSideWrapper.classList.contains('full-view')) {
+            this.splitSideWrapper.classList.remove('full-view');
+            this.header.personsSplitOpen = false;
+            this.header.inventorySplitOpen = false;
+            this.header.calendarSplitOpen = false;
+            this._updateSplitVisibility();
         }
 
         Object.entries(this.app.tableElements).forEach(([id, el]) => {
@@ -512,8 +545,13 @@ export class UIManager {
                 return;
             } else if (categoryId === 'all-people') {
                 exportFileName = 'Personen';
-                if (this.personsTable) tablesToExport.push(this.personsTable);
-                if (this.inactivePersonsTable) tablesToExport.push(this.inactivePersonsTable);
+                const peopleWrap = this.tables['tbl_people'];
+                if (peopleWrap && peopleWrap.instances) {
+                    tablesToExport.push(...peopleWrap.instances);
+                } else {
+                    if (this.personsTable) tablesToExport.push(this.personsTable);
+                    if (this.inactivePersonsTable) tablesToExport.push(this.inactivePersonsTable);
+                }
             } else if (categoryId === 'all-inventory') {
                 exportFileName = 'Inventar';
                 const inv = this.tables['tbl_inventory'];
@@ -774,12 +812,26 @@ export class UIManager {
     }
 
     _updateSplitVisibility() {
+        const isFull = this.splitSideWrapper.classList.contains('full-view');
         const open = this.header.personsSplitOpen || this.header.inventorySplitOpen || this.header.calendarSplitOpen;
-        this.splitSideWrapper.style.display = open ? 'flex' : 'none';
-        this.resizer.style.display = open ? 'block' : 'none';
-        this.header.element.querySelector('.persons-toggle-btn')?.classList.toggle('active', this.header.personsSplitOpen);
-        this.header.element.querySelector('.inventory-toggle-btn')?.classList.toggle('active', this.header.inventorySplitOpen);
-        this.header.element.querySelector('.calendar-toggle-btn')?.classList.toggle('active', this.header.calendarSplitOpen);
+        
+        if (isFull) {
+            this.mainContent.style.display = 'none';
+            this.resizer.style.display = 'none';
+            this.splitSideWrapper.style.display = 'flex';
+            this.splitSideWrapper.style.flex = '1';
+        } else {
+            this.mainContent.style.display = 'flex';
+            this.splitSideWrapper.style.display = open ? 'flex' : 'none';
+            this.resizer.style.display = open ? 'block' : 'none';
+            // Restore flex if needed
+            if (!open) this.splitSideWrapper.style.flex = '';
+        }
+
+        const headerEl = this.header.element;
+        headerEl.querySelector('.persons-toggle-btn')?.classList.toggle('active', this.header.personsSplitOpen);
+        headerEl.querySelector('.inventory-toggle-btn')?.classList.toggle('active', this.header.inventorySplitOpen);
+        headerEl.querySelector('.calendar-toggle-btn')?.classList.toggle('active', this.header.calendarSplitOpen);
     }
 
     _setSplitContent(type) {
@@ -792,8 +844,12 @@ export class UIManager {
             const { activeRows, inactiveRows } = this._splitPeopleByStatus(this.app.peopleData);
             const activeTable = this._createPeopleTable(config, 'Personen (Aktiv)', activeRows, { Status: 'Aktiv' });
             const inactiveTable = this._createPeopleTable(config, 'Personen (Inaktiv)', inactiveRows, { Status: 'Inaktiv' });
+            
+            const inactiveEl = inactiveTable.render();
+            inactiveEl.classList.add('inactive-members-table');
+            
             this.splitSideContainer.appendChild(activeTable.render());
-            this.splitSideContainer.appendChild(inactiveTable.render());
+            this.splitSideContainer.appendChild(inactiveEl);
         } else {
             const table = type === 'inventory' ? this.inventoryTable : (type === 'calendar' ? this.calendarView : this.personsTable);
             if (table) this.splitSideContainer.appendChild(table.render());
@@ -801,22 +857,29 @@ export class UIManager {
     }
 
     _handlePersonsFullView() {
-        this.tablesContainer.style.display = 'none';
         this._setSplitContent('people');
-        this.splitSideContainer.style.display = 'flex';
-        this.resizer.style.display = 'none';
-        this.splitSideContainer.classList.add('full-view');
-        this.header.personsSplitOpen = true; this.header.inventorySplitOpen = false;
+        this.splitSideWrapper.classList.add('full-view');
+        this.header.personsSplitOpen = true; 
+        this.header.inventorySplitOpen = false;
+        this.header.calendarSplitOpen = false;
         this._updateSplitVisibility();
     }
 
     _handleInventoryFullView() {
-        this.tablesContainer.style.display = 'none';
         this._setSplitContent('inventory');
-        this.splitSideContainer.style.display = 'flex';
-        this.resizer.style.display = 'none';
-        this.splitSideContainer.classList.add('full-view');
-        this.header.inventorySplitOpen = true; this.header.personsSplitOpen = false;
+        this.splitSideWrapper.classList.add('full-view');
+        this.header.inventorySplitOpen = true; 
+        this.header.personsSplitOpen = false;
+        this.header.calendarSplitOpen = false;
+        this._updateSplitVisibility();
+    }
+
+    _handleCalendarFullView() {
+        this._setSplitContent('calendar');
+        this.splitSideWrapper.classList.add('full-view');
+        this.header.calendarSplitOpen = true; 
+        this.header.personsSplitOpen = false; 
+        this.header.inventorySplitOpen = false;
         this._updateSplitVisibility();
     }
 
@@ -828,13 +891,17 @@ export class UIManager {
     _setupResizer() {
         this.resizer.addEventListener('mousedown', (e) => {
             const startX = e.clientX;
-            const startWidth = this.splitSideContainer.offsetWidth;
+            const startWidth = this.splitSideWrapper.offsetWidth;
             const onMouseMove = (me) => {
                 const deltaX = me.clientX - startX;
                 const newWidth = Math.max(300, Math.min(window.innerWidth - 400, startWidth - deltaX));
-                this.splitSideContainer.style.flex = `0 0 ${newWidth}px`;
+                this.splitSideWrapper.style.flex = `0 0 ${newWidth}px`;
             };
-            const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); document.body.style.cursor = ''; };
+            const onMouseUp = () => { 
+                document.removeEventListener('mousemove', onMouseMove); 
+                document.removeEventListener('mouseup', onMouseUp); 
+                document.body.style.cursor = ''; 
+            };
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
             document.body.style.cursor = 'col-resize';

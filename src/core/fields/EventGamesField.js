@@ -159,7 +159,7 @@ export class EventGamesField extends Field {
                         const itemRow = document.createElement('div');
                         itemRow.className = 'event-game-picker-row';
                         itemRow.style.display = 'flex';
-                        itemRow.style.alignItems = 'center';
+                        itemRow.style.alignItems = 'flex-end';
                         itemRow.style.gap = '12px';
                         itemRow.style.padding = '8px';
                         itemRow.style.borderBottom = '1px solid var(--border-light)';
@@ -205,17 +205,18 @@ export class EventGamesField extends Field {
                             if (!isDeleted) window.dispatchEvent(new CustomEvent('jump-to-game', { detail: { gameName: item.name } }));
                         };
 
+                        const cat = document.createElement('div');
+                        cat.style.fontSize = '10px';
+                        cat.style.color = 'var(--text-muted)';
+                        cat.style.marginBottom = '2px';
+                        cat.textContent = isDeleted ? 'Eintrag wurde gelöscht' : this._getGameCategory(item.name);
+                        info.appendChild(cat);
+
                         const name = document.createElement('div');
                         name.className = `event-game-tag-preview ${statusClass}`;
                         name.style.fontWeight = '600';
                         name.textContent = item.name;
                         info.appendChild(name);
-
-                        const cat = document.createElement('div');
-                        cat.style.fontSize = '10px';
-                        cat.style.color = 'var(--text-muted)';
-                        cat.textContent = isDeleted ? 'Eintrag wurde gelöscht' : this._getGameCategory(item.name);
-                        info.appendChild(cat);
 
                         itemRow.appendChild(info);
 
@@ -305,7 +306,7 @@ export class EventGamesField extends Field {
                         tag.style.flexDirection = 'column';
                         tag.style.padding = '6px 10px';
                         tag.style.cursor = 'pointer';
-                        tag.innerHTML = `<span style="font-weight:500">${game}</span><span style="font-size:8px; opacity:0.6">${this._getGameCategory(game) || ''}</span>`;
+                        tag.innerHTML = `<span style="font-size:8px; opacity:0.6">${this._getGameCategory(game) || '&nbsp;'}</span><span style="font-weight:500">${game}</span>`;
                         tag.onclick = () => { internalSelected.push({ name: game, responsible: null }); refreshSelected(); };
                         tag.ondblclick = (e) => {
                             e.stopPropagation();

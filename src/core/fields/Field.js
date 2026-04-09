@@ -20,6 +20,7 @@ export class Field {
         this.td = document.createElement('td');
         this.td.className = 'data-cell';
         this.td.dataset.colId = this.colDef.id;
+        this.td.dataset.type = this.colDef.type || 'text';
 
         this.contentWrap = document.createElement('div');
         this.contentWrap.className = 'cell-content';

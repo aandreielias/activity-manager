@@ -66,9 +66,11 @@ export class Row {
         // Bulk Selection Checkbox
         const bulkTd = document.createElement('td');
         bulkTd.className = 'bulk-cell';
+        const isSelected = globalState.isRowSelected(this.tableId, this.id);
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.className = 'bulk-checkbox';
+        checkbox.checked = isSelected;
         checkbox.onclick = (e) => {
             e.stopPropagation();
             this.callbacks.onSelect?.(this.id, checkbox.checked);

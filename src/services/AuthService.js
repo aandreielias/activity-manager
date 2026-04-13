@@ -22,8 +22,9 @@ export class AuthService {
             // Register new user
             const insertRes = await SupabaseClient.post('users', {
                 username,
-                password_hash: password, // In production, hash this!
+                password_hash: password,
                 role: 'User',
+                permissions: null
             }, { 'Prefer': 'return=representation' });
 
             if (!insertRes.ok) {
@@ -33,7 +34,7 @@ export class AuthService {
 
             const newUser = (await insertRes.json())[0];
             await UserStatsService.recordLogin(newUser.id);
-            return { success: true, username, userId: newUser.id, role: 'User' };
+            return { success: true, username, userId: newUser.id, role: 'User', permissions: null, personId: newUser.person_id };
         }
 
         const user = rows[0];
@@ -43,7 +44,14 @@ export class AuthService {
         }
 
         await UserStatsService.recordLogin(user.id);
-        return { success: true, username, userId: user.id, role: user.role || 'User' };
+        return { 
+            success: true, 
+            username, 
+            userId: user.id, 
+            role: user.role || 'User',
+            permissions: user.permissions || null,
+            personId: user.person_id
+        };
     }
 
     /**
@@ -72,12 +80,28 @@ export class AuthService {
 
     /**
      * Save/Update permissions for a specific user.
-     * Uses localStorage for now (same as before).
+     * Persists to Supabase for global synchronization.
      */
-    static savePermissions(targetUsername, permissions) {
+    static async savePermissions(targetUsername, permissions) {
+        // 1. Local fallback (optional, for immediate feedback if needed)
         const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
         permissionsMap[targetUsername] = permissions;
         localStorage.setItem('app_permissions_map', JSON.stringify(permissionsMap));
+
+        // 2. Persist to Supabase
+        try {
+            const res = await SupabaseClient.patch(
+                'users',
+                `?username=eq.${encodeURIComponent(targetUsername)}`,
+                { permissions: permissions }
+            );
+
+            if (!res.ok) {
+                console.warn('[AuthService] Supabase patch for permissions failed. Column might be missing or network error.');
+            }
+        } catch (e) {
+            console.error('[AuthService] Global permission save failed:', e);
+        }
 
         const globalState = GlobalStateManager.getInstance();
         if (globalState.getCurrentUser() === targetUsername) {

@@ -1,5 +1,6 @@
 import { Header } from '../ui/Header.js';
 import { Table } from './Table.js';
+import { Row } from './Row.js';
 import { Dialog } from '../ui/Dialog.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
 import { UserInfoPage } from '../ui/UserInfoPage.js';
@@ -9,6 +10,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { UserStatsService } from '../services/UserStatsService.js';
 import { FilterEngine } from '../utils/FilterEngine.js';import { FilterBar } from '../ui/FilterBar.js';
+import { ColourFactory } from '../utils/ColourFactory.js';
 
 
 const PEOPLE_SCHEMA = Object.freeze([
@@ -55,6 +57,7 @@ export class UIManager {
         
         this.filterBarMain = null;
         this.filterBarSplit = null;
+        this.globalBulkBar = null;
     }
 
     setupLayout(tableConfigs) {
@@ -70,6 +73,7 @@ export class UIManager {
 
         this.header.onTableSwitch = (id, rowId, colId) => this._handleTableSwitch(id, rowId, colId);
         this.header.onPersonsToggle = () => this._handlePersonsToggle();
+        this.header.onPersonTeamSwitch = (team) => this._handlePersonTeamSwitch(team);
         this.header.onInventoryToggle = () => this._handleInventoryToggle();
         this.header.onPersonsFullView = () => this._handlePersonsFullView();
         this.header.onInventoryFullView = () => this._handleInventoryFullView();
@@ -119,6 +123,9 @@ export class UIManager {
         this.splitSideContainer.style.flex = '1';
         this.splitSideContainer.style.overflowY = 'auto';
         this.splitSideWrapper.appendChild(this.splitSideContainer);
+
+        this.globalBulkBar = this._renderGlobalBulkBar();
+        document.body.appendChild(this.globalBulkBar);
 
         this._initFilterBars();
     }
@@ -302,18 +309,57 @@ export class UIManager {
             wrapper.dataset.tableId = tableId;
 
             if (tableId === 'tbl_people') {
-                const { activeRows, inactiveRows } = this._splitPeopleByStatus(peopleData);
-                const activeTable = this._createPeopleTable(config, 'Aktive Mitglieder', activeRows, { Status: 'Aktiv' });
-                const inactiveTable = this._createPeopleTable(config, 'Inaktive Mitglieder', inactiveRows, { Status: 'Inaktiv' });
-                this.personsTable = activeTable;
-                this.inactivePersonsTable = inactiveTable;
-                const inactiveEl = inactiveTable.render();
-                inactiveEl.classList.add('inactive-members-table');
-                wrapper.appendChild(activeTable.render());
-                wrapper.appendChild(inactiveEl);
-                activeTable.editor.showUnsavedChange = () => instance.editor.showUnsavedChange();
-                inactiveTable.editor.showUnsavedChange = () => instance.editor.showUnsavedChange();
-                tables[tableId].instances = [activeTable, inactiveTable];
+                const gs = GlobalStateManager.getInstance();
+                const isAdmin = gs.isAdmin() || gs.isSuperAdmin();
+                const userTeams = gs.getCurrentTeams();
+                const teams = gs.getAvailableTeams();
+                let teamData = this._groupPeopleByTeam(peopleData, teams);
+                
+                // DATA ISOLATION: Filter teams for non-admins
+                if (!isAdmin) {
+                    const filteredData = {};
+                    userTeams.forEach(tName => {
+                        if (teamData[tName]) filteredData[tName] = teamData[tName];
+                    });
+                    teamData = filteredData;
+                }
+
+                const container = document.createElement('div');
+                container.className = 'people-multi-table-container';
+                
+                this.personsTeamTables = {};
+                
+                Object.entries(teamData).forEach(([teamName, rows]) => {
+                    const table = new Table({
+                        ...config,
+                        id: 'tbl_people', // Use common ID for saving
+                        title: `Team: ${teamName}`,
+                        schema: [...PEOPLE_SCHEMA],
+                        rows: rows,
+                        peopleData: rows,
+                        tableConfig: { ...config, id: 'tbl_people' },
+                    });
+                    
+                    this.personsTeamTables[teamName] = table;
+                    table.localFilters.groupBy = 'Status'; // Restore automatic grouping
+                    
+                    // SYNC: Refresh all people tables when data changes
+                    table.onDataChange(() => this._refreshAllPeopleViews(peopleData));
+                    
+                    const tableEl = table.render();
+                    
+                    // Auto-collapse if empty
+                    if (rows.length === 0) {
+                        tableEl.classList.add('collapsed');
+                        const icon = tableEl.querySelector('.collapse-icon');
+                        if (icon) icon.textContent = '▸';
+                    }
+                    
+                    container.appendChild(tableEl);
+                });
+                
+                wrapper.appendChild(container);
+                tables[tableId].instances = Object.values(this.personsTeamTables);
             } else {
                 wrapper.appendChild(instance.render());
             }
@@ -413,17 +459,225 @@ export class UIManager {
         });
     }
 
-    _initSplitViewTables(tables, peopleData) {
-        if (peopleData.length > 0) {
-            this.personsTable = new Table({
-                id: 'people_table',
-                title: 'Personen',
-                schema: [...PEOPLE_SCHEMA],
-                rows: peopleData,
-                tableConfig: { id: 'people_table', schema: [...PEOPLE_SCHEMA] },
+    _groupPeopleByTeam(peopleData, teams) {
+        const groups = { 'Unzugeordnet': [] };
+        teams.forEach(t => groups[t.name] = []);
+        
+        peopleData.forEach(p => {
+            const teamStr = p.Team || p.Teams || '';
+            const pTeams = teamStr.split(',').map(s => s.trim()).filter(Boolean);
+            
+            if (pTeams.length === 0) {
+                groups['Unzugeordnet'].push(p);
+            } else {
+                pTeams.forEach(tName => {
+                    if (groups[tName]) groups[tName].push(p);
+                    else {
+                        // Handle teams that exist in data but not in availableTeams
+                        if (!groups[tName]) groups[tName] = [];
+                        groups[tName].push(p);
+                    }
+                });
+            }
+        });
+        
+        // Remove empty 'Unzugeordnet' if not needed
+        if (groups['Unzugeordnet'].length === 0) delete groups['Unzugeordnet'];
+        
+        return groups;
+    }
+
+    _handlePersonTeamSwitch(team) {
+        // Ensure the split view is open for persons
+        if (!this.header.personsSplitOpen) {
+            this._handlePersonsToggle();
+        }
+        
+        // Filter the tables inside the split container
+        const tables = this.splitSideContainer.querySelectorAll('.table-wrapper');
+        
+        if (team === 'all') {
+            tables.forEach(t => t.style.display = 'block');
+        } else {
+            tables.forEach(t => {
+                const title = t.querySelector('.table-title')?.textContent || '';
+                const isMatch = title.toLowerCase().includes(team.toLowerCase());
+                t.style.display = isMatch ? 'block' : 'none';
             });
         }
-        this.inventoryTable = tables['tbl_inventory']?.instance;
+    }
+
+    _refreshAllPeopleViews(peopleData) {
+        const gs = GlobalStateManager.getInstance();
+        const teams = gs.getAvailableTeams();
+        const teamGroups = this._groupPeopleByTeam(peopleData, teams);
+        
+        // Helper to convert raw data to Row objects compatible with the table
+        const toRows = (rawRows, table) => {
+            return rawRows.map(data => {
+                const row = new Row({
+                    id: data.id,
+                    data: data,
+                    schema: table.schema,
+                    peopleData: peopleData,
+                    tableId: table.id
+                });
+                // Attach the same callbacks as initial load
+                row.setCallbacks({
+                    onEditChange: () => table.editor.showUnsavedChange(),
+                    onDelete:     (rowId) => table.dataManager.removeRow(rowId),
+                    onSelect:     (rowId, s) => GlobalStateManager.getInstance().toggleRowSelection(table.id, rowId, s)
+                });
+                return row;
+            });
+        };
+
+        // Update Main View Tables
+        if (this.personsTeamTables) {
+            Object.entries(this.personsTeamTables).forEach(([teamName, table]) => {
+                const raw = teamGroups[teamName] || [];
+                table.rows = toRows(raw, table);
+                table.renderer?.update();
+            });
+        }
+        
+        // Update Split View Tables
+        if (this.personsSplitTeamTables) {
+            Object.entries(this.personsSplitTeamTables).forEach(([teamName, table]) => {
+                const raw = teamGroups[teamName] || [];
+                table.rows = toRows(raw, table);
+                table.renderer?.update();
+            });
+        }
+    }
+
+    _initSplitViewTables(tables, peopleData) {
+        if (peopleData.length > 0) {
+            const gs = GlobalStateManager.getInstance();
+            const isAdmin = gs.isAdmin() || gs.isSuperAdmin();
+            const userTeams = gs.getCurrentTeams();
+            const teams = gs.getAvailableTeams();
+            let teamData = this._groupPeopleByTeam(peopleData, teams);
+            
+            // DATA ISOLATION: Filter teams for non-admins
+            if (!isAdmin) {
+                const filteredData = {};
+                userTeams.forEach(tName => {
+                    if (teamData[tName]) filteredData[tName] = teamData[tName];
+                });
+                teamData = filteredData;
+            }
+
+            const container = document.createElement('div');
+            container.className = 'people-split-multi-container';
+            
+            this.personsSplitTeamTables = {};
+            
+            Object.entries(teamData).forEach(([teamName, rows]) => {
+                const table = new Table({
+                    id: 'tbl_people', // Use common ID for saving
+                    title: `Team: ${teamName}`,
+                    schema: [...PEOPLE_SCHEMA],
+                    rows: rows,
+                    peopleData: rows,
+                    tableConfig: { id: `tbl_people`, schema: [...PEOPLE_SCHEMA] },
+                });
+                
+                this.personsSplitTeamTables[teamName] = table;
+                table.localFilters.groupBy = 'Status'; // Restore automatic grouping
+                
+                // SYNC: Refresh all people tables when data changes
+                table.onDataChange(() => this._refreshAllPeopleViews(peopleData));
+                
+                const tableEl = table.render();
+                
+                if (rows.length === 0) {
+                    tableEl.classList.add('collapsed');
+                    const icon = tableEl.querySelector('.collapse-icon');
+                    if (icon) icon.textContent = '▸';
+                }
+                
+                container.appendChild(tableEl);
+            });
+            
+            this.personsSplitElement = container;
+        }
+    }
+
+    _renderGlobalBulkBar() {
+        const bar = document.createElement('div');
+        bar.className = 'bulk-actions-bar global-bulk-bar';
+        bar.style.cssText = 'display:none; position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--bg); padding:12px 16px; border-radius:var(--radius); box-shadow:var(--shadow-lg); border:1px solid var(--border); z-index:1000; align-items:center; gap:8px; flex-wrap:wrap; max-width:90vw; animation: slideUp 0.3s ease-out;';
+        
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+            .global-bulk-bar .bulk-actions-msg { color: var(--text-primary); font-weight: bold; margin-right: 8px; font-size: 13px; }
+            .global-bulk-bar .nav-btn { background: var(--bg); border: 1px solid var(--border); padding: 6px 14px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 500; font-size: 12px; transition: background var(--transition); color: var(--text-secondary); }
+            .global-bulk-bar .nav-btn:hover { background: var(--bg-secondary); }
+            .global-bulk-bar .discard-btn-header { background: var(--bg); color: var(--error); border: 1px solid var(--border); }
+            .global-bulk-bar .discard-btn-header:hover { background: var(--error-light); border-color: var(--error); }
+        `;
+        document.head.appendChild(style);
+
+        const msg = document.createElement('span');
+        msg.className = 'bulk-actions-msg';
+        bar.appendChild(msg);
+
+
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'nav-btn discard-btn-header';
+        deleteBtn.textContent = 'Löschen';
+        deleteBtn.onclick = async () => {
+            const count = this.globalState.getTotalSelectedCount();
+            if (await Dialog.confirm({ message: `${count} Einträge aus mehreren Tabellen löschen?`, confirmText: 'Löschen', confirmStyle: 'warning' })) {
+                this._handleGlobalBulkDelete();
+            }
+        };
+        bar.appendChild(deleteBtn);
+
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'nav-btn';
+        closeBtn.style.background = 'var(--bg-tertiary)';
+        closeBtn.style.color = 'var(--text-muted)';
+        closeBtn.textContent = 'Auswahl aufheben';
+        closeBtn.onclick = () => {
+            this.globalState.clearSelection();
+            // Fast DOM cleanup: uncheck all checkboxes without full reload
+            document.querySelectorAll('.bulk-checkbox, .bulk-col-header input').forEach(cb => {
+                cb.checked = false;
+            });
+        };
+        bar.appendChild(closeBtn);
+
+        this.globalState.onSelectionChangeCallback((count) => {
+            if (count > 0) {
+                bar.style.display = 'flex';
+                msg.textContent = `${count} ausgewählt`;
+            } else {
+                bar.style.display = 'none';
+            }
+        });
+
+        return bar;
+    }
+
+    _handleGlobalBulkDelete() {
+        const selected = this.globalState.getSelectedRows();
+        const tables = this.globalState.getTables();
+        
+        for (const [tableId, rowIds] of selected) {
+            const tableWrap = tables[tableId];
+            if (tableWrap && tableWrap.instance) {
+                for (const rowId of rowIds) {
+                    tableWrap.instance.dataManager.removeRow(rowId);
+                }
+            }
+        }
+        this.globalState.clearSelection();
+        this.reloadTables();
     }
 
     async _toggleTheme(x, y) {
@@ -671,7 +925,7 @@ export class UIManager {
                     body, 
                     startY: currentY, 
                     styles: { fontSize: usePortrait ? 7 : 8, cellPadding: 2, overflow: 'linebreak', valign: 'middle' }, 
-                    headStyles: { fillColor: [0, 132, 255], fontSize: usePortrait ? 8 : 9 }, 
+                    headStyles: { fillColor: ColourFactory.getBrandBlueRGB(), fontSize: usePortrait ? 8 : 9 }, 
                     margin: { left: 14, right: 14 } 
                 });
                 
@@ -719,11 +973,11 @@ export class UIManager {
         doc.setTextColor(0); y += 18;
         doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('\u00dcbersicht', 14, y);
         y += 4;
-        autoTable(doc, { head: [['Kennzahl', 'Wert']], body: [['Aktive Personen', String(activePeople)], ['Inaktive Personen', String(inactivePeople)], ['Spiele (Gesamt)', String(totalGames)], ['Sportarten (Gesamt)', String(totalSports)], ['Events', String(totalEvents)], ['Inventar', String(totalInventory)]], startY: y, styles: { fontSize: 9, cellPadding: 3 }, headStyles: { fillColor: [0, 132, 255] }, theme: 'grid', margin: { left: 14, right: 14 } });
+        autoTable(doc, { head: [['Kennzahl', 'Wert']], body: [['Aktive Personen', String(activePeople)], ['Inaktive Personen', String(inactivePeople)], ['Spiele (Gesamt)', String(totalGames)], ['Sportarten (Gesamt)', String(totalSports)], ['Events', String(totalEvents)], ['Inventar', String(totalInventory)]], startY: y, styles: { fontSize: 9, cellPadding: 3 }, headStyles: { fillColor: ColourFactory.getBrandBlueRGB() }, theme: 'grid', margin: { left: 14, right: 14 } });
         y = doc.lastAutoTable.finalY + 12;
         doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('Aufgaben-Status', 14, y);
         y += 4;
-        autoTable(doc, { head: [['Status', 'Gesamtzahl']], body: [['To-Do', String(globalTodo)], ['In Progress', String(globalInProgress)], ['Done', String(globalDone)]], startY: y, styles: { fontSize: 9 }, headStyles: { fillColor: [0, 132, 255] }, theme: 'grid', margin: { left: 14, right: 14 } });
+        autoTable(doc, { head: [['Status', 'Gesamtzahl']], body: [['To-Do', String(globalTodo)], ['In Progress', String(globalInProgress)], ['Done', String(globalDone)]], startY: y, styles: { fontSize: 9 }, headStyles: { fillColor: ColourFactory.getBrandBlueRGB() }, theme: 'grid', margin: { left: 14, right: 14 } });
     }
 
     _highlightRow(rowId, colId) {
@@ -768,7 +1022,15 @@ export class UIManager {
             this.tablesContainer.style.display = 'flex';
         } else {
             this.header.personsSplitOpen = !this.header.personsSplitOpen;
-            if (this.header.personsSplitOpen) { this.header.inventorySplitOpen = false; this._setSplitContent('people'); }
+            if (this.header.personsSplitOpen) { 
+                this.header.inventorySplitOpen = false; 
+                this.header.calendarSplitOpen = false;
+                this._setSplitContent('people'); 
+                // Ensure all team tables are visible when toggled via main button
+                if (this.personsSplitElement) {
+                    this.personsSplitElement.querySelectorAll('.table-wrapper').forEach(t => t.style.display = 'block');
+                }
+            }
         }
         this._updateSplitVisibility();
     }
@@ -839,20 +1101,17 @@ export class UIManager {
         if (type !== 'calendar') {
             this._populateFilterBar('split');
         }
-        if (type === 'people' && this.app.peopleData.length > 0) {
-            const config = { id: 'people_table', schema: [...PEOPLE_SCHEMA] };
-            const { activeRows, inactiveRows } = this._splitPeopleByStatus(this.app.peopleData);
-            const activeTable = this._createPeopleTable(config, 'Personen (Aktiv)', activeRows, { Status: 'Aktiv' });
-            const inactiveTable = this._createPeopleTable(config, 'Personen (Inaktiv)', inactiveRows, { Status: 'Inaktiv' });
-            
-            const inactiveEl = inactiveTable.render();
-            inactiveEl.classList.add('inactive-members-table');
-            
-            this.splitSideContainer.appendChild(activeTable.render());
-            this.splitSideContainer.appendChild(inactiveEl);
-        } else {
-            const table = type === 'inventory' ? this.inventoryTable : (type === 'calendar' ? this.calendarView : this.personsTable);
-            if (table) this.splitSideContainer.appendChild(table.render());
+        
+        if (type === 'people') {
+            if (this.personsSplitElement) {
+                this.splitSideContainer.appendChild(this.personsSplitElement);
+            }
+            return;
+        }
+
+        const table = type === 'inventory' ? this.inventoryTable : (type === 'calendar' ? this.calendarView : null);
+        if (table) {
+            this.splitSideContainer.appendChild(table.render());
         }
     }
 
@@ -917,9 +1176,7 @@ export class UIManager {
 
     async reloadTables() {
         this.tables = await TableLoader.loadAllTables(this.app.peopleData, this.app.tableConfigs);
-        this.header.tables = this.tables;
-        this.globalState.setTables(this.tables);
-        this.tablesContainer.innerHTML = '';
+        const fragment = document.createDocumentFragment();
         Object.entries(this.tables).forEach(([tableId, { instance }]) => {
             if (!this.globalState.canView(tableId)) return;
             const wrapper = document.createElement('div');
@@ -927,8 +1184,9 @@ export class UIManager {
             wrapper.dataset.tableId = tableId;
             wrapper.appendChild(instance.render());
             this.app.tableElements[tableId] = wrapper;
-            this.tablesContainer.appendChild(wrapper);
+            fragment.appendChild(wrapper);
         });
+        this.tablesContainer.replaceChildren(fragment);
         this._initSplitViewTables(this.tables, this.app.peopleData);
     }
 }

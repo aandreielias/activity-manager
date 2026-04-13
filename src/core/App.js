@@ -10,6 +10,7 @@ import { DataService } from '../services/DataService.js';
 import { AuthService } from '../services/AuthService.js';
 import { UIManager } from './UIManager.js';
 import { TableLoader } from './TableLoader.js';
+import { ColourFactory } from '../utils/ColourFactory.js';
 
 /**
  * App - The main application class that orchestrates everything.
@@ -41,9 +42,16 @@ export class App {
             this.uiManager.setupEventListeners();
             this.uiManager.showInitialView();
 
+            // SINGLE SUMMARY LOG
+            console.log(`%c[System] %cBereit. %c${Object.keys(this.tables).length} Tabellen für "${this.globalState.getCurrentUser()}" geladen (%c${this.globalState.getCurrentRole()}%c)`,
+                'color: #0052cc; font-weight: bold;', 
+                'color: #28a745; font-weight: bold;',
+                'color: #555;',
+                'color: #0052cc; font-weight: bold;',
+                'color: #555;');
+
             // Listen for cross-component data refresh requests
             window.addEventListener('refresh-data', async () => {
-                console.log('[App] Refreshing data...');
                 try {
                     await this._refreshApp(true);
                 } catch (e) {
@@ -65,7 +73,7 @@ export class App {
 
     _setFavicon() {
         const logoChar = '⬡';
-        const color = '#0084ff';
+        const color = ColourFactory.getBrandBlue();
         const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='50%' font-size='120' fill='${color}' dominant-baseline='central' text-anchor='middle' font-weight='bold'>${logoChar}</text></svg>`;
 
         let link = document.querySelector("link[rel*='icon']");
@@ -82,31 +90,34 @@ export class App {
         const base = import.meta.env.BASE_URL;
 
         try {
-            const res = await SupabaseClient.get('app_config', '?id=eq.tables_config');
-            if (res.ok) {
-                const data = await res.json();
-                if (data && data.length > 0 && data[0].config) {
-                    this.tableConfigs = data[0].config;
-                    console.log('[App] Table configurations successfully loaded from Supabase.');
-                } else {
-                    throw new Error('Database config is empty or unreachable.');
+            // Priority 1: New structured table_definitions
+            let configs = await DataService.loadTableDefinitions();
+
+            if (!configs) {
+                // Priority 2: Legacy app_config JSON
+                const res = await SupabaseClient.get('app_config', '?id=eq.tables_config');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0 && data[0].config) {
+                        configs = data[0].config;
+                    }
                 }
+            }
+
+            if (configs) {
+                this.tableConfigs = configs;
             } else {
-                throw new Error('Database config fetch failed.');
+                throw new Error('Database config is empty or unreachable.');
             }
         } catch (e) {
-            console.warn('[App] Falling back to check local tables.json:', e.message);
-
             try {
                 const localRes = await fetch(`${base}data/tables.json`);
                 if (localRes.ok) {
-                    console.log('[App] Falling back to local tables.json.');
                     this.tableConfigs = await localRes.json();
                 } else {
                     throw new Error('Local tables.json not found or invalid.');
                 }
             } catch (err) {
-                console.error('[App] CRITICAL: No table configurations found anywhere!', err.message);
                 this.tableConfigs = [];
             }
         }
@@ -114,7 +125,6 @@ export class App {
         try {
             this.peopleData = await DataService.loadPeople();
         } catch (e) {
-            console.error('[App] Failed to load people:', e);
             this.peopleData = [];
         }
     }
@@ -124,14 +134,17 @@ export class App {
         let authPass = localStorage.getItem('auth_pass');
         let authRole = null;
         let userId = null;
+        let perms = null;
+        let personId = null; 
 
         if (authUser && authPass) {
             try {
                 const result = await AuthService.authenticate(authUser, authPass);
                 authRole = result.role;
                 userId = result.userId;
+                perms = result.permissions;
+                personId = result.personId; // Capturing the UUID link
             } catch (e) {
-                console.error('Auth check error:', e);
                 authUser = null;
             }
         }
@@ -142,6 +155,8 @@ export class App {
             authPass = creds.password;
             authRole = creds.role;
             userId = creds.userId;
+            perms = creds.permissions;
+            personId = creds.personId; 
             localStorage.setItem('auth_user', authUser);
             localStorage.setItem('auth_pass', authPass);
         }
@@ -154,33 +169,35 @@ export class App {
             if (userRecord) {
                 this.globalState.setCurrentUserId(userRecord.id);
                 authRole = userRecord.role || authRole;
+                perms = userRecord.permissions || perms;
+                personId = userRecord.person_id;
             }
         }
 
-        const person = this.peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === authUser);
-        if (!person) {
-            this.globalState.setCurrentUser(authUser, authRole || 'User', { type: 'readonly', tables: [] });
-        } else {
-            // Apply Status-based role override
-            if ((person.Status || '').toLowerCase() === 'inaktiv' || (person.role || '').toLowerCase() === 'inaktiv') {
+        // FIND THE DIRECTORY ENTRY (Robust way via person_id, fallback to name)
+        const person = personId 
+            ? this.peopleData.find(p => p.id === personId)
+            : this.peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === authUser);
+            
+        let teams = [];
+
+        // Unified Role/Permission Handling: 
+        if (person) {
+            const isInactiveDir = (person.Status || '').toLowerCase() === 'inaktiv';
+            if (isInactiveDir || (authRole || '').toLowerCase() === 'inaktiv') {
                 authRole = 'Inaktiv';
-            } else {
-                authRole = person.role || authRole || 'User';
-            }
-
-            let perms = null;
-            if (authRole === 'Inaktiv') {
                 perms = PermissionService.getPermissionsForRole('Inaktiv');
-            } else {
-                const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
-                perms = permissionsMap[authUser];
             }
 
-            this.globalState.setCurrentUser(authUser, authRole, perms);
+            const rawTeams = person.Team || '';
+            teams = rawTeams.split(',').map(t => t.trim()).filter(Boolean);
         }
+
+        this.globalState.setCurrentUser(authUser, authRole || 'User', perms, teams);
 
         await this.globalState.loadFavorites();
         await this.globalState.loadGlobalEnums();
+        await this.globalState.loadAvailableTeams();
     }
 
     // ── Interaction Handlers ─────────────────────────────────────
@@ -213,8 +230,14 @@ export class App {
                 const entry = this.tables[id];
                 if (entry) {
                     if (entry.instances) {
-                        const allRows = [];
-                        entry.instances.forEach(inst => allRows.push(...inst.rows));
+                        const rowMap = new Map();
+                        entry.instances.forEach(inst => {
+                            inst.rows.forEach(row => {
+                                const id = row.id || (row.data ? row.data.id : null);
+                                if (id) rowMap.set(id, row);
+                            });
+                        });
+                        const allRows = Array.from(rowMap.values());
                         const mainInst = entry.instances[0];
                         if (mainInst?.editor) {
                             const originalRows = mainInst.rows;
@@ -245,7 +268,12 @@ export class App {
             await this._refreshApp(true);
             
         } catch (e) {
-            alert(`Fehler beim Speichern: ${e.message}`);
+            if (e.message.includes('Reload requested due to concurrent edits.')) {
+                alert('Daten wurden von einem anderen Benutzer geändert. Daten werden neu geladen.');
+                await this._refreshApp(true);
+            } else {
+                alert(`Fehler beim Speichern: ${e.message}`);
+            }
         } finally {
             this.uiManager.header.setLoading(false);
             document.body.classList.remove('global-loading');

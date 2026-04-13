@@ -1178,3 +1178,23 @@ th:hover .col-edit-controls {
     border-radius: 12px;
     margin-left: 4px;
 }
+
+/* ── Mobile Responsiveness ───────────────────────────── */
+@media (max-width: 768px) {
+    .table-wrapper {
+        max-width: 100%;
+    }
+
+    .table-top {
+        padding: 12px 16px;
+    }
+
+    .data-table {
+        font-size: 12px;
+    }
+
+    .table-scroll {
+        overflow-x: auto;
+        min-width: 600px;
+    }
+}

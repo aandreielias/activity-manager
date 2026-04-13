@@ -185,3 +185,15 @@
     margin-top: -8px;
     font-weight: 500;
 }
+
+/* ── Mobile Responsiveness ───────────────────────────── */
+@media (max-width: 768px) {
+    .login-dialog {
+        max-width: 95vw;
+        padding: 16px;
+    }
+
+    .login-btn {
+        min-height: 44px;
+    }
+}

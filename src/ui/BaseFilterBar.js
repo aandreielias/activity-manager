@@ -33,7 +33,7 @@ export class BaseFilterBar {
     _populate(container) {
         if (this.schema.length === 0) return;
         const g1 = document.createElement('div'); g1.className = 'filter-group'; g1.innerHTML = '<span class="filter-label">Gruppieren:</span>';
-        const gO = this.schema.filter(f => ['enum', 'number'].includes(f.type));
+        const gO = this.schema.filter(f => ['enum', 'number', 'tag'].includes(f.type));
         const curG = this.schema.find(s => s.id === this.state.groupBy);
         g1.appendChild(this._createFilterDropdown(gO, curG ? curG.label : 'Attribut...', (o) => { this.state.groupBy = o.id; this.refresh(); this.onUpdate(this.state); }));
         if (this.state.groupBy) {

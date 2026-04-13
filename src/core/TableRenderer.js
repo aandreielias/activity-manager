@@ -7,6 +7,7 @@ import { Dialog } from '../ui/Dialog.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FilterBar } from '../ui/FilterBar.js';
+import { ColourFactory } from '../utils/ColourFactory.js';
 
 /**
  * TableRenderer - Handles rendering and updating the table UI
@@ -15,7 +16,6 @@ export class TableRenderer {
     constructor(table) {
         this.table = table;
         this.element = null;
-        this.selectedRows = new Set();
         this.filterBar = null;
     }
 
@@ -44,9 +44,6 @@ export class TableRenderer {
 
         this.element.appendChild(this._renderTableScroll());
         
-        this.bulkBar = this._renderBulkActionsBar();
-        this.element.appendChild(this.bulkBar);
-
         // Auto-collapse if empty
         if (this.table.rows.length === 0) {
             this.element.classList.add('collapsed');
@@ -64,6 +61,19 @@ export class TableRenderer {
         if (oldBody) {
             const newBody = this._renderTableBody();
             oldBody.replaceWith(newBody);
+            
+            // Auto-collapse / expand based on row count
+            const hasRows = this.table.rows.length > 0;
+            const icon = this.element.querySelector('.collapse-icon');
+            
+            if (!hasRows) {
+                this.element.classList.add('collapsed');
+                if (icon) icon.textContent = '▸';
+            } else {
+                // Only auto-expand if it was previously auto-collapsed (optional)
+                // For now, let's just make it consistent
+                this.updateMeta();
+            }
         }
     }
 
@@ -191,27 +201,41 @@ export class TableRenderer {
         divider.className = 'context-menu-divider';
         menu.appendChild(divider);
 
-        const filterLocalBtn = document.createElement('button');
-        filterLocalBtn.className = 'context-menu-item';
-        filterLocalBtn.textContent = 'Filter für diese Tabelle';
-        filterLocalBtn.onclick = () => {
-            this.table.localFilters.active = !this.table.localFilters.active;
-            this.filterBar.refresh();
-            menu.remove();
-        };
-        menu.appendChild(filterLocalBtn);
+        const isSingleTableView = ['tbl_people', 'people_table', 'tbl_inventory'].includes(this.table.id);
 
-        const filterAllBtn = document.createElement('button');
-        filterAllBtn.className = 'context-menu-item';
-        filterAllBtn.textContent = 'Filter für alle Tabellen';
-        filterAllBtn.style.fontStyle = 'italic';
-        filterAllBtn.onclick = () => {
-            const isSplit = this.element.closest('.split-container-inner') !== null;
-            const side = isSplit ? 'split' : 'main';
-            window.dispatchEvent(new CustomEvent('toggle-filter-bar', { detail: { side } }));
-            menu.remove();
-        };
-        menu.appendChild(filterAllBtn);
+        if (isSingleTableView) {
+            const filterBtn = document.createElement('button');
+            filterBtn.className = 'context-menu-item';
+            filterBtn.textContent = this.table.localFilters.active ? 'Filter ausblenden' : 'Filter anzeigen';
+            filterBtn.onclick = () => {
+                this.table.localFilters.active = !this.table.localFilters.active;
+                this.filterBar.refresh();
+                menu.remove();
+            };
+            menu.appendChild(filterBtn);
+        } else {
+            const filterLocalBtn = document.createElement('button');
+            filterLocalBtn.className = 'context-menu-item';
+            filterLocalBtn.textContent = 'Filter für diese Tabelle';
+            filterLocalBtn.onclick = () => {
+                this.table.localFilters.active = !this.table.localFilters.active;
+                this.filterBar.refresh();
+                menu.remove();
+            };
+            menu.appendChild(filterLocalBtn);
+
+            const filterAllBtn = document.createElement('button');
+            filterAllBtn.className = 'context-menu-item';
+            filterAllBtn.textContent = 'Filter für alle Tabellen';
+            filterAllBtn.style.fontStyle = 'italic';
+            filterAllBtn.onclick = () => {
+                const isSplit = this.element.closest('.split-container-inner') !== null;
+                const side = isSplit ? 'split' : 'main';
+                window.dispatchEvent(new CustomEvent('toggle-filter-bar', { detail: { side } }));
+                menu.remove();
+            };
+            menu.appendChild(filterAllBtn);
+        }
 
         document.body.appendChild(menu);
         const closeMenu = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', closeMenu); } };
@@ -240,15 +264,14 @@ export class TableRenderer {
         chkAll.type = 'checkbox';
         chkAll.onchange = (e) => {
             const isChecked = e.target.checked;
-            this.selectedRows.clear();
+            const gs = GlobalStateManager.getInstance();
             this.element.querySelectorAll('tbody tr[data-row-id]').forEach(rowEl => {
                 const cb = rowEl.querySelector('.bulk-checkbox');
                 if (cb) {
                     cb.checked = isChecked;
-                    if (isChecked) this.selectedRows.add(rowEl.dataset.rowId);
+                    gs.toggleRowSelection(this.table.id, rowEl.dataset.rowId, isChecked);
                 }
             });
-            this._updateBulkBarVisibility();
         };
         chkTh.appendChild(chkAll);
         tr.appendChild(chkTh);
@@ -374,9 +397,8 @@ export class TableRenderer {
         }
 
         // 2. Group Rows
-        // Priority: local grouping, then global grouping if active
-        let groupBy = localFilter.active ? localFilter.groupBy : null;
-        if (!groupBy && globalFilter.active) groupBy = globalFilter.groupBy;
+        // Priority: local grouping (even if bar hidden), then global grouping if active
+        let groupBy = localFilter.groupBy || (globalFilter.active ? globalFilter.groupBy : null);
 
         if (groupBy) {
             const groups = FilterEngine.groupRows(filteredRows, groupBy);
@@ -401,9 +423,11 @@ export class TableRenderer {
                 `;
 
                 // Click to collapse/expand the group
-                gtd.addEventListener('click', () => {
+                const toggleGroup = (forceState = null) => {
                     const icon = gtd.querySelector('.group-toggle-icon');
-                    const isCollapsed = gtr.classList.toggle('group-collapsed');
+                    const isCollapsed = forceState !== null ? forceState : gtr.classList.toggle('group-collapsed');
+                    if (forceState !== null) gtr.classList.toggle('group-collapsed', isCollapsed);
+                    
                     icon.textContent = isCollapsed ? '▸' : '▾';
                     // Toggle visibility of subsequent rows until next group header
                     let next = gtr.nextElementSibling;
@@ -411,15 +435,26 @@ export class TableRenderer {
                         next.style.display = isCollapsed ? 'none' : '';
                         next = next.nextElementSibling;
                     }
-                });
+                };
+
+                gtd.addEventListener('click', () => toggleGroup());
 
                 gtr.appendChild(gtd);
                 tbody.appendChild(gtr);
 
+                // Initial State: Collapse specific groups by default
+                const shouldCollapse = groupName.toLowerCase() === 'inaktiv';
+                if (shouldCollapse) {
+                    gtr.classList.add('group-collapsed');
+                    gtd.querySelector('.group-toggle-icon').textContent = '▸';
+                }
+
                 // Render Rows for this group
                 rows.forEach(row => {
                     this._setupRowCallbacks(row);
-                    tbody.appendChild(row.render());
+                    const rowEl = row.render();
+                    if (shouldCollapse) rowEl.style.display = 'none';
+                    tbody.appendChild(rowEl);
                 });
             });
         } else {
@@ -438,11 +473,7 @@ export class TableRenderer {
         row.setCallbacks({
             onEditChange: () => this.table.editor.showUnsavedChange(),
             onDelete:     (rowId) => this.table.dataManager.removeRow(rowId),
-            onSelect:     (rowId, s) => { 
-                if (s) this.selectedRows.add(rowId); 
-                else this.selectedRows.delete(rowId); 
-                this._updateBulkBarVisibility(); 
-            }
+            onSelect:     (rowId, s) => GlobalStateManager.getInstance().toggleRowSelection(this.table.id, rowId, s)
         });
     }
 
@@ -466,9 +497,6 @@ export class TableRenderer {
     updateMeta() {
         const meta = this.element?.querySelector('[data-role="row-count"]');
         if (meta) meta.textContent = `${this.table.rows.length} Zeilen`;
-        const ids = new Set(this.table.rows.map(r => r.id));
-        for (const id of this.selectedRows) if (!ids.has(id)) this.selectedRows.delete(id);
-        this._updateBulkBarVisibility();
     }
 
     async _exportPDF() {
@@ -504,7 +532,10 @@ export class TableRenderer {
                 if (!proceed) return;
             }
 
-            const doc = new jsPDF({ orientation: 'landscape', format: 'a3' });
+            const isPortrait = ['tbl_inventory', 'tbl_people', 'people_table'].includes(this.table.id);
+            const doc = isPortrait 
+                ? new jsPDF({ orientation: 'portrait', format: 'a4' })
+                : new jsPDF({ orientation: 'landscape', format: 'a3' });
             let currentY = 20;
             
             doc.setFontSize(18); doc.setFont(undefined, 'bold');
@@ -574,7 +605,7 @@ export class TableRenderer {
                 body, 
                 startY: currentY, 
                 styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' }, 
-                headStyles: { fillColor: [0, 132, 255] } 
+                headStyles: { fillColor: ColourFactory.getBrandBlueRGB() } 
             });
             
             window.open(doc.output('bloburl'), '_blank');
@@ -582,25 +613,5 @@ export class TableRenderer {
             console.error('PDF export failed', e);
             alert('Fehler beim PDF Export: ' + e.message);
         }
-    }
-
-    _renderBulkActionsBar() {
-        const bar = document.createElement('div');
-        bar.className = 'bulk-actions-bar';
-        bar.style.cssText = 'display:none; position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--bg); padding:12px 24px; border-radius:var(--radius); box-shadow:var(--shadow-lg); border:1px solid var(--border); z-index:1000; align-items:center; gap:16px;';
-        const msg = document.createElement('span'); msg.className = 'bulk-actions-msg'; bar.appendChild(msg);
-        const btn = document.createElement('button'); btn.textContent = 'Löschen (Bulk)'; btn.style.color = '#ff4d4d'; btn.onclick = async () => { if (await Dialog.confirm({ message: 'Löschen?' })) { for (const id of this.selectedRows) this.table.dataManager.removeRow(id); this.selectedRows.clear(); this._updateBulkBarVisibility(); } };
-
-        const close = document.createElement('button'); close.textContent = '✕'; close.onclick = () => { this.selectedRows.clear(); this.element.querySelectorAll('.bulk-checkbox').forEach(c => c.checked = false); this._updateBulkBarVisibility(); };
-        bar.append(btn, close);
-        return bar;
-    }
-
-    _updateBulkBarVisibility() {
-        if (!this.bulkBar) return;
-        if (this.selectedRows.size > 0) {
-            this.bulkBar.style.display = 'flex';
-            this.bulkBar.querySelector('.bulk-actions-msg').textContent = `${this.selectedRows.size} ausgewählt`;
-        } else { this.bulkBar.style.display = 'none'; }
     }
 }

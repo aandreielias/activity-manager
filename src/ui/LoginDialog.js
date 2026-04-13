@@ -111,6 +111,8 @@ export class LoginDialog {
                             password: pass,
                             role: result.role,
                             userId: result.userId,
+                            permissions: result.permissions,
+                            personId: result.personId
                         });
                     } catch (e) {
                         errorMsg.textContent = e.message;

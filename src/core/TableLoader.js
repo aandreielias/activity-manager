@@ -20,7 +20,6 @@ export class TableLoader {
                 const data = await DataService.loadRows(config.id);
 
                 const table = this._createTableInstance(config, data, peopleData);
-                console.log(`[TableLoader] Initialized ${config.title} (${config.id}) with ${data.length} rows.`);
 
                 if (config.category === 'spiele') {
                     allGames.push(...data);

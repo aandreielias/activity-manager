@@ -182,3 +182,15 @@
 .dropdown-item.styled-status-item:hover {
     filter: brightness(0.95);
 }
+
+/* ── Mobile Responsiveness ───────────────────────────── */
+@media (max-width: 768px) {
+    .filter-bar-content {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .filter-bar .filter-input {
+        width: 100%;
+    }
+}

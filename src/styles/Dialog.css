@@ -104,3 +104,16 @@ select.dialog-input {
 [data-theme="dark"] select.dialog-input {
     background-color: var(--bg-secondary);
 }
+
+/* ── Mobile Responsiveness ───────────────────────────── */
+@media (max-width: 768px) {
+    .custom-dialog {
+        max-width: 95vw;
+        padding: 16px;
+    }
+
+    .custom-dialog .save-btn-header,
+    .custom-dialog .discard-btn-header {
+        min-height: 44px;
+    }
+}

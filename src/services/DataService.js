@@ -1,5 +1,7 @@
 import { SupabaseClient } from './SupabaseClient.js';
 import { InventoryService } from './InventoryService.js';
+import { ColourFactory } from '../utils/ColourFactory.js';
+import { AccessGuard } from './AccessGuard.js';
 
 /**
  * DataService — CRUD operations against the relational Supabase schema.
@@ -14,7 +16,8 @@ export class DataService {
      * and supply additional defaults (e.g. the activity category).
      */
     static _resolveTable(tableId) {
-        if (tableId === 'tbl_people' || tableId === 'people_table') {
+        // Resolve virtual people tables to the real 'people' table
+        if (tableId.startsWith('people_') || tableId.startsWith('split_people_') || tableId === 'tbl_people') {
             return { supaTable: 'people', category: null };
         }
         if (tableId === 'tbl_inventory') {
@@ -36,27 +39,42 @@ export class DataService {
     }
 
     // ── READ ───────────────────────────────────────────────────
+    
+    /**
+     * Loads the global table definitions from the structured table_definitions table.
+     * Replaces the old app_config JSON approach.
+     */
+    static async loadTableDefinitions() {
+        // This follows the new bootstrap exemption in AccessGuard
+        const res = await SupabaseClient.get('table_definitions', '?order=order_index.asc');
+        if (!res.ok) {
+            console.warn('[DataService] Structured table_definitions not found or inaccessible.');
+            return null;
+        }
+        return await res.json();
+    }
 
     /**
      * Load all rows for a front-end table.
      * Returns an array of plain objects.
      */
     static async loadRows(tableId) {
-        const { supaTable, category } = this._resolveTable(tableId);
+        return AccessGuard.run('READ', tableId, async () => {
+            const { supaTable, category } = this._resolveTable(tableId);
 
-        let query = '?select=*';
-        if (supaTable === 'people') {
-            query = '?select=*,person_teams(teams(name))';
-        } else if (supaTable === 'activities' && category) {
-            query = `?select=*,activity_required_items(*,inventory(name))&category=eq.${category}`;
-        } else if (supaTable === 'sport_venues') {
-            query = '?select=*,address:ort(*)';
-            if (category) query += `&sport_type=eq.${category}`;
-        } else if (supaTable === 'events') {
-            query = '?select=*,location:ort(*)';
-        }
+            let query = '?select=*';
+            if (supaTable === 'people') {
+                query = '?select=*,person_teams(teams(name))';
+            } else if (supaTable === 'activities' && category) {
+                query = `?select=*,activity_required_items(*,inventory(name))&category=eq.${category}`;
+            } else if (supaTable === 'sport_venues') {
+                query = '?select=*,address:ort(*)';
+                if (category) query += `&sport_type=eq.${category}`;
+            } else if (supaTable === 'events') {
+                query = '?select=*,location:ort(*)';
+            }
 
-        const res = await SupabaseClient.get(supaTable, query);
+            const res = await SupabaseClient.get(supaTable, query);
 
         if (!res.ok) {
             const txt = await res.text();
@@ -64,8 +82,8 @@ export class DataService {
         }
 
         const rows = await res.json();
-        console.log(`[DataService] Data loaded for ${tableId || supaTable}:`, rows);
         return rows.map(r => this._fromDb(supaTable, r));
+        });
     }
 
     // ── SAVE (full table upsert) ──────────────────────────────
@@ -77,23 +95,27 @@ export class DataService {
      * @param {Array}  rows  Array of Row instances or plain objects
      */
     static async saveTable(tableId, _filename, rows) {
-        const { supaTable, category } = this._resolveTable(tableId);
+        return AccessGuard.run('WRITE', tableId, async () => {
+            const { supaTable, category } = this._resolveTable(tableId);
 
-        if (supaTable === 'events') {
-            await this._checkConflicts(rows);
-        }
+            if (supaTable === 'events') {
+                await this._checkConflicts(rows);
+            }
 
-        const dbRows = rows.map(row => {
-            const plain = row.toJSON ? row.toJSON() : row;
-            return this._toDb(supaTable, plain, category);
-        });
+            // Check for concurrent edits
+            await this._checkConcurrentEdits(tableId, rows);
 
-        // Delete rows that no longer exist (full replace strategy)
-        await this._deleteRemovedRows(supaTable, category, dbRows);
+            const dbRows = rows.map(row => {
+                const plain = row.toJSON ? row.toJSON() : row;
+                return this._toDb(supaTable, plain, category);
+            });
 
-        // Upsert all current rows
-        if (dbRows.length > 0) {
-            const res = await SupabaseClient.post(supaTable, dbRows, { 'Prefer': 'resolution=merge-duplicates' });
+            // Delete rows that no longer exist (full replace strategy)
+            await this._deleteRemovedRows(supaTable, category, dbRows, tableId);
+
+            // Upsert all current rows
+            if (dbRows.length > 0) {
+                const res = await SupabaseClient.post(supaTable, dbRows, { 'Prefer': 'resolution=merge-duplicates' });
 
             if (!res.ok) {
                 const txt = await res.text();
@@ -115,9 +137,10 @@ export class DataService {
             }
         }
         
-        await this.logAudit('UPSERT', supaTable, { affected: dbRows.length, category: category || 'none' });
+            await this.logAudit('UPSERT', supaTable, { affected: dbRows.length, category: category || 'none' });
 
-        return { success: true, message: `Table ${tableId} saved` };
+            return { success: true, message: `Table ${tableId} saved` };
+        });
     }
 
     static async _checkConflicts(rows) {
@@ -179,23 +202,25 @@ export class DataService {
     /**
      * Delete rows from the DB that are no longer present in the current dataset.
      */
-    static async _deleteRemovedRows(supaTable, category, dbRows) {
-        const currentIds = dbRows.map(r => r.id).filter(Boolean);
-        let deleteQuery;
+    static async _deleteRemovedRows(supaTable, category, dbRows, tableId) {
+        return AccessGuard.run('WRITE', tableId, async () => {
+            const currentIds = dbRows.map(r => r.id).filter(Boolean);
+            let deleteQuery;
 
-        if (currentIds.length > 0) {
-            deleteQuery = `?id=not.in.(${currentIds.map(id => `"${id}"`).join(',')})`;
-        } else {
-            deleteQuery = '?id=not.is.null';
-        }
+            if (currentIds.length > 0) {
+                deleteQuery = `?id=not.in.(${currentIds.map(id => `"${id}"`).join(',')})`;
+            } else {
+                deleteQuery = '?id=not.is.null';
+            }
 
-        if (supaTable === 'activities' && category) {
-            deleteQuery += `&category=eq.${category}`;
-        } else if (supaTable === 'sport_venues' && category) {
-            deleteQuery += `&sport_type=eq.${category}`;
-        }
+            if (supaTable === 'activities' && category) {
+                deleteQuery += `&category=eq.${category}`;
+            } else if (supaTable === 'sport_venues' && category) {
+                deleteQuery += `&sport_type=eq.${category}`;
+            }
 
-        await SupabaseClient.delete(supaTable, deleteQuery);
+            await SupabaseClient.delete(supaTable, deleteQuery);
+        });
     }
 
     // ── Column Mapping: App → DB ──────────────────────────────
@@ -319,6 +344,7 @@ export class DataService {
                 Team: (row.person_teams || []).map(pt => pt.teams?.name).filter(Boolean).join(', '),
                 createdBy: row.created_by || 'Unbekannt',
                 createdAt: row.created_at || null,
+                last_updated: row.updated_at || null,
             };
 
         case 'activities':
@@ -344,6 +370,7 @@ export class DataService {
                 status: row.status || 'To Do',
                 createdBy: row.created_by || 'Unbekannt',
                 createdAt: row.created_at || null,
+                last_updated: row.updated_at || null,
             };
 
         case 'inventory':
@@ -357,6 +384,7 @@ export class DataService {
                 notes: row.notes || '',
                 createdBy: row.created_by || 'Unbekannt',
                 createdAt: row.created_at || null,
+                last_updated: row.updated_at || null,
             };
 
         case 'sport_venues':
@@ -371,6 +399,7 @@ export class DataService {
                 notes: row.notes || '',
                 createdBy: row.created_by || 'Unbekannt',
                 createdAt: row.created_at || null,
+                last_updated: row.updated_at || null,
             };
 
         case 'events':
@@ -386,6 +415,7 @@ export class DataService {
                 notes: row.notes || '',
                 createdBy: row.created_by || 'Unbekannt',
                 createdAt: row.created_at || null,
+                last_updated: row.updated_at || null,
             };
 
         case 'ort':
@@ -400,6 +430,7 @@ export class DataService {
                 notes: row.notes || '',
                 createdBy: row.created_by || 'Unbekannt',
                 createdAt: row.created_at || null,
+                last_updated: row.updated_at || null,
             };
 
         default:
@@ -479,19 +510,22 @@ export class DataService {
     }
 
     static async createActivity(name, category = 'sonstige') {
-        const payload = {
-            name,
-            category,
-            status: 'To Do',
-            created_at: new Date().toISOString()
-        };
-        const res = await SupabaseClient.post('activities', payload, { 'Prefer': 'return=representation' });
-        if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`Failed to create activity: ${txt}`);
-        }
-        const rows = await res.json();
-        return rows[0];
+        const tableId = `tbl_activities_${category}`;
+        return AccessGuard.run('WRITE', tableId, async () => {
+            const payload = {
+                name,
+                category,
+                status: 'To Do',
+                created_at: new Date().toISOString()
+            };
+            const res = await SupabaseClient.post('activities', payload, { 'Prefer': 'return=representation' });
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(`Failed to create activity: ${txt}`);
+            }
+            const rows = await res.json();
+            return rows[0];
+        });
     }
 
     // ── Utility ───────────────────────────────────────────────
@@ -505,5 +539,71 @@ export class DataService {
         if (!value) return null;
         const parsed = parseInt(value, 10);
         return isNaN(parsed) ? null : parsed;
+    }
+
+    static async createTeam(name) {
+        return AccessGuard.run('WRITE', 'teams', async () => {
+            const payload = {
+                name: name,
+                color: ColourFactory.getRandomPremiumColor()
+            };
+            const res = await SupabaseClient.post('teams', [payload], { 'Prefer': 'return=representation' });
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(`Failed to create team: ${txt}`);
+            }
+            const rows = await res.json();
+            return rows[0];
+        });
+    }
+
+    static async _checkConcurrentEdits(tableId, rows) {
+        const { supaTable, category } = this._resolveTable(tableId);
+
+        const ids = rows.map(r => r.id || (r.toJSON ? r.toJSON().id : null)).filter(Boolean);
+        if (ids.length === 0) return;
+
+        let query = `?select=id,updated_at&id=in.(${ids.map(id => `"${id}"`).join(',')})`;
+        if (supaTable === 'activities' && category) {
+            query += `&category=eq.${category}`;
+        } else if (supaTable === 'sport_venues' && category) {
+            query += `&sport_type=eq.${category}`;
+        }
+
+        const res = await SupabaseClient.get(supaTable, query);
+        if (!res.ok) {
+            const error = await res.json();
+            // If column doesn't exist, just skip checking to avoid blocking the user
+            if (error.code === '42703') {
+                console.warn(`[DataService] Column updated_at missing on ${supaTable}. Skipping concurrent check.`);
+                return;
+            }
+            console.warn('[DataService] Could not check for concurrent edits:', error);
+            return;
+        }
+
+        const currentRows = await res.json();
+        const currentMap = new Map(currentRows.map(r => [r.id, r.updated_at]));
+
+        const conflicts = [];
+        for (const row of rows) {
+            const plain = row.toJSON ? row.toJSON() : row;
+            const currentUpdated = currentMap.get(plain.id);
+            const localUpdated = plain.last_updated;
+            if (currentUpdated && localUpdated && new Date(currentUpdated) > new Date(localUpdated)) {
+                conflicts.push(plain.id);
+            }
+        }
+
+        if (conflicts.length > 0) {
+            const { Dialog } = await import('../ui/Dialog.js');
+            const choice = await Dialog.showConflictDialog(conflicts.length);
+            if (choice === 'reload') {
+                throw new Error('Reload requested due to concurrent edits.');
+            } else if (choice === 'cancel') {
+                throw new Error('Save cancelled due to concurrent edits.');
+            }
+            // If 'overwrite', continue
+        }
     }
 }

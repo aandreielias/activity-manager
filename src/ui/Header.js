@@ -24,8 +24,13 @@ export class Header {
         this.favoritesActive = false;
         this.currentResults = [];
         this.selectedIndex = -1;
+        this.version = this._getVersion();
 
         GlobalStateManager.getInstance().onFlashMessageCallback((msg, type) => this.showFlash(msg, type));
+    }
+
+    _getVersion() {
+        return '2.4.1';
     }
 
     render() {
@@ -72,7 +77,7 @@ export class Header {
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v2.3.2</span>
+                    <span class="header-version">v${this.version}</span>
                 </div>
             </div>
             <nav class="header-nav">
@@ -82,10 +87,7 @@ export class Header {
             `<button class="nav-btn ${idx === 0 && spieleTables.length === 0 ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`
         ).join('')}
                 
-                ${canViewPeople ? `
-                <button class="nav-btn persons-toggle-btn" title="Personen-Ansicht umschalten">
-                    Personen
-                </button>` : ''}
+                ${canViewPeople ? this._renderPersonenButton(globalState.getCurrentTeams()) : ''}
                 
                 ${canViewInventory ? `
                 <button class="nav-btn inventory-toggle-btn" title="Inventar-Ansicht umschalten">
@@ -151,6 +153,37 @@ export class Header {
         `;
     }
 
+    _renderPersonenButton() {
+        const gs = GlobalStateManager.getInstance();
+        const isAdmin = gs.isAdmin() || gs.isSuperAdmin();
+        const allTeams = gs.getAvailableTeams();
+        
+        if (!isAdmin) {
+            // Simple button for regular users/supervisors: No dropdown
+            return `
+                <button class="nav-btn persons-toggle-btn" title="Mein Team anzeigen">
+                    Personen
+                </button>
+            `;
+        }
+
+        // Full dropdown for Admins
+        return `
+            <div class="dropdown-container split-btn-group">
+                <button class="nav-btn split-main-btn persons-toggle-btn" title="Alle Personen anzeigen">
+                    Personen
+                </button>
+                <div class="split-divider"></div>
+                <button class="nav-btn split-arrow-btn dropdown-btn" aria-label="Team-Auswahl öffnen">
+                    <span class="dropdown-arrow">▼</span>
+                </button>
+                <div class="dropdown-menu">
+                    ${allTeams.map(t => `<button class="dropdown-item" data-team="${t.name}">Team ${t.name}</button>`).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     _renderCategoryButton(categoryTables, categoryId, categoryLabel) {
         if (categoryTables.length === 0) return '';
 
@@ -187,6 +220,12 @@ export class Header {
                 const tableId = btn.dataset.table;
                 this.switchTo(tableId);
                 this.onTableSwitch?.(tableId);
+                this._closeAllDropdowns();
+            }
+
+            if (btn && btn.dataset.team) {
+                const team = btn.dataset.team;
+                this.onPersonTeamSwitch?.(team);
                 this._closeAllDropdowns();
             }
 
@@ -402,7 +441,7 @@ export class Header {
 
     _handleSearch(query) {
         const resultsDropdown = this.element.querySelector('.search-results-dropdown');
-        const trimmedQuery = query.trim();
+        const trimmedQuery = query.trim().toLowerCase();
 
         if (trimmedQuery.length < 2) {
             resultsDropdown.classList.remove('show');
@@ -430,18 +469,43 @@ export class Header {
                     Object.entries(row.data).forEach(([colId, value]) => {
                         if (value === null || value === undefined) return;
 
-                        const strValue = String(value);
-                        if (strValue.toLowerCase().includes(trimmedQuery.toLowerCase())) {
-                            const colDef = inst.schema.find(c => c.id === colId);
-                            // Avoid duplicate results for the same row in same table if we already found a match
-                            // (Actually the user wants column name, so multiple columns in same row are fine)
+                        const strValue = String(value).toLowerCase();
+                        const colDef = inst.schema.find(c => c.id === colId);
+
+                        // Exact match (weight 2)
+                        if (strValue === trimmedQuery) {
                             results.push({
-                                tableId,
-                                tableTitle,
-                                colId,
+                                tableId, tableTitle, colId,
                                 colLabel: colDef ? colDef.label : colId,
-                                value: strValue,
-                                rowId: row.id
+                                value: String(value), rowId: row.id,
+                                score: 100, type: 'exact'
+                            });
+                        }
+                        // Starts with (weight 1.5)
+                        else if (strValue.startsWith(trimmedQuery)) {
+                            results.push({
+                                tableId, tableTitle, colId,
+                                colLabel: colDef ? colDef.label : colId,
+                                value: String(value), rowId: row.id,
+                                score: 75, type: 'start'
+                            });
+                        }
+                        // Contains (weight 1)
+                        else if (strValue.includes(trimmedQuery)) {
+                            results.push({
+                                tableId, tableTitle, colId,
+                                colLabel: colDef ? colDef.label : colId,
+                                value: String(value), rowId: row.id,
+                                score: 50, type: 'contains'
+                            });
+                        }
+                        // Fuzzy match (weight 0.5) - check if all chars present in order
+                        else if (this._fuzzyMatch(trimmedQuery, strValue)) {
+                            results.push({
+                                tableId, tableTitle, colId,
+                                colLabel: colDef ? colDef.label : colId,
+                                value: String(value), rowId: row.id,
+                                score: 25, type: 'fuzzy'
                             });
                         }
                     });
@@ -449,9 +513,25 @@ export class Header {
             });
         });
 
-        this.currentResults = results.slice(0, 5);
+        // Sort by score (highest first) and deduplicate
+        const unique = new Map();
+        results.sort((a, b) => b.score - a.score);
+        results.forEach(r => {
+            const key = `${r.tableId}:${r.rowId}`;
+            if (!unique.has(key)) unique.set(key, r);
+        });
+
+        this.currentResults = Array.from(unique.values()).slice(0, 10);
         this.selectedIndex = this.currentResults.length > 0 ? 0 : -1;
         this._renderSearchResults(this.currentResults, trimmedQuery);
+    }
+
+    _fuzzyMatch(needle, haystack) {
+        let idx = 0;
+        for (let i = 0; i < haystack.length && idx < needle.length; i++) {
+            if (haystack[i] === needle[idx]) idx++;
+        }
+        return idx === needle.length;
     }
 
     _renderSearchResults(results, query) {
@@ -459,23 +539,25 @@ export class Header {
         if (!resultsDropdown) return;
 
         if (results.length === 0) {
-            resultsDropdown.innerHTML = '<div class="no-results">Keine Ergebnisse gefunden</div>';
+            resultsDropdown.innerHTML = '<div class="no-results" style="padding:12px; color:var(--text-muted);">Keine Ergebnisse gefunden</div>';
         } else {
-            resultsDropdown.innerHTML = results.map((res, i) => `
-                <div class="search-result-item ${i === this.selectedIndex ? 'selected' : ''}" 
-                     data-index="${i}"
-                     data-table-id="${res.tableId}" 
-                     data-row-id="${res.rowId}" 
-                     data-col-id="${res.colId}">
-                    <div class="result-meta">
-                        <span class="result-table-name">${res.tableTitle}</span>
-                        <span class="result-col-name">${res.colLabel}</span>
+            resultsDropdown.innerHTML = results.map((res, i) => {
+                return `
+                    <div class="search-result-item ${i === this.selectedIndex ? 'selected' : ''}" 
+                         data-index="${i}"
+                         data-table-id="${res.tableId}" 
+                         data-row-id="${res.rowId}" 
+                         data-col-id="${res.colId}">
+                        <div class="result-meta">
+                            <span class="result-table-name">${res.tableTitle}</span>
+                            <span class="result-col-name">${res.colLabel}</span>
+                        </div>
+                        <div class="result-content">
+                            ${this._highlightSearchTerm(res.value, query)}
+                        </div>
                     </div>
-                    <div class="result-content">
-                        ${this._highlightSearchTerm(res.value, query)}
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         resultsDropdown.classList.add('show');

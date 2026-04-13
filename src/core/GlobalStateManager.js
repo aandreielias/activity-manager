@@ -1,5 +1,6 @@
 import { PermissionService } from '../services/PermissionService.js';
 import { SupabaseClient } from '../services/SupabaseClient.js';
+import { ColourFactory } from '../utils/ColourFactory.js';
 
 /**
  * GlobalStateManager - Standardized state management.
@@ -11,6 +12,7 @@ export class GlobalStateManager {
     #currentUser = null;
     #currentRole = null;
     #currentUserId = null;
+    #currentTeams = []; // Array of team names the current user belongs to
     #permissions = null;
     #favorites = [];
     #inventory = [];
@@ -21,8 +23,11 @@ export class GlobalStateManager {
     #favoritesFilterActive = false;
     #editModeActive = localStorage.getItem('edit_mode_active') === 'true';
     #sessionNewGames = new Map(); // Track games created this session to prevent 'Deleted' status
+    #selectedRows = new Map(); // tableId -> Set([rowIds])
+    #onSelectionChange = null;
 
     #tableConfigs = [];
+    #availableTeams = []; // Global list of all available teams in the system
     #globalFilters = {
         main: {}, // tableId -> { active, groupBy, filters }
         split: {} // tableId -> { active, groupBy, filters }
@@ -65,13 +70,18 @@ export class GlobalStateManager {
 
     // ── Authentication & Permissions ───────────────────────────
 
-    setCurrentUser(username, role, permissions = null) {
+    setCurrentUser(username, role, permissions = null, teams = []) {
         this.#currentUser = username;
         this.#currentRole = role;
+        this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []);
         this.#permissions = permissions || PermissionService.getDefaultPermissions();
     }
 
     setCurrentRole(role) { this.#currentRole = role; }
+
+    setCurrentTeams(teams) { 
+        this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []); 
+    }
 
     setPermissions(perms) { this.#permissions = perms; }
 
@@ -79,94 +89,81 @@ export class GlobalStateManager {
     getCurrentUserId() { return this.#currentUserId; }
     getCurrentUser() { return this.#currentUser; }
     getCurrentRole() { return this.#currentRole; }
+    getCurrentTeams() { return this.#currentTeams; }
+    getPermissions() { return this.#permissions; }
+
+    getRoleForTeam(teamName) {
+        if (!teamName || !this.#permissions || !this.#permissions.teamRoles) return 'User';
+        return this.#permissions.teamRoles[teamName] || 'User';
+    }
 
     isSuperAdmin() { return (this.#currentRole || '').toLowerCase() === 'superadmin'; }
     isAdmin() { return (this.#currentRole || '').toLowerCase() === 'admin'; }
 
-    /**
-     * Determines if the current user can view a specific table.
-     */
     canView(tableId) {
-        const context = { role: this.#currentRole, permissions: this.#permissions };
+        const config = this.getTableConfig(tableId);
+        const context = { 
+            role: this.#currentRole, 
+            permissions: this.#permissions, 
+            teams: this.#currentTeams, 
+            category: config?.category 
+        };
         return PermissionService.canViewTable(tableId, context);
     }
 
-    /**
-     * Determines if the current user can edit a specific table.
-     */
     canEdit(tableId) {
-        const context = { role: this.#currentRole, permissions: this.#permissions };
+        const config = this.getTableConfig(tableId);
+        const teamRole = config?.requiresTeam ? this.getRoleForTeam(config.requiresTeam) : null;
+        const context = { 
+            role: this.#currentRole, 
+            permissions: this.#permissions, 
+            teams: this.#currentTeams,
+            teamRole: teamRole,
+            tableConfig: config
+        };
         return PermissionService.canEditTable(tableId, context);
     }
 
-    /**
-     * More granular column-level editing rights.
-     */
     canEditColumn(tableId, colId) {
         if (this.isSuperAdmin()) return true;
-
-        // Prevent editing of metadata columns
-        if (colId === 'createdBy' || colId === 'createdAt') {
-            return false;
-        }
-
-        // Check for specific role modification permission
+        if (colId === 'createdBy' || colId === 'createdAt') return false;
         if ((tableId === 'tbl_people' || tableId === 'people_table') && colId === 'role') {
-            const context = { role: this.#currentRole, permissions: this.#permissions };
+            const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
             if (!PermissionService.canEditRoles(context)) return false;
         }
-
         return this.canEdit(tableId);
     }
 
-    /**
-     * Right to manage users/see stats.
-     */
     canSeeStats() {
-        const context = { role: this.#currentRole, permissions: this.#permissions };
+        const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
         return PermissionService.canSeeStats(context);
     }
 
-    /**
-     * Right to manage permissions.
-     */
     canManagePermissions() {
-        const context = { role: this.#currentRole, permissions: this.#permissions };
+        const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
         return PermissionService.canManagePermissions(context);
     }
 
-    /**
-     * Right to use the Edit Mode.
-     */
     canUseEditMode() {
-        const context = { role: this.#currentRole, permissions: this.#permissions };
+        const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
         return PermissionService.canUseEditMode(context);
     }
 
-    /**
-     * Right to view Audit Logs.
-     */
     canViewLogs() {
-        const context = { role: this.#currentRole, permissions: this.#permissions };
+        const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
         return PermissionService.canViewLogs(context);
     }
 
-    /**
-     * Verifies if Edit Mode is applicable to a specific table for the current user.
-     */
     canUseEditModeForTable(tableId) {
-        const context = { role: this.#currentRole, permissions: this.#permissions };
+        const config = this.getTableConfig(tableId);
+        const context = { 
+            role: this.#currentRole, 
+            permissions: this.#permissions, 
+            teams: this.#currentTeams, 
+            category: config?.category 
+        };
         return PermissionService.canUseEditModeForTable(tableId, context);
     }
-
-    updatePermissionsFromStorage() {
-        const authUser = localStorage.getItem('auth_user');
-        if (!authUser) return;
-        const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
-        this.#permissions = permissionsMap[authUser] || PermissionService.getDefaultPermissions();
-    }
-
-    // ── Favorites Management ───────────────────────────────────
 
     async loadFavorites() {
         if (!this.#currentUserId) return;
@@ -181,41 +178,39 @@ export class GlobalStateManager {
         }
     }
 
-    /**
-     * Fetches all Postgres Enum types from Supabase via RPC.
-     * This ensures the UI is always in sync with the database schema.
-     */
     async loadGlobalEnums() {
         try {
-            // Attempt to call the 'get_all_enums' RPC function
             const res = await SupabaseClient.post('rpc/get_all_enums', {});
-            if (res.ok) {
-                this.#enums = await res.json();
-                console.log('[GlobalStateManager] Global Enums loaded:', Object.keys(this.#enums));
-            } else {
-                console.warn('[GlobalStateManager] Failed to load enums (RPC might not exist). Falling back to JSON defaults.');
-            }
+            if (res.ok) this.#enums = await res.json();
         } catch (e) {
             console.error('[GlobalStateManager] Enum fetch failed:', e);
         }
     }
 
-    /**
-     * Returns the options for a specific enum type, or null if not found.
-     */
     getEnums() { return this.#enums; }
+    getEnumOptions(enumName) { return this.#enums[enumName] || null; }
 
-    getEnumOptions(enumName) {
-        return this.#enums[enumName] || null;
+    async loadAvailableTeams() {
+        try {
+            const res = await SupabaseClient.get('teams', '?select=name,color&order=name.asc');
+            if (res.ok) {
+                const rows = await res.json();
+                this.#availableTeams = rows.map(r => ({
+                    name: r.name,
+                    color: r.color || ColourFactory.getBrandBlue()
+                }));
+            }
+        } catch (e) {
+            console.error('[GlobalStateManager] Team load failed:', e);
+        }
     }
 
-    /**
-     * Attempts to find a matching enum for a given column ID by checking common naming patterns.
-     */
+    getAvailableTeams() {
+        return this.#availableTeams.length > 0 ? this.#availableTeams : [{ name: 'Aktivitäten', color: ColourFactory.getBrandBlue() }];
+    }
+
     getEnumOptionsForColumn(colId, tableId) {
         const id = colId.toLowerCase();
-
-        // Match specific common mappings
         if (id === 'status') {
             if (tableId === 'tbl_people') return this.getEnumOptions('status_enum');
             return this.getEnumOptions('task_status_enum');
@@ -226,140 +221,49 @@ export class GlobalStateManager {
         if (id === 'condition' || id === 'zustand') return this.getEnumOptions('condition_enum');
         if (id === 'type' || id === 'typ') return this.getEnumOptions('venue_type_enum') || this.getEnumOptions('sport_type_enum');
         if (id === 'indoor_outdoor') return this.getEnumOptions('indoor_outdoor_enum');
-
         return null;
     }
 
-    /**
-     * Adds a new option to a Postgres Enum type. (Edit Mode ONLY)
-     */
     async addEnumOption(enumName, newValue) {
         if (!this.isEditModeActive()) return;
         try {
-            const res = await SupabaseClient.post('rpc/add_enum_value', {
-                t_name: enumName,
-                new_value: newValue
-            });
-            if (res.ok) {
-                // Refresh our local cache
-                await this.loadGlobalEnums();
-            } else {
-                const txt = await res.text();
-                throw new Error(txt);
-            }
-        } catch (e) {
-            console.error('[GlobalStateManager] Add enum option failed:', e);
-            throw e;
-        }
+            const res = await SupabaseClient.post('rpc/add_enum_value', { t_name: enumName, new_value: newValue });
+            if (res.ok) await this.loadGlobalEnums();
+        } catch (e) { console.error('[GlobalStateManager] Add enum option failed:', e); throw e; }
     }
 
     #onFlashMessage = null;
-
     showFlashMessage(message, type = 'success') {
-        if (this.#onFlashMessage) {
-            this.#onFlashMessage(message, type);
-        } else {
-            alert(`${type.toUpperCase()}: ${message}`);
-        }
+        if (this.#onFlashMessage) this.#onFlashMessage(message, type);
+        else alert(`${type.toUpperCase()}: ${message}`);
     }
-
     onFlashMessageCallback(cb) { this.#onFlashMessage = cb; }
 
-    /**
-     * Adds a new column to a physical table.
-     */
     async addColumn(tableId, colData) {
         if (!this.isEditModeActive()) return;
         const { name, type, newEnum } = colData;
-
         try {
             const { DataService } = await import('../services/DataService.js');
             const { supaTable } = DataService._resolveTable(tableId);
-
-            // 1. Create New Enum if requested
             if (newEnum) {
-                const resEnum = await SupabaseClient.post('rpc/create_enum_type', {
-                    t_name: newEnum.name,
-                    options: newEnum.options
-                });
-                if (!resEnum.ok) {
-                    const err = await resEnum.json();
-                    throw new Error(`Enum-Fehler: ${err.message}`);
-                }
+                await SupabaseClient.post('rpc/create_enum_type', { t_name: newEnum.name, options: newEnum.options });
             }
-
-            // 2. Type Mapping (Frontend -> Postgres)
             let pgType = type;
             if (pgType === 'number') pgType = 'numeric';
             if (pgType === 'int') pgType = 'integer';
-
-            const res = await SupabaseClient.post('rpc/add_table_column', {
-                t_name: supaTable,
-                c_name: name,
-                c_type: pgType
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.message || 'Spalte konnte nicht hinzugefügt werden');
-            }
-
-            // Sync Table Config JSON
+            const res = await SupabaseClient.post('rpc/add_table_column', { t_name: supaTable, c_name: name, c_type: pgType });
+            if (!res.ok) throw new Error('Spalte konnte nicht hinzugefügt werden');
             const cfg = this.getTableConfig(tableId);
             if (cfg) {
                 const newCol = { id: name, label: name, type: type === 'number' ? 'number' : (type === 'int' ? 'number' : type) };
-                if (newEnum) newCol.type = 'enum'; // Or custom enum handling
-
-                // Add before audit columns if they exist
                 const auditIdx = cfg.schema.findIndex(c => c.id === 'createdBy' || c.id === 'createdAt');
                 if (auditIdx !== -1) cfg.schema.splice(auditIdx, 0, newCol);
                 else cfg.schema.push(newCol);
-
                 await this.saveTableConfigs();
             }
-
-            this.showFlashMessage(`Spalte '${name}' wurde zu '${supaTable}' hinzugefügt!`, 'success');
+            this.showFlashMessage(`Spalte '${name}' hinzugefügt!`, 'success');
             setTimeout(() => window.location.reload(), 1500);
-        } catch (e) {
-            console.error('[GlobalStateManager] Add column failed:', e);
-            this.showFlashMessage(e.message, 'error');
-            throw e;
-        }
-    }
-
-    /**
-     * Removes a column from a physical table.
-     */
-    async removeColumn(tableId, colId) {
-        if (!this.isEditModeActive()) return;
-        try {
-            const { DataService } = await import('../services/DataService.js');
-            const { supaTable } = DataService._resolveTable(tableId);
-
-            const res = await SupabaseClient.post('rpc/remove_table_column', {
-                t_name: supaTable,
-                c_name: colId
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.message || 'Spalte konnte nicht gelöscht werden');
-            }
-
-            // Sync Table Config JSON
-            const cfg = this.getTableConfig(tableId);
-            if (cfg) {
-                cfg.schema = cfg.schema.filter(c => c.id !== colId);
-                await this.saveTableConfigs();
-            }
-
-            this.showFlashMessage(`Spalte '${colId}' wurde aus '${supaTable}' gelöscht.`, 'success');
-            setTimeout(() => window.location.reload(), 1500);
-        } catch (e) {
-            console.error('[GlobalStateManager] Remove column failed:', e);
-            this.showFlashMessage(e.message, 'error');
-            throw e;
-        }
+        } catch (e) { this.showFlashMessage(e.message, 'error'); throw e; }
     }
 
     async toggleFavorite(rowId) {
@@ -368,57 +272,30 @@ export class GlobalStateManager {
         try {
             if (index === -1) {
                 this.#favorites.push(rowId);
-                await SupabaseClient.post('user_favorites', {
-                    user_id: this.#currentUserId,
-                    row_id: rowId
-                });
+                await SupabaseClient.post('user_favorites', { user_id: this.#currentUserId, row_id: rowId });
             } else {
                 this.#favorites.splice(index, 1);
                 await SupabaseClient.delete('user_favorites', `?user_id=eq.${this.#currentUserId}&row_id=eq.${rowId}`);
             }
-        } catch (e) {
-            console.error('[GlobalStateManager] Toggle favorite failed:', e);
-        }
+        } catch (e) { console.error('[GlobalStateManager] Toggle favorite failed:', e); }
     }
 
     isFavorite(rowId) { return this.#favorites.includes(rowId); }
-
     setFavoritesFilterActive(active) { this.#favoritesFilterActive = active; }
     isFavoritesFilterActive() { return this.#favoritesFilterActive; }
 
-    // ── Unsaved Changes Tracking ──────────────────────────────
-
-    markTableAsUnsaved(tableId) {
-        this.#unsavedTableIds.add(tableId);
-        this.#notifyUnsavedChange();
-    }
-
-    markTableAsSaved(tableId) {
-        this.#unsavedTableIds.delete(tableId);
-        this.#notifyUnsavedChange();
-    }
-
-    clearAllUnsaved() {
-        this.#unsavedTableIds.clear();
-        this.#notifyUnsavedChange();
-    }
-
+    markTableAsUnsaved(tableId) { this.#unsavedTableIds.add(tableId); this.#notifyUnsavedChange(); }
+    markTableAsSaved(tableId) { this.#unsavedTableIds.delete(tableId); this.#notifyUnsavedChange(); }
+    clearAllUnsaved() { this.#unsavedTableIds.clear(); this.#notifyUnsavedChange(); }
     getUnsavedTableIds() { return [...this.#unsavedTableIds]; }
-
     onUnsavedChangeCallback(cb) { this.#onUnsavedChange = cb; }
 
     #notifyUnsavedChange() {
-        if (this.#onUnsavedChange) {
-            this.#onUnsavedChange(this.#unsavedTableIds.size > 0);
-        }
+        if (this.#onUnsavedChange) this.#onUnsavedChange(this.#unsavedTableIds.size > 0);
     }
-
-    // ── Inventory State ────────────────────────────────────────
 
     setInventory(data) { this.#inventory = data; }
     getInventory() { return this.#inventory; }
-
-    // ── Edit Mode ─────────────────────────────────────────────
 
     setEditModeActive(active) {
         this.#editModeActive = active;
@@ -427,27 +304,34 @@ export class GlobalStateManager {
     }
     isEditModeActive() { return this.#editModeActive; }
 
-    trackSessionGame(name, categoryLabel) {
-        this.#sessionNewGames.set(name, categoryLabel);
-    }
-
-    getSessionGameCategory(name) {
-        return this.#sessionNewGames.get(name);
-    }
+    trackSessionGame(name, categoryLabel) { this.#sessionNewGames.set(name, categoryLabel); }
+    getSessionGameCategory(name) { return this.#sessionNewGames.get(name); }
 
     getGlobalFilterState(side, tableId) {
         if (!this.#globalFilters[side][tableId]) {
-            this.#globalFilters[side][tableId] = { 
-                active: false, 
-                groupBy: null, 
-                filters: [{ attrId: null, mode: null, value: [], quantityMode: 'any', quantityValue: '', availability: [] }] 
-
-            };
+            this.#globalFilters[side][tableId] = { active: false, groupBy: null, filters: [{ attrId: null, mode: null, value: [], quantityMode: 'any', quantityValue: '', availability: [] }] };
         }
         return this.#globalFilters[side][tableId];
     }
+    setGlobalFilterState(side, tableId, state) { this.#globalFilters[side][tableId] = state; }
 
-    setGlobalFilterState(side, tableId, state) {
-        this.#globalFilters[side][tableId] = state;
+    isRowSelected(tableId, rowId) { return this.#selectedRows.get(tableId)?.has(rowId) || false; }
+    toggleRowSelection(tableId, rowId, selected) {
+        if (!this.#selectedRows.has(tableId)) this.#selectedRows.set(tableId, new Set());
+        const set = this.#selectedRows.get(tableId);
+        if (selected) set.add(rowId); else set.delete(rowId);
+        if (set.size === 0) this.#selectedRows.delete(tableId);
+        this.#notifySelectionChange();
+    }
+    clearSelection() { this.#selectedRows.clear(); this.#notifySelectionChange(); }
+    getSelectedRows() { return this.#selectedRows; }
+    getTotalSelectedCount() {
+        let count = 0;
+        for (const set of this.#selectedRows.values()) count += set.size;
+        return count;
+    }
+    onSelectionChangeCallback(cb) { this.#onSelectionChange = cb; }
+    #notifySelectionChange() {
+        if (this.#onSelectionChange) this.#onSelectionChange(this.getTotalSelectedCount());
     }
 }

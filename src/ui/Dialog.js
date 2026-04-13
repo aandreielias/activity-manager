@@ -278,4 +278,41 @@ export class Dialog {
             }
         });
     }
+
+    static async showConflictDialog(conflictCount) {
+        return BaseDialog.show({
+            onEscapeValue: 'cancel',
+            render: (dialog, overlay, resolve, cleanup) => {
+                const msgSpan = document.createElement('span');
+                msgSpan.className = 'unsaved-msg';
+                msgSpan.textContent = `${conflictCount} Zeile(n) wurden von einem anderen Benutzer bearbeitet.`;
+
+                const overwriteBtn = document.createElement('button');
+                overwriteBtn.className = 'discard-btn-header';
+                overwriteBtn.textContent = 'Überschreiben';
+
+                const reloadBtn = document.createElement('button');
+                reloadBtn.className = 'save-btn-header';
+                reloadBtn.textContent = 'Neu laden';
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'discard-btn-header';
+                cancelBtn.textContent = 'Abbrechen';
+
+                overwriteBtn.addEventListener('click', () => resolve('overwrite'));
+                reloadBtn.addEventListener('click', () => resolve('reload'));
+                cancelBtn.addEventListener('click', () => resolve('cancel'));
+
+                dialog.appendChild(msgSpan);
+                dialog.appendChild(cancelBtn);
+                dialog.appendChild(reloadBtn);
+                dialog.appendChild(overwriteBtn);
+
+                reloadBtn.focus();
+            },
+            onKeydown: (e, dialog, overlay, resolve) => {
+                if (e.key === 'Enter') resolve('reload');
+            }
+        });
+    }
 }

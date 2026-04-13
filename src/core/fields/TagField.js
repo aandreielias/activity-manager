@@ -13,11 +13,23 @@ export class TagField extends Field {
         }
 
         const tags = rawValue.split(',').map(t => t.trim()).filter(t => t);
+        const gs = GlobalStateManager.getInstance();
+        const teamColors = this.colDef.id === 'Team' ? gs.getAvailableTeams() : [];
 
         tags.forEach(text => {
             const tag = document.createElement('span');
-            tag.className = 'inventory-tag available'; // Style like available inventory items
+            tag.className = 'inventory-tag available';
             tag.textContent = text;
+            
+            if (this.colDef.id === 'Team') {
+                const match = teamColors.find(tc => tc.name === text);
+                if (match) {
+                    tag.style.backgroundColor = match.color;
+                    tag.style.color = '#fff';
+                    tag.style.borderColor = 'transparent';
+                }
+            }
+            
             this.contentWrap.appendChild(tag);
         });
     }
@@ -40,7 +52,7 @@ export class TagField extends Field {
             if (globalEnums) {
                 availableTags = globalEnums;
             } else if (this.colDef.id === 'Team') {
-                availableTags = ['Aktivitäten'];
+                availableTags = globalState.getAvailableTeams();
             }
         }
 
@@ -60,7 +72,7 @@ export class TagField extends Field {
             const displayLabel = this.colDef.label;
             let displayLabelPlural = displayLabel.endsWith('e') ? displayLabel : displayLabel + 's';
             let displayLabelSingular = displayLabel.endsWith('e') ? displayLabel.slice(0, -1) : displayLabel;
-            let addPrefix = 'Neuen';
+            let addPrefix = 'Neues';
 
             if (displayLabel === 'Spiele') {
                 displayLabelPlural = 'Spiele';
@@ -99,6 +111,15 @@ export class TagField extends Field {
                     tagContainer.className = 'inventory-tag available';
                     tagContainer.style.paddingRight = '4px';
 
+                    if (this.colDef.id === 'Team') {
+                        const match = availableTags.find(tc => tc.name === text);
+                        if (match) {
+                            tagContainer.style.backgroundColor = match.color;
+                            tagContainer.style.color = '#fff';
+                            tagContainer.style.borderColor = 'transparent';
+                        }
+                    }
+
                     const span = document.createElement('span');
                     span.textContent = text;
                     tagContainer.appendChild(span);
@@ -107,7 +128,7 @@ export class TagField extends Field {
                     removeBtn.innerHTML = '✕';
                     removeBtn.style.cursor = 'pointer';
                     removeBtn.style.fontSize = '10px';
-                    removeBtn.style.opacity = '0.6';
+                    removeBtn.style.opacity = '1';
                     removeBtn.onclick = (e) => {
                         e.stopPropagation();
                         internalSelected.splice(idx, 1);
@@ -144,11 +165,21 @@ export class TagField extends Field {
                 suggestionList.style.flexDirection = 'row';
                 suggestionList.style.flexWrap = 'wrap';
 
-                availableTags.forEach(text => {
+                availableTags.forEach(teamObj => {
+                    const text = typeof teamObj === 'object' ? teamObj.name : teamObj;
+                    const color = typeof teamObj === 'object' ? teamObj.color : null;
+
                     const tag = document.createElement('span');
                     tag.className = 'inventory-tag available';
                     tag.style.cursor = 'pointer';
                     tag.textContent = text;
+                    
+                    if (color) {
+                        tag.style.backgroundColor = color;
+                        tag.style.color = '#fff';
+                        tag.style.borderColor = 'transparent';
+                    }
+
                     tag.onclick = () => {
                         if (!internalSelected.includes(text)) {
                             internalSelected.push(text);
@@ -179,7 +210,7 @@ export class TagField extends Field {
             };
 
             // Custom Add Section (only if not restricted)
-            if (this.colDef.id !== 'Team') {
+            if (true) {
                 const addSection = document.createElement('div');
                 addSection.className = 'picker-section';
                 addSection.innerHTML = `<div class="picker-section-title">${addPrefix} ${displayLabelSingular} hinzufügen</div>`;
@@ -202,9 +233,25 @@ export class TagField extends Field {
                 addSection.appendChild(inputGroup);
                 content.appendChild(addSection);
 
-                const addTag = () => {
+                const addTag = async () => {
                     const val = input.value.trim();
                     if (val && !internalSelected.includes(val)) {
+                        // If it's the Team column, sync new team to DB
+                        if (this.colDef.id === 'Team') {
+                            const gs = GlobalStateManager.getInstance();
+                            const currentTeams = gs.getAvailableTeams();
+                            if (!currentTeams.find(t => t.name === val)) {
+                                try {
+                                    const { DataService } = await import('../../services/DataService.js');
+                                    const newTeam = await DataService.createTeam(val);
+                                    await gs.loadAvailableTeams();
+                                    availableTags = gs.getAvailableTeams(); // Update local copy for immediate color mapping
+                                } catch (e) {
+                                    console.error('[TagField] Failed to sync new team:', e);
+                                }
+                            }
+                        }
+
                         internalSelected.push(val);
                         input.value = '';
                         filterSuggestions('');

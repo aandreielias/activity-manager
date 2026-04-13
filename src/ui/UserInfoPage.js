@@ -187,13 +187,13 @@ export class UserInfoPage {
             dialog.appendChild(content);
 
             const userSelect = header.querySelector('.user-select-dropdown');
-            userSelect.onchange = (e) => {
+            userSelect.onchange = async (e) => {
                 const selectedName = e.target.value;
                 const person = peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === selectedName);
                 if (person) {
                     const userStats = stats[selectedName] || {};
                     userStats.gameRespCount = gameRespCounts[person.id] || 0;
-                    this._renderUserProfile(content, person, userStats, tableConfigs, peopleData);
+                    await this._renderUserProfile(content, person, userStats, tableConfigs, peopleData);
                 }
             };
 
@@ -211,14 +211,14 @@ export class UserInfoPage {
         });
     }
 
-    static _renderUserProfile(container, person, userStat, tableConfigs, peopleData) {
+    static async _renderUserProfile(container, person, userStat, tableConfigs, peopleData) {
         const globalState = GlobalStateManager.getInstance();
         const isSuperAdmin = globalState.isSuperAdmin();
         const name = `${person.vorname || ''} ${person.nachname || ''}`.trim();
 
-        // Load fresh permissions map
-        const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
-        const userPerm = permissionsMap[name] || PermissionService.getDefaultPermissions();
+        // Load fresh permissions from DB
+        const userRecord = await AuthService.getUserByUsername(name);
+        const userPerm = userRecord?.permissions || PermissionService.getDefaultPermissions();
 
         const activityLevel = userStat.activityLevel || 'Idle';
         const lastLoginStr = userStat.lastLogin ? new Date(userStat.lastLogin).toLocaleDateString('de-DE') : 'N/A';
@@ -277,44 +277,130 @@ export class UserInfoPage {
                     </div>
                 </div>
 
+                <!-- Team & Roles Section -->
+                <div class="profile-section team-config-section">
+                    <div class="section-header"><h4>Team-Konfiguration & Rollen</h4></div>
+                    <div class="team-roles-grid">
+                        ${(person.Team || person.Teams || '').split(',').filter(t => t.trim()).map(teamName => {
+                            teamName = teamName.trim();
+                            const currentTeamRole = (userPerm.teamRoles || {})[teamName] || 'User';
+                            return `
+                                <div class="team-role-card" data-team="${teamName}">
+                                    <div class="trc-info">
+                                        <span class="trc-name">${teamName}</span>
+                                        <span class="trc-desc">Rolle in diesem Team</span>
+                                    </div>
+                                    <div class="trc-action">
+                                        <select class="team-role-select" data-team="${teamName}">
+                                            <option value="User" ${currentTeamRole === 'User' ? 'selected' : ''}>User</option>
+                                            <option value="Supervisor" ${currentTeamRole === 'Supervisor' ? 'selected' : ''}>Supervisor</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('') || '<div class="empty-msg">Diesem Nutzer sind aktuell keine Teams zugewiesen.</div>'}
+                    </div>
+                </div>
+
                 <!-- Settings & Permissions -->
                 ${globalState.canManagePermissions() ? `
                 <div class="profile-section settings-section">
-                    <div class="section-header"><h4>Rechte & Rollen</h4></div>
+                    <div class="section-header"><h4>Management & Strategie</h4></div>
                     
-                    <div class="settings-grid">
-                        <!-- Management Access Card -->
-                        <div class="settings-card">
-                            <h5>Dashboard Zugriff</h5>
-                            <p class="settings-desc">Bestimmt, welche Administrations-Tools dieser Nutzer sehen kann.</p>
-                            <select class="mgmt-select-modern" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>
-                                <option value="none" ${userPerm.managementAccess === 'none' ? 'selected' : ''}>Kein Zugriff</option>
-                                <option value="stats_only" ${userPerm.managementAccess === 'stats_only' ? 'selected' : ''}>Nur Statistiken</option>
-                                <option value="stats_perms" ${userPerm.managementAccess === 'stats_perms' ? 'selected' : ''}>Stats & Berechtigungen</option>
-                            </select>
+                    <div class="settings-grid dynamic-settings">
+                        <!-- Management Modules Card -->
+                        <div class="settings-card mgmt-card">
+                            <div class="card-title-row">
+                                <h5>Dashboard & Tools</h5>
+                                <span class="card-status-pill">${userPerm.managementAccess !== 'none' ? 'Aktiv' : 'Inaktiv'}</span>
+                            </div>
+                            <p class="settings-desc">Einzelne Administrations-Module für diesen Nutzer freischalten.</p>
                             
-                            <!-- Administrator-Status toggle removed as role is now a direct dropdown -->
+                            <div class="mgmt-toggles-list">
+                                <label class="mgmt-toggle-item">
+                                    <span class="mt-label">Statistiken & Overview</span>
+                                    <input type="checkbox" class="cb-mgmt-module" data-module="stats" ${['stats_only', 'stats_perms'].includes(userPerm.managementAccess) ? 'checked' : ''}>
+                                    <span class="mt-slider"></span>
+                                </label>
+                                <label class="mgmt-toggle-item">
+                                    <span class="mt-label">Nutzer & Rechte</span>
+                                    <input type="checkbox" class="cb-mgmt-module" data-module="perms" ${userPerm.managementAccess === 'stats_perms' ? 'checked' : ''}>
+                                    <span class="mt-slider"></span>
+                                </label>
+                                <label class="mgmt-toggle-item">
+                                    <span class="mt-label">Audit-Logs (System)</span>
+                                    <input type="checkbox" class="cb-view-logs-allow" ${userPerm.canViewLogs ? 'checked' : ''}>
+                                    <span class="mt-slider"></span>
+                                </label>
+                                <label class="mgmt-toggle-item">
+                                    <span class="mt-label">Edit-Modus Master</span>
+                                    <input type="checkbox" class="cb-edit-mode-allow" ${userPerm.canUseEditMode ? 'checked' : ''}>
+                                    <span class="mt-slider"></span>
+                                </label>
+                            </div>
                         </div>
 
-                        <!-- Permission Preset Card -->
-                        <div class="settings-card">
-                            <h5>Zugriffs-Profil</h5>
-                            <p class="settings-desc">Vordefinierte Berechtigungs-Schemas für schnelles Zuweisen.</p>
-                            <div class="permission-presets">
-                                <button class="preset-btn ${userPerm.type === 'readonly' ? 'active' : ''}" data-type="readonly" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Lese-Schutz</button>
-                                <button class="preset-btn ${userPerm.type === 'except_people' ? 'active' : ''}" data-type="except_people" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Ohne Personen</button>
-                                <button class="preset-btn ${userPerm.type === 'except_inventory' ? 'active' : ''}" data-type="except_inventory" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Ohne Inventar</button>
-                                <button class="preset-btn ${userPerm.type === 'all' ? 'active' : ''}" data-type="all" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Vollzugriff</button>
-                                <button class="preset-btn ${userPerm.type === 'specific' ? 'active' : ''}" data-type="specific" ${(person.role || '').toLowerCase() === 'superadmin' ? 'disabled' : ''}>Manuell</button>
+                        <!-- Smart Preset Card -->
+                        <div class="settings-card preset-card">
+                            <div class="card-title-row">
+                                <h5>Smart-Profile</h5>
+                                <span class="card-status-pill highlight">${userPerm.type.toUpperCase()}</span>
+                            </div>
+                            <p class="settings-desc">Rechte-Sets basierend auf Teams & Workspaces.</p>
+                            
+                            <div class="permission-presets-grid">
+                                <button class="smart-preset-btn ${userPerm.type === 'readonly' ? 'active' : ''}" data-type="readonly">
+                                    <span class="sp-text">Nur Lesen (Global)</span>
+                                </button>
+                                <button class="smart-preset-btn ${userPerm.type === 'all' ? 'active' : ''}" data-type="all">
+                                    <span class="sp-text">Vollzugriff (Global)</span>
+                                </button>
+                                
+                                <!-- Dynamic Team/Workspace Presets -->
+                                ${this._renderDynamicPresets(tableConfigs, person)}
+
+                                <button class="smart-preset-btn manual-btn ${userPerm.type === 'specific' ? 'active' : ''}" data-type="specific">
+                                    <span class="sp-text">Manuelle Konsole</span>
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Fine-grained Table Permissions -->
-                    <div class="table-permissions-area" style="display: ${ (userPerm.type === 'specific' || userPerm.type === 'readonly') ? 'block' : 'none'};">
-                        <h5>Tabellen-Berechtigungen</h5>
-                        <div class="table-groups-container">
-                            ${this._renderTableGroups(tableConfigs, userPerm)}
+                    <!-- FINE-GRAINED PERMISSION CONSOLE (RENEWED) -->
+                    <div class="perm-console" style="display: ${ (userPerm.type === 'specific' || userPerm.type === 'readonly') ? 'flex' : 'none'};">
+                        <div class="perm-sidebar">
+                            <div class="perm-sidebar-search">
+                                <input type="text" placeholder="Tabelle suchen..." class="perm-search-input">
+                            </div>
+                            <div class="perm-workspace-list">
+                                <!-- Dynamically filled via JS -->
+                            </div>
+                        </div>
+                        <div class="perm-main-stage">
+                            <div class="perm-stage-header">
+                                <div class="stage-title-group">
+                                    <h5 class="active-workspace-title">Workspace auswählen</h5>
+                                    <div class="perspective-switcher">
+                                        <span class="ps-label">Sichtweise:</span>
+                                        <select class="ps-select">
+                                            <option value="global">Global (Alle)</option>
+                                            <option value="System">System & Verwaltung</option>
+                                            ${(person.Team || person.Teams || '').split(',').filter(t => t.trim()).map(t => {
+                                                const role = (userPerm.teamRoles || {})[t.trim()] || 'User';
+                                                return `<option value="${t.trim()}">${t.trim()} (${role})</option>`;
+                                            }).join('')}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="stage-actions">
+                                    <button class="stage-bulk-btn" data-mode="read-all">Alles Lesen</button>
+                                    <button class="stage-bulk-btn" data-mode="edit-all">Alles Edit</button>
+                                </div>
+                            </div>
+                            <div class="perm-tables-grid">
+                                <!-- Tables for the selected workspace -->
+                                <div class="empty-stage-hint">Wähle einen Workspace links aus, um detaillierte Rechte zu setzen.</div>
+                            </div>
                         </div>
                     </div>
                 </div>` : ''}
@@ -322,45 +408,234 @@ export class UserInfoPage {
         `;
 
         this._attachProfileListeners(container, name, userPerm, peopleData, tableConfigs, userStat);
+        
+        // Initial setup for the new dynamic permission console
+        if (userPerm.type === 'specific' || userPerm.type === 'readonly') {
+            this._setupPermConsole(container, tableConfigs, userPerm);
+        }
+    }
+
+    static _setupPermConsole(container, tableConfigs, userPerm) {
+        const workspaceList = container.querySelector('.perm-workspace-list');
+        const searchInput = container.querySelector('.perm-search-input');
+        const perspectiveSelect = container.querySelector('.ps-select');
+        
+        // Group tables
+        const groups = this._getGroupedTables(tableConfigs);
+        let activeGroup = null;
+        
+        const renderSidebar = (filter = '') => {
+            const perspective = perspectiveSelect.value.toLowerCase();
+            
+            workspaceList.innerHTML = Object.keys(groups)
+                .filter(name => {
+                    const matchesSearch = name.toLowerCase().includes(filter.toLowerCase());
+                    if (perspective === 'global') return matchesSearch;
+                    
+                    // Perspective Mapping Logic
+                    if (perspective === 'system') return matchesSearch && name === 'System';
+                    if (perspective === 'aktivitäten') {
+                        return matchesSearch && (['Spiele', 'Sportarten', 'Aktivitäten'].includes(name));
+                    }
+                    
+                    // Dynamic direct match for other teams
+                    return matchesSearch && (name.toLowerCase() === perspective);
+                })
+                .map(name => `
+                    <div class="perm-workspace-item ${activeGroup === name ? 'active' : ''}" data-workspace="${name}">
+                        <span class="pw-name">${name}</span>
+                        <span class="pw-count">${groups[name].length}</span>
+                    </div>
+                `).join('');
+                
+            workspaceList.querySelectorAll('.perm-workspace-item').forEach(item => {
+                item.onclick = () => {
+                    activeGroup = item.dataset.workspace;
+                    workspaceList.querySelectorAll('.perm-workspace-item').forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    this._renderWorkspaceStage(container, activeGroup, groups[activeGroup], userPerm, perspectiveSelect.value);
+                };
+            });
+        };
+
+        searchInput.oninput = (e) => renderSidebar(e.target.value);
+        perspectiveSelect.onchange = () => {
+            renderSidebar(searchInput.value);
+            // After re-rendering sidebar, try to select the focus workspace
+            const focusName = perspectiveSelect.value !== 'global' ? this._capitalizeFirst(perspectiveSelect.value) : null;
+            const target = workspaceList.querySelector(`[data-workspace="${focusName}"]`) || workspaceList.querySelector('.perm-workspace-item');
+            if (target) target.click();
+        };
+
+        renderSidebar();
+
+        // Select first automatically
+        const first = workspaceList.querySelector('.perm-workspace-item');
+        if (first) first.click();
+    }
+
+    static _getGroupedTables(tableConfigs) {
+        const groups = { 'System': [
+            { id: 'people_table', title: 'Personen (Split)', isSensitive: true },
+            { id: 'tbl_people', title: 'Personen (Haupt)', isSensitive: true },
+            { id: 'tbl_inventory', title: 'Inventar', isSensitive: true }
+        ]};
+
+        tableConfigs.forEach(t => {
+            if (['tbl_people', 'tbl_inventory'].includes(t.id)) return;
+            let groupName = this._capitalizeFirst(t.workspace || t.category || 'System');
+            if (groupName === 'Sonstige') groupName = 'System'; // Merge Sonstige into System
+            
+            if (!groups[groupName]) groups[groupName] = [];
+            groups[groupName].push(t);
+        });
+        return groups;
+    }
+
+    static _renderWorkspaceStage(container, groupName, tables, userPerm, activePerspective = 'global') {
+        const stageGrid = container.querySelector('.perm-tables-grid');
+        const stageTitle = container.querySelector('.active-workspace-title');
+        const userTeams = GlobalStateManager.getInstance().getCurrentTeams() || [];
+        
+        stageTitle.textContent = groupName;
+        
+        // Determine the effective role for this perspective
+        const perspectiveRole = activePerspective === 'global' ? null : ((userPerm.teamRoles || {})[activePerspective] || 'User');
+
+        stageGrid.innerHTML = tables.map(t => {
+            const isSensitive = t.isSensitive || false;
+            const viewChecked = Array.isArray(userPerm.viewTables) ? userPerm.viewTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+            const editChecked = Array.isArray(userPerm.editTables) ? userPerm.editTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+            
+            const teamRequirement = t.requiresTeam;
+            const isContextTeam = teamRequirement && teamRequirement.toLowerCase() === activePerspective.toLowerCase();
+            const hasTeamAccess = teamRequirement && userTeams.some(ut => ut.toLowerCase() === teamRequirement.toLowerCase());
+
+            let accessLevel = 'none';
+            if (editChecked) accessLevel = 'edit';
+            else if (viewChecked || hasTeamAccess) accessLevel = 'read';
+            
+            // If we are in the context of the required team, and the role is Supervisor, indicate edit potential
+            const contextBonus = isContextTeam && perspectiveRole?.toLowerCase() === 'supervisor' ? ' (Team Supervisor)' : '';
+
+            return `
+                <div class="perm-table-card ${isSensitive ? 'sensitive' : ''} ${hasTeamAccess ? 'team-owned' : ''} ${isContextTeam ? 'context-active' : ''}" data-table-id="${t.id}">
+                    <div class="ptc-header">
+                        <div class="ptc-name-group">
+                            <span class="ptc-name">${t.title || t.label}</span>
+                            ${isContextTeam ? `<span class="context-tag">Aktueller Kontext</span>` : ''}
+                        </div>
+                        ${teamRequirement ? `<span class="team-badge-mini">${teamRequirement}</span>` : ''}
+                    </div>
+                    <div class="ptc-access-selector">
+                        <button class="access-btn ${accessLevel === 'none' ? 'active' : ''}" data-level="none">Aus</button>
+                        <button class="access-btn ${accessLevel === 'read' ? 'active' : ''}" data-level="read">Lesen</button>
+                        <button class="access-btn ${accessLevel === 'edit' ? 'active' : ''}" data-level="edit">Edit</button>
+                    </div>
+                    <div class="ptc-footer">
+                        ${isContextTeam ? `Rolle im Team: <b>${perspectiveRole}</b>` : (hasTeamAccess ? 'Team-Zugriff aktiv' : '')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (groupName === 'System') {
+            stageGrid.innerHTML += this._renderSpecialSystemPerms(userPerm);
+        }
+
+        this._attachStageListeners(container, groupName, tables);
+    }
+
+    static _attachStageListeners(container, groupName, tables) {
+        container.querySelectorAll('.access-btn').forEach(btn => {
+            btn.onclick = () => {
+                const card = btn.closest('.perm-table-card');
+                card.querySelectorAll('.access-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Trigger global save
+                container.dispatchEvent(new CustomEvent('perm-change'));
+            };
+        });
+
+        // Bulk buttons in the header
+        container.querySelectorAll('.stage-bulk-btn').forEach(btn => {
+            btn.onclick = () => {
+                const mode = btn.dataset.mode;
+                container.querySelectorAll('.perm-table-card').forEach(card => {
+                    card.querySelectorAll('.access-btn').forEach(b => b.classList.remove('active'));
+                    const targetBtn = mode === 'read-all' ? card.querySelector('[data-level="read"]') : card.querySelector('[data-level="edit"]');
+                    if (targetBtn) targetBtn.classList.add('active');
+                });
+                container.dispatchEvent(new CustomEvent('perm-change'));
+            };
+        });
     }
 
     static _renderTableGroups(tableConfigs, userPerm) {
         const globalState = GlobalStateManager.getInstance();
         const isSuperAdmin = globalState.isSuperAdmin();
+        const userTeams = globalState.getCurrentTeams() || [];
 
-        const groups = {
-            'System': [
-                { id: 'people_table', label: 'Personen (Split)' },
-                { id: 'tbl_people', label: 'Personen (Haupt)' },
-                { id: 'tbl_inventory', label: 'Inventar' }
-            ],
-            'Aktivitäten': tableConfigs.filter(t => t.category === 'spiele' && !['tbl_people', 'tbl_inventory'].includes(t.id)).map(t => ({ id: t.id, label: t.title })),
-            'Sportarten': tableConfigs.filter(t => t.category === 'sportarten').map(t => ({ id: t.id, label: t.title })),
-            ...this._getCustomGroups(tableConfigs)
-        };
+        // 1. Group tables by Workspace (Primary) or Category (Secondary)
+        const groups = {};
+
+        // Explicit System Group for core tables
+        groups['System'] = [
+            { id: 'people_table', label: 'Personen (Split)', isSensitive: true },
+            { id: 'tbl_people', label: 'Personen (Haupt)', isSensitive: true },
+            { id: 'tbl_inventory', label: 'Inventar', isSensitive: true }
+        ];
+
+        tableConfigs.forEach(t => {
+            if (['tbl_people', 'tbl_inventory'].includes(t.id)) return;
+            
+            const groupName = t.workspace || t.category || 'Sonstige';
+            const normalizedGroupName = this._capitalizeFirst(groupName);
+            
+            if (!groups[normalizedGroupName]) groups[normalizedGroupName] = [];
+            groups[normalizedGroupName].push({
+                id: t.id,
+                label: t.title,
+                requiresTeam: t.requiresTeam,
+                isSensitive: t.isSensitive
+            });
+        });
 
         let html = '';
-        Object.entries(groups).filter(([_, items]) => items.length > 0).forEach(([name, items]) => {
+        Object.entries(groups).forEach(([name, items]) => {
+            if (items.length === 0) return;
+
             html += `
-                <div class="permission-group-card">
+                <div class="permission-group-card workspace-card">
                     <div class="group-header">
-                        <h6>${name}</h6>
+                        <div class="group-title-info">
+                            <h6>${name}</h6>
+                            ${name !== 'System' ? `<span class="group-subtitle">${items.length} Tabellen</span>` : ''}
+                        </div>
                         <div class="group-actions">
-                            <button class="group-select-all" data-group="${name}" data-mode="view">Sicht</button>
-                            <button class="group-select-all" data-group="${name}" data-mode="edit">Edit</button>
+                            <button class="group-select-all" data-group="${name}" data-mode="view" title="Alle anzeigen">Sicht</button>
+                            <button class="group-select-all" data-group="${name}" data-mode="edit" title="Alle editieren">Edit</button>
                         </div>
                     </div>
                     <div class="group-rows">
                         ${items.map(t => {
-        const viewChecked = Array.isArray(userPerm.viewTables) ? userPerm.viewTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
-        const editChecked = Array.isArray(userPerm.editTables) ? userPerm.editTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+                            const viewChecked = Array.isArray(userPerm.viewTables) ? userPerm.viewTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+                            const editChecked = Array.isArray(userPerm.editTables) ? userPerm.editTables.includes(t.id) : (Array.isArray(userPerm.tables) && userPerm.tables.includes(t.id));
+                            
+                            // Check if team-based access applies
+                            const teamRequirement = t.requiresTeam;
+                            const hasTeamAccess = teamRequirement && userTeams.some(ut => ut.toLowerCase() === teamRequirement.toLowerCase());
 
-        return `
-                                <div class="table-perm-row">
-                                    <span class="table-perm-label">${t.label}</span>
+                            return `
+                                <div class="table-perm-row ${t.isSensitive ? 'is-sensitive-row' : ''} ${hasTeamAccess ? 'has-team-access' : ''}">
+                                    <div class="table-perm-info">
+                                        <span class="table-perm-label">${t.label}</span>
+                                        ${teamRequirement ? `<span class="team-badge-mini" title="Team-Berechtigung: ${teamRequirement}">${teamRequirement}</span>` : ''}
+                                    </div>
                                     <div class="table-perm-checks">
-                                        <label class="compact-checkbox" title="Sichtbar">
-                                            <input type="checkbox" class="cb-view" value="${t.id}" ${viewChecked ? 'checked' : ''} data-group="${name}">
+                                        <label class="compact-checkbox ${hasTeamAccess ? 'team-locked' : ''}" title="${hasTeamAccess ? 'Freigegeben durch Team' : 'Sichtbar'}">
+                                            <input type="checkbox" class="cb-view" value="${t.id}" ${ (viewChecked || hasTeamAccess) ? 'checked' : ''} ${hasTeamAccess ? 'disabled' : ''} data-group="${name}">
                                             <span class="box"></span>
                                         </label>
                                         <label class="compact-checkbox" title="Editierbar">
@@ -370,37 +645,9 @@ export class UserInfoPage {
                                     </div>
                                 </div>
                             `;
-    }).join('')}
+                        }).join('')}
                         
-                        ${(name === 'System' && isSuperAdmin) ? `
-                            <div class="table-perm-row special-perm-row">
-                                <span class="table-perm-label">Rollen bearbeiten (Admin+)</span>
-                                <div class="table-perm-checks">
-                                    <label class="compact-checkbox" title="Edit Roles">
-                                        <input type="checkbox" class="cb-role-edit" ${userPerm.canEditRoles ? 'checked' : ''}>
-                                        <span class="box"></span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="table-perm-row special-perm-row">
-                                <span class="table-perm-label">Edit-Modus berechtigen</span>
-                                <div class="table-perm-checks">
-                                    <label class="compact-checkbox" title="Edit Mode">
-                                        <input type="checkbox" class="cb-edit-mode-allow" ${userPerm.canUseEditMode ? 'checked' : ''}>
-                                        <span class="box"></span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="table-perm-row special-perm-row">
-                                <span class="table-perm-label">Audit-Logs ansehen</span>
-                                <div class="table-perm-checks">
-                                    <label class="compact-checkbox" title="View Logs">
-                                        <input type="checkbox" class="cb-view-logs-allow" ${userPerm.canViewLogs ? 'checked' : ''}>
-                                        <span class="box"></span>
-                                    </label>
-                                </div>
-                            </div>
-                        ` : ''}
+                        ${(name === 'System' && isSuperAdmin) ? this._renderSpecialSystemPerms(userPerm) : ''}
                     </div>
                 </div>
             `;
@@ -408,91 +655,156 @@ export class UserInfoPage {
         return html;
     }
 
-    static _getCustomGroups(tableConfigs) {
-        const other = tableConfigs.filter(t => !['spiele', 'sportarten'].includes(t.category) && !['tbl_people', 'tbl_inventory'].includes(t.id));
-        return other.length > 0 ? { 'Sonstige': other.map(t => ({ id: t.id, label: t.title })) } : {};
+    static _renderSpecialSystemPerms(userPerm) {
+        return `
+            <div class="table-perm-row special-perm-row">
+                <span class="table-perm-label">Rollen bearbeiten (Admin+)</span>
+                <div class="table-perm-checks">
+                    <label class="compact-checkbox">
+                        <input type="checkbox" class="cb-role-edit" ${userPerm.canEditRoles ? 'checked' : ''}>
+                        <span class="box"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="table-perm-row special-perm-row">
+                <span class="table-perm-label">Edit-Modus berechtigen</span>
+                <div class="table-perm-checks">
+                    <label class="compact-checkbox">
+                        <input type="checkbox" class="cb-edit-mode-allow" ${userPerm.canUseEditMode ? 'checked' : ''}>
+                        <span class="box"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="table-perm-row special-perm-row">
+                <span class="table-perm-label">Audit-Logs ansehen</span>
+                <div class="table-perm-checks">
+                    <label class="compact-checkbox">
+                        <input type="checkbox" class="cb-view-logs-allow" ${userPerm.canViewLogs ? 'checked' : ''}>
+                        <span class="box"></span>
+                    </label>
+                </div>
+            </div>
+        `;
+    }
+
+    static _capitalizeFirst(str) {
+        if (!str) return '';
+        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    }
+
+    static _renderDynamicPresets(tableConfigs, person) {
+        // Collect workspaces
+        const workspaces = [...new Set(tableConfigs.map(t => t.workspace || t.category || 'Sonstige'))];
+        const userTeams = (person.Teams || '').split(',').map(t => t.trim().toLowerCase());
+
+        return workspaces.map(ws => {
+            const isTeamMatch = userTeams.includes(ws.toLowerCase());
+            return `
+                <button class="smart-preset-btn ${isTeamMatch ? 'team-suggested' : ''}" data-type="workspace:${ws}">
+                    <span class="sp-text">${this._capitalizeFirst(ws)}-Schreiber</span>
+                </button>
+            `;
+        }).join('');
     }
 
     static _attachProfileListeners(container, name, userPerm, peopleData, tableConfigs, userStat) {
         const isSuperAdmin = GlobalStateManager.getInstance().isSuperAdmin();
 
         const save = (overridePerms = null) => {
-            const activePreset = container.querySelector('.preset-btn.active');
-            const type = activePreset ? activePreset.dataset.type : userPerm.type;
+            const activePreset = container.querySelector('.smart-preset-btn.active');
+            let type = activePreset ? activePreset.dataset.type : userPerm.type;
 
-            const mgmtSelect = container.querySelector('.mgmt-select-modern');
-            const managementAccess = mgmtSelect ? mgmtSelect.value : (userPerm.managementAccess || 'none');
-            const canManage = (managementAccess === 'stats_only' || managementAccess === 'stats_perms');
+            // Resolve managementAccess from toggles
+            const statsOn = container.querySelector('.cb-mgmt-module[data-module="stats"]').checked;
+            const permsOn = container.querySelector('.cb-mgmt-module[data-module="perms"]').checked;
+            let managementAccess = 'none';
+            if (permsOn) managementAccess = 'stats_perms';
+            else if (statsOn) managementAccess = 'stats_only';
 
             const viewTables = [];
-            container.querySelectorAll('.cb-view:checked').forEach(cb => viewTables.push(cb.value));
-
             const editTables = [];
-            container.querySelectorAll('.cb-edit:checked').forEach(cb => editTables.push(cb.value));
 
-            const roleEditCb = container.querySelector('.cb-role-edit');
-            const canEditRoles = roleEditCb ? roleEditCb.checked : (userPerm.canEditRoles || false);
+            // If a preset was just clicked, we might need to overwrite table lists
+            if (overridePerms && overridePerms.isPresetAction) {
+                const presetValue = overridePerms.preset;
+                tableConfigs.concat(this._getGroupedTables(tableConfigs)['System']).forEach(t => {
+                    if (presetValue === 'all') { viewTables.push(t.id); editTables.push(t.id); }
+                    else if (presetValue === 'readonly') { viewTables.push(t.id); }
+                    else if (presetValue.startsWith('workspace:')) {
+                        const ws = presetValue.split(':')[1];
+                        viewTables.push(t.id);
+                        if ((t.workspace || t.category || 'Sonstige') === ws) editTables.push(t.id);
+                    }
+                });
+                type = presetValue;
+            } else {
+                // Collect from active cards in console
+                container.querySelectorAll('.perm-table-card').forEach(card => {
+                    const tableId = card.dataset.tableId;
+                    const activeLevel = card.querySelector('.access-btn.active')?.dataset.level;
+                    if (activeLevel === 'read' || activeLevel === 'edit') viewTables.push(tableId);
+                    if (activeLevel === 'edit') editTables.push(tableId);
+                });
+            }
 
-            const editModeCb = container.querySelector('.cb-edit-mode-allow');
-            const canUseEditMode = editModeCb ? editModeCb.checked : (userPerm.canUseEditMode || false);
+            const canViewLogs = container.querySelector('.cb-view-logs-allow').checked;
+            const canUseEditMode = container.querySelector('.cb-edit-mode-allow').checked;
 
-            const viewLogsCb = container.querySelector('.cb-view-logs-allow');
-            const canViewLogs = viewLogsCb ? viewLogsCb.checked : (userPerm.canViewLogs || false);
+            // Collect Team-based Roles
+            const teamRoles = {};
+            container.querySelectorAll('.team-role-select').forEach(sel => {
+                teamRoles[sel.dataset.team] = sel.value;
+            });
 
-            const newPerms = overridePerms || { type, viewTables, editTables, canManageUsers: canManage, managementAccess, canEditRoles, canUseEditMode, canViewLogs };
-            AuthService.savePermissions(name, newPerms);
+            const newPerms = { 
+                type, 
+                viewTables: [...new Set(viewTables)], 
+                editTables: [...new Set(editTables)], 
+                canManageUsers: (managementAccess === 'stats_perms'),
+                managementAccess,
+                canEditRoles: permsOn, // Inherit role editing from perms module
+                canUseEditMode,
+                canViewLogs,
+                teamRoles
+            };
 
-            // Show feedback
-            const saveIndicator = document.createElement('div');
-            saveIndicator.className = 'save-indicator-toast';
-            saveIndicator.textContent = 'Gespeichert';
-            document.body.appendChild(saveIndicator);
-            setTimeout(() => { if (saveIndicator.parentNode) saveIndicator.remove(); }, 2000);
+            AuthService.savePermissions(name, newPerms).then(() => {
+                const saveIndicator = document.createElement('div');
+                saveIndicator.className = 'save-indicator-toast';
+                saveIndicator.textContent = 'Berechtigungen aktualisiert';
+                document.body.appendChild(saveIndicator);
+                setTimeout(() => { if (saveIndicator.parentNode) saveIndicator.remove(); }, 2000);
+            });
         };
 
-        // Presets
-        container.querySelectorAll('.preset-btn').forEach(btn => {
+        // Presets (Smart Profiles)
+        container.querySelectorAll('.smart-preset-btn').forEach(btn => {
             btn.onclick = () => {
-                container.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                container.querySelectorAll('.smart-preset-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
 
-                const type = btn.dataset.type;
-                const grid = container.querySelector('.table-permissions-area');
-                if (grid) grid.style.display = (type === 'specific' || type === 'readonly') ? 'block' : 'none';
-
-                save();
-            };
-        });
-
-        // Group selection helpers
-        container.querySelectorAll('.group-select-all').forEach(btn => {
-            btn.onclick = () => {
-                const group = btn.dataset.group;
-                const mode = btn.dataset.mode;
-                const selector = mode === 'view' ? '.cb-view' : '.cb-edit';
-                const checkboxes = container.querySelectorAll(`${selector}[data-group="${group}"]`);
-                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-                checkboxes.forEach(cb => cb.checked = !allChecked);
-                save();
-            };
-        });
-
-        // Individual checkboxes
-        container.querySelectorAll('.table-groups-container input').forEach(cb => {
-            cb.onchange = () => {
-                const row = cb.closest('.table-perm-row');
-                const viewCb = row.querySelector('.cb-view');
-                const editCb = row.querySelector('.cb-edit');
-
-                if (cb === editCb && editCb.checked) {
-                    viewCb.checked = true; // Auto-enable view if editing is enabled
-                } else if (cb === viewCb && !viewCb.checked) {
-                    editCb.checked = false; // Auto-disable editing if view is revoked
+                const val = btn.dataset.type;
+                const consoleArea = container.querySelector('.perm-console');
+                if (consoleArea) {
+                    consoleArea.style.display = (val === 'specific' || val === 'readonly') ? 'flex' : 'none';
                 }
-
-                save();
+                
+                // If not manual, perform a bulk update
+                if (val !== 'specific') {
+                    save({ isPresetAction: true, preset: val });
+                } else {
+                    save(); // Just update type
+                }
             };
         });
+
+        // Toggles & Team Roles
+        container.querySelectorAll('.mgmt-toggle-item input, .team-role-select').forEach(inp => {
+            inp.onchange = () => save();
+        });
+
+        // Sidebar card changes
+        container.addEventListener('perm-change', () => save());
 
         // Management access
         const ms = container.querySelector('.mgmt-select-modern');
@@ -509,10 +821,10 @@ export class UserInfoPage {
 
                 // Automatically apply new role default permissions
                 const newPerms = PermissionService.getPermissionsForRole(newRole);
-                save(newPerms);
+                await AuthService.savePermissions(name, newPerms);
 
                 // Re-render UI to reflect automatic preset change and updated states
-                this._renderUserProfile(container, person, userStat, tableConfigs, peopleData);
+                await this._renderUserProfile(container, person, userStat, tableConfigs, peopleData);
             }
         };
 

@@ -475,3 +475,25 @@
     left: auto;
     min-width: 180px;
 }
+
+/* ── Mobile Responsiveness ───────────────────────────── */
+@media (max-width: 768px) {
+    .app-header {
+        padding: 0 16px;
+    }
+
+    .header-left {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .nav-btn, .save-btn-header, .discard-btn-header, .persons-toggle-btn, .theme-toggle {
+        padding: 8px 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-nav {
+        display: none;
+    }
+}

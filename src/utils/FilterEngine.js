@@ -147,6 +147,8 @@ export class FilterEngine {
 
         const groups = {};
         rows.forEach(row => {
+            if (!row || !row.data) return; // Skip invalid rows 
+
             let rawValue = row.data[groupByAttrId];
             // Case-insensitive key lookup fallback
             if (rawValue === undefined) {

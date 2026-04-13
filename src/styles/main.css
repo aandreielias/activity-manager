@@ -196,6 +196,22 @@ body.global-loading::after {
     }
 }
 
+@media (max-width: 480px) {
+    .main-container {
+        padding: 8px;
+    }
+
+    .tables-scroll-container {
+        flex-direction: column;
+        gap: 12px;
+        padding-right: 8px;
+    }
+
+    .persons-split-container {
+        display: none;
+    }
+}
+
 /* ── Extracted Layout Classes from main.js ──────────── */
 .layout-row {
     display: flex !important;

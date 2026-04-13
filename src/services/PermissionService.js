@@ -22,26 +22,41 @@ export class PermissionService {
      * Determines if a user (from their global state context) can view a table.
      */
     static canViewTable(tableId, context) {
-        const { role, permissions } = context;
+        const { role, permissions, teams, tableConfig } = context;
         const normalizedRole = (role || '').toLowerCase();
-        if (normalizedRole === 'superadmin') return true;
-        if (!permissions || !permissions.type) {
-            return normalizedRole === 'admin' || normalizedRole === 'supervisor'; // Safe fallback: only admins/supervisors see all by default
+        const category = tableConfig?.category || context.category;
+
+        // ── Workspace / Team Rule (Replaces Hardcoded activities rule) ─────────────────────
+        const requiresTeam = tableConfig?.requiresTeam || ( (category === 'spiele' || category === 'sportarten') ? 'aktivitäten' : null );
+        if (requiresTeam) {
+            const hasTeam = (teams || []).some(t => t.toLowerCase() === requiresTeam.toLowerCase());
+            if (!hasTeam && normalizedRole !== 'superadmin') {
+                return false;
+            }
         }
+
+        if (normalizedRole === 'superadmin') return true;
+        
+        // If the user's role is "Inaktiv", they see nothing
+        if (normalizedRole === 'inaktiv') return false;
+
+        if (!permissions || !permissions.type) {
+            return normalizedRole === 'admin' || normalizedRole === 'supervisor'; 
+        }
+
+        const isSensitive = tableConfig?.isSensitive || (tableId === 'tbl_people' || tableId === 'people_table' || tableId === 'tbl_inventory');
 
         switch (permissions.type) {
         case this.TYPES.ALL:
             return true;
         case this.TYPES.EXCEPT_PEOPLE:
-            return tableId !== 'tbl_people' && tableId !== 'people_table';
+            return !isSensitive || (tableId !== 'tbl_people' && tableId !== 'people_table');
         case this.TYPES.EXCEPT_INVENTORY:
-            return tableId !== 'tbl_inventory';
+            return !isSensitive || (tableId !== 'tbl_inventory');
         case this.TYPES.SPECIFIC:
         case this.TYPES.READONLY:
             const views = Array.isArray(permissions.viewTables) ? permissions.viewTables : (Array.isArray(permissions.tables) ? permissions.tables : []);
             if (views.includes(tableId)) return true;
-
-            // If you can edit, you can see
             const edits = Array.isArray(permissions.editTables) ? permissions.editTables : (Array.isArray(permissions.tables) ? permissions.tables : []);
             return edits.includes(tableId);
         case this.TYPES.NONE:
@@ -55,27 +70,47 @@ export class PermissionService {
      * Determines if a user can edit a specific table.
      */
     static canEditTable(tableId, context) {
-        const { role, permissions } = context;
+        const { role, permissions, teams, tableConfig } = context;
         const r = (role || '').toLowerCase();
+        const category = tableConfig?.category || context.category;
+
+        // ── Workspace / Team Rule ─────────────────────
+        const requiresTeam = tableConfig?.requiresTeam || ( (category === 'spiele' || category === 'sportarten') ? 'aktivitäten' : null );
+        if (requiresTeam) {
+            const hasTeam = (teams || []).some(t => t.toLowerCase() === requiresTeam.toLowerCase());
+            if (!hasTeam && r !== 'superadmin') {
+                return false;
+            }
+        }
+
         if (r === 'superadmin') return true;
+        if (r === 'inaktiv') return false;
+
+        // PRIORITIZE team-specific role for granular editing rights
+        const effectiveRole = (context.teamRole || r || 'user').toLowerCase();
 
         // Everyone (Users) can view, but only Supervisor+ can edit Events
-        if (tableId === 'tbl_events' && (r === 'user' || !r)) return false;
+        const minRoleForEdit = tableConfig?.minRoleForEdit || (tableId === 'tbl_events' ? 'supervisor' : 'user');
+        if (minRoleForEdit === 'supervisor' && effectiveRole === 'user') return false;
 
         if (!permissions || !permissions.type) {
             if (r === 'admin') return true;
-            return tableId !== 'tbl_people' && tableId !== 'people_table';
+            // Fallback for sensitive tables
+            const isSensitive = tableConfig?.isSensitive || (tableId === 'tbl_people' || tableId === 'people_table');
+            return !isSensitive;
         }
 
         if (permissions.type === this.TYPES.READONLY) return false;
+
+        const isSensitive = tableConfig?.isSensitive || (tableId === 'tbl_people' || tableId === 'people_table' || tableId === 'tbl_inventory');
 
         switch (permissions.type) {
         case this.TYPES.ALL:
             return true;
         case this.TYPES.EXCEPT_PEOPLE:
-            return tableId !== 'tbl_people' && tableId !== 'people_table';
+            return !isSensitive || (tableId !== 'tbl_people' && tableId !== 'people_table');
         case this.TYPES.EXCEPT_INVENTORY:
-            return tableId !== 'tbl_inventory';
+            return !isSensitive || (tableId !== 'tbl_inventory');
         case this.TYPES.SPECIFIC:
             if (Array.isArray(permissions.editTables)) return permissions.editTables.includes(tableId);
             return Array.isArray(permissions.tables) && permissions.tables.includes(tableId);

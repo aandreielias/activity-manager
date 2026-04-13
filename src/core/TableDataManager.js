@@ -31,6 +31,7 @@ export class TableDataManager {
         });
 
         const row = new Row({ id, data, schema: this.table.schema, peopleData: this.table.peopleData, tableId: this.table.id });
+        row.isDirty = true;
         row.setCallbacks({
             onEditStart: () => this.table.editor.showUnsavedChange(),
             onEditChange: () => this.table.editor.showUnsavedChange(),
@@ -42,6 +43,11 @@ export class TableDataManager {
         }
 
         this.table.rows.push(row);
+        
+        // SYNC: Push to source data array if it exists
+        if (this.table.sourceData && Array.isArray(this.table.sourceData)) {
+            this.table.sourceData.push(data);
+        }
 
         // Clean up empty state if it's the first row
         const emptyRow = this.table._tbody.querySelector('.empty-row');
@@ -59,6 +65,7 @@ export class TableDataManager {
     addRow(rowData) {
         if (!rowData.id) rowData.id = this._generateId();
         const row = new Row({ id: rowData.id, data: rowData, schema: this.table.schema, peopleData: this.table.peopleData, tableId: this.table.id });
+        row.isDirty = true;
         row.setCallbacks({
             onEditStart: () => this.table.editor.showUnsavedChange(),
             onEditChange: () => this.table.editor.showUnsavedChange(),
@@ -66,6 +73,11 @@ export class TableDataManager {
         });
 
         this.table.rows.push(row);
+
+        // SYNC: Push to source data array if it exists
+        if (this.table.sourceData && Array.isArray(this.table.sourceData)) {
+            this.table.sourceData.push(rowData);
+        }
 
         const addTr = this.table._tbody?.querySelector('.add-row-tr');
         if (addTr) {
@@ -83,6 +95,8 @@ export class TableDataManager {
         this.table.rows = this.table.rows.filter(r => r.id !== id);
         this.table.renderer.element?.querySelector(`[data-row-id="${id}"]`)?.remove();
         this.table.renderer.updateMeta();
+        
+        GlobalStateManager.getInstance().markRowAsDeleted(this.table.id, id);
         this.table.editor.showUnsavedChange();
     }
 }

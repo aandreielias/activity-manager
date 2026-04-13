@@ -137,40 +137,44 @@ export class TableRenderer {
     _showTableContextMenu(e) {
         const existingMenu = document.querySelector('.category-context-menu');
         if (existingMenu) existingMenu.remove();
-
         const menu = document.createElement('div');
         menu.className = 'row-context-menu category-context-menu';
         menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
         menu.style.position = 'fixed'; menu.style.zIndex = '100000';
 
-        const exportBtn = document.createElement('button');
-        exportBtn.className = 'context-menu-item';
-        exportBtn.textContent = 'Als PDF exportieren';
-        exportBtn.onclick = () => { this._exportPDF(); menu.remove(); };
-        menu.appendChild(exportBtn);
+        const isSingleTableView = ['tbl_people', 'people_table', 'tbl_inventory'].includes(this.table.id);
 
-        const exportAllBtn = document.createElement('button');
-        exportAllBtn.className = 'context-menu-item';
-        exportAllBtn.textContent = 'Alle als PDF exportieren';
-        exportAllBtn.style.fontStyle = 'italic';
-        exportAllBtn.onclick = () => {
-            const category = this.table.tableConfig?.category;
-            let categoryId = category ? `all-${category}` : null;
-            if (this.table.id === 'tbl_people' || this.table.id === 'people_table') categoryId = 'all-people';
-            if (this.table.id === 'tbl_inventory') categoryId = 'all-inventory';
-            
-            if (categoryId) {
-                window.dispatchEvent(new CustomEvent('export-category-pdf', { detail: { categoryId } }));
-            }
-            menu.remove();
-        };
-        menu.appendChild(exportAllBtn);
+        if (isSingleTableView) {
+            const exportBtn = document.createElement('button');
+            exportBtn.className = 'context-menu-item';
+            exportBtn.textContent = 'Als PDF exportieren';
+            exportBtn.onclick = () => { this._exportPDF(); menu.remove(); };
+            menu.appendChild(exportBtn);
+        } else {
+            const exportBtn = document.createElement('button');
+            exportBtn.className = 'context-menu-item';
+            exportBtn.textContent = 'Diese Tabelle als PDF';
+            exportBtn.onclick = () => { this._exportPDF(); menu.remove(); };
+            menu.appendChild(exportBtn);
+
+            const exportAllBtn = document.createElement('button');
+            exportAllBtn.className = 'context-menu-item';
+            exportAllBtn.textContent = 'Alle als PDF exportieren';
+            exportAllBtn.style.fontStyle = 'italic';
+            exportAllBtn.onclick = () => {
+                const category = this.table.tableConfig?.category;
+                let categoryId = category ? `all-${category}` : null;
+                if (this.table.id === 'tbl_people' || this.table.id === 'people_table') categoryId = 'all-people';
+                if (this.table.id === 'tbl_inventory') categoryId = 'all-inventory';
+                if (categoryId) window.dispatchEvent(new CustomEvent('export-category-pdf', { detail: { categoryId } }));
+                menu.remove();
+            };
+            menu.appendChild(exportAllBtn);
+        }
 
         const divider = document.createElement('div');
         divider.className = 'context-menu-divider';
         menu.appendChild(divider);
-
-        const isSingleTableView = ['tbl_people', 'people_table', 'tbl_inventory'].includes(this.table.id);
 
         if (isSingleTableView) {
             const filterBtn = document.createElement('button');
@@ -338,15 +342,10 @@ export class TableRenderer {
             this.filterBar.updateRows(filteredRows, globalFilter);
         }
 
-
-
-
         // C) Apply Local Filter
         if (localFilter.active) {
             filteredRows = filteredRows.filter(row => FilterEngine.matchesFilters(row, localFilter.filters));
         }
-
-
 
         if (filteredRows.length === 0) {
             const tr = document.createElement('tr');
@@ -437,7 +436,6 @@ export class TableRenderer {
         });
     }
 
-
     _renderAddRowButton(tbody) {
         if (!GlobalStateManager.getInstance().canEdit(this.table.id)) return;
         const tr = document.createElement('tr');
@@ -462,7 +460,6 @@ export class TableRenderer {
     async _exportPDF() {
         try {
             const gs = GlobalStateManager.getInstance();
-
             const side = this.element?.closest('.split-container-inner') ? 'split' : 'main';
             
             // Resolve Filter State (Global + Local)
@@ -492,11 +489,31 @@ export class TableRenderer {
                 if (!proceed) return;
             }
 
+            const isInventory = this.table.id === 'tbl_inventory';
             const isPortrait = ['tbl_inventory', 'tbl_people', 'people_table'].includes(this.table.id);
             const doc = isPortrait 
                 ? new jsPDF({ orientation: 'portrait', format: 'a4' })
                 : new jsPDF({ orientation: 'landscape', format: 'a3' });
             let currentY = 20;
+
+            // Helper to load image as base64 for PDF
+            const getBase64Image = async (imgUrl) => {
+                if (!imgUrl) return null;
+                try {
+                    const isFull = imgUrl.includes('://') || imgUrl.startsWith('data:');
+                    const fullUrl = isFull ? imgUrl : `https://kmsdsymoehleonxzcbnm.supabase.co/storage/v1/object/public/inventory_picture_bucket/${imgUrl}`;
+                    const response = await fetch(fullUrl);
+                    const blob = await response.blob();
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (e) {
+                    console.warn('[PDF Export] Failed to fetch image:', imgUrl);
+                    return null;
+                }
+            };
             
             doc.setFontSize(18); doc.setFont(undefined, 'bold');
             doc.text(this.table.title || 'Export', 14, currentY);
@@ -507,9 +524,7 @@ export class TableRenderer {
                 doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
                 let filterText = 'Aktive Filter: ';
                 const activeCriteria = [];
-                
                 if (gs.isFavoritesFilterActive()) activeCriteria.push('Nur Favoriten');
-                
                 if (globalFilter.active) {
                     globalFilter.filters.forEach(f => {
                         if (f.attrId) {
@@ -522,7 +537,6 @@ export class TableRenderer {
                         }
                     });
                 }
-                
                 if (localFilter.active) {
                     localFilter.filters.forEach(f => {
                         if (f.attrId) {
@@ -535,8 +549,6 @@ export class TableRenderer {
                         }
                     });
                 }
-
-                
                 doc.text(filterText + activeCriteria.join(' | '), 14, currentY);
                 currentY += 10;
                 doc.setTextColor(0);
@@ -546,7 +558,13 @@ export class TableRenderer {
 
             const ignore = ['Erstellt von', 'Erstellt am', 'createdAt', 'createdBy', 'Link/Video/Lied'];
             const schema = this.table.schema.filter(c => !ignore.includes(c.label) && !ignore.includes(c.id));
-            const head = [schema.map(c => c.label)];
+            
+            // Inject image column if missing for inventory
+            if (isInventory && !schema.find(c => c.id === 'image_url')) {
+                schema.unshift({ id: 'image_url', label: 'Bild' });
+            }
+
+            const head = [schema.map(c => c.id === 'image_url' ? 'Bild' : c.label)];
 
             // Filter Rows logic
             let filteredRows = this.table.rows;
@@ -554,20 +572,51 @@ export class TableRenderer {
             if (globalFilter.active) filteredRows = filteredRows.filter(row => FilterEngine.matchesFilters(row, globalFilter.filters));
             if (localFilter.active) filteredRows = filteredRows.filter(row => FilterEngine.matchesFilters(row, localFilter.filters));
 
+            // Pre-load images if inventory
+            const imageCache = {};
+            if (isInventory) {
+                const imagePromises = filteredRows.map(async (row) => {
+                    const url = row.data.image_url;
+                    if (url) {
+                        const base64 = await getBase64Image(url);
+                        if (base64) imageCache[row.id] = base64;
+                    }
+                });
+                await Promise.all(imagePromises);
+            }
+
             const body = filteredRows.map(row => schema.map(c => {
+                if (c.id === 'image_url') return ''; 
                 let v = row.data[c.id]; if (v === null || v === undefined) return '';
                 let s = typeof v === 'object' ? (Array.isArray(v) ? v.map(i => typeof i === 'object' ? i.name || i.id : i).join(', ') : (v.title || v.name || JSON.stringify(v))) : String(v);
                 return s.length > 250 ? s.substring(0, 247) + '...' : s;
             }));
 
+            const imgColIdx = schema.findIndex(c => c.id === 'image_url');
+
             autoTable(doc, { 
                 head, 
                 body, 
                 startY: currentY, 
-                styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' }, 
-                headStyles: { fillColor: ColourFactory.getBrandBlueRGB() } 
+                styles: { 
+                    fontSize: 8, 
+                    cellPadding: 3, 
+                    overflow: 'linebreak', 
+                    valign: 'middle',
+                    minCellHeight: isInventory ? 30 : 0
+                }, 
+                headStyles: { fillColor: ColourFactory.getBrandBlueRGB() },
+                columnStyles: isInventory && imgColIdx !== -1 ? { [imgColIdx]: { cellWidth: 32 } } : {},
+                didDrawCell: (data) => {
+                    if (isInventory && data.section === 'body' && data.column.index === imgColIdx) {
+                        const rowId = filteredRows[data.row.index].id;
+                        const base64 = imageCache[rowId];
+                        if (base64) {
+                            doc.addImage(base64, 'JPEG', data.cell.x + 3.5, data.cell.y + 2.5, 25, 25);
+                        }
+                    }
+                }
             });
-            
             window.open(doc.output('bloburl'), '_blank');
         } catch (e) {
             console.error('PDF export failed', e);

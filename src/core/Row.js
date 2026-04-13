@@ -20,8 +20,22 @@ export class Row {
 
         this.createdBy = data.createdBy || 'Unbekannt';
         this.createdAt = data.createdAt || null;
+        this._isDirty = GlobalStateManager.getInstance().isRowDirty(this.tableId, this.id);
+        if (data.isDirty) this.isDirty = true; // Handle explicitly passed dirty state
 
         this.fields = this._buildFields();
+    }
+
+    get isDirty() {
+        return GlobalStateManager.getInstance().isRowDirty(this.tableId, this.id);
+    }
+
+    set isDirty(val) {
+        if (val) {
+            GlobalStateManager.getInstance().markRowAsDirty(this.tableId, this.id);
+        } else {
+            // Usually clearing is handled via clearDirtyRowIds
+        }
     }
 
     _buildFields() {
@@ -36,6 +50,7 @@ export class Row {
                 tableId: this.tableId,
                 onChange: (fieldId, newVal) => {
                     this.data[fieldId] = newVal;
+                    this.isDirty = true;
                     this.callbacks.onEditChange?.();
                 },
                 onEditStart: () => {
@@ -166,6 +181,7 @@ export class Row {
             }
         }
 
+        this.isDirty = true;
         this.callbacks.onEditChange?.();
     }
 

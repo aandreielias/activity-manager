@@ -1,9 +1,25 @@
 import '../styles/LoginDialog.css';
 import { AuthService } from '../services/AuthService.js';
 import { BaseDialog } from './BaseDialog.js';
+import { GlobalStateManager } from '../core/GlobalStateManager.js';
 
 export class LoginDialog {
     static async show(peopleData) {
+        const gs = GlobalStateManager.getInstance();
+        const availableTeams = gs.getAvailableTeams();
+        
+        // Filter out inactive users immediately and sort alphabetically
+        const activePeople = (peopleData || [])
+            .filter(p => {
+                const isInactive = (p.Status || '').toLowerCase() === 'inaktiv' || (p.role || '').toLowerCase() === 'inaktiv';
+                return !isInactive;
+            })
+            .sort((a, b) => {
+                const nameA = `${a.vorname || ''} ${a.nachname || ''}`.trim().toLowerCase();
+                const nameB = `${b.vorname || ''} ${b.nachname || ''}`.trim().toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+
         return BaseDialog.show({
             overlayClassName: 'login-overlay',
             dialogClassName: 'login-dialog dialog-window',
@@ -13,33 +29,32 @@ export class LoginDialog {
             render: (dialog, overlay, resolve, cleanup) => {
                 dialog.innerHTML = `
                     <h2>Login</h2>
-                    <div class="login-input-group">
+                    
+                    <div class="login-input-group login-row">
                         <div id="login-user-dropdown" class="custom-login-select">
                             <div class="login-select-display">
                                 <span class="selected-value">Nutzer Auswählen</span>
                                 <span class="dropdown-arrow">▼</span>
                             </div>
+                            <div class="login-select-options" id="login-user-options-container">
+                                <!-- Users will be rendered here dynamically -->
+                            </div>
+                        </div>
+
+                        <div id="login-team-dropdown" class="custom-login-select">
+                            <div class="login-select-display">
+                                <span class="selected-value">Alle</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </div>
                             <div class="login-select-options">
-                                ${(peopleData || [])
-            .sort((a, b) => {
-                const aInactive = (a.Status || '').toLowerCase() === 'inaktiv' || (a.role || '').toLowerCase() === 'inaktiv';
-                const bInactive = (b.Status || '').toLowerCase() === 'inaktiv' || (b.role || '').toLowerCase() === 'inaktiv';
-                if (aInactive && !bInactive) return 1;
-                if (!aInactive && bInactive) return -1;
-                return 0;
-            })
-            .map(p => {
-                const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
-                if (!name) return '';
-                const role = p.role || '';
-                const isInactive = (p.Status || '').toLowerCase() === 'inaktiv' || (p.role || '').toLowerCase() === 'inaktiv';
-                return `
-                                            <div class="login-option ${isInactive ? 'is-inactive' : ''}" data-value="${name}">
-                                                <span class="option-name">${name}</span>
-                                                <span class="option-role">${role}</span>
-                                            </div>
-                                        `;
-            }).join('')}
+                                <div class="login-option" data-value="all">
+                                    <span class="option-name">Alle</span>
+                                </div>
+                                ${availableTeams.map(t => `
+                                    <div class="login-option" data-value="${t.name}">
+                                        <span class="option-name">${t.name}</span>
+                                    </div>
+                                `).join('')}
                             </div>
                         </div>
                     </div>
@@ -50,36 +65,82 @@ export class LoginDialog {
                     <div id="login-error-msg" class="login-error"></div>
                 `;
 
-                const dropdown = dialog.querySelector('#login-user-dropdown');
-                const display = dropdown.querySelector('.login-select-display');
-                const selectedText = display.querySelector('.selected-value');
+                const teamDropdown = dialog.querySelector('#login-team-dropdown');
+                const userDropdown = dialog.querySelector('#login-user-dropdown');
+                const userOptionsContainer = dialog.querySelector('#login-user-options-container');
                 const password = dialog.querySelector('#login-password-input');
                 const submitBtn = dialog.querySelector('#login-submit-btn');
                 const errorMsg = dialog.querySelector('#login-error-msg');
 
                 let selectedUser = '';
+                let currentTeamFilter = 'all';
 
-                // Toggle dropdown
-                display.onclick = (e) => {
-                    e.stopPropagation();
-                    dropdown.classList.toggle('open');
+                const renderUsers = (filterTeam = 'all') => {
+                    const filtered = activePeople.filter(p => {
+                        if (filterTeam === 'all') return true;
+                        const pTeams = (p.Team || p.Teams || '').split(',').map(s => s.trim()).filter(Boolean);
+                        return pTeams.includes(filterTeam);
+                    });
+
+                    userOptionsContainer.innerHTML = filtered.map(p => {
+                        const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
+                        if (!name) return '';
+                        const teams = p.Team || p.Teams || '';
+                        return `
+                            <div class="login-option stacked" data-value="${name}">
+                                <div class="option-name">${name}</div>
+                                <div class="option-role">${teams}</div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // Re-attach clicks
+                    userOptionsContainer.querySelectorAll('.login-option').forEach(opt => {
+                        opt.onclick = (e) => {
+                            e.stopPropagation();
+                            selectedUser = opt.dataset.value;
+                            userDropdown.querySelector('.selected-value').textContent = selectedUser;
+                            userDropdown.classList.remove('open');
+                            password.focus();
+                        };
+                    });
                 };
 
-                // Select option
-                dropdown.querySelectorAll('.login-option').forEach(opt => {
+                // Initial render
+                renderUsers();
+
+                // Toggle dropdowns
+                [teamDropdown, userDropdown].forEach(dd => {
+                    const display = dd.querySelector('.login-select-display');
+                    display.onclick = (e) => {
+                        e.stopPropagation();
+                        // Close other if open
+                        [teamDropdown, userDropdown].filter(d => d !== dd).forEach(d => d.classList.remove('open'));
+                        dd.classList.toggle('open');
+                    };
+                });
+
+                // Team filter selection
+                teamDropdown.querySelectorAll('.login-option').forEach(opt => {
                     opt.onclick = (e) => {
                         e.stopPropagation();
-                        selectedUser = opt.dataset.value;
-                        selectedText.textContent = selectedUser;
-                        dropdown.classList.remove('open');
-                        password.focus();
+                        currentTeamFilter = opt.dataset.value;
+                        teamDropdown.querySelector('.selected-value').textContent = currentTeamFilter === 'all' ? 'Alle' : currentTeamFilter;
+                        teamDropdown.classList.remove('open');
+                        
+                        // Reset selected user when team changes
+                        selectedUser = '';
+                        userDropdown.querySelector('.selected-value').textContent = 'Nutzer Auswählen';
+                        
+                        renderUsers(currentTeamFilter);
                     };
                 });
 
                 // Close on outside click for dropdown
                 const outsideClick = (e) => {
-                    if (!dropdown.contains(e.target)) {
-                        dropdown.classList.remove('open');
+                    if (!teamDropdown.contains(e.target) && !userDropdown.contains(e.target)) {
+                        teamDropdown.classList.remove('open');
+                        userDropdown.classList.remove('open');
                     }
                 };
                 window.addEventListener('click', outsideClick);

@@ -11,6 +11,11 @@ import { AuditLogsDialog } from './AuditLogsDialog.js';
  */
 export class UserInfoPage {
     static async show(peopleData, tableConfigs, allTables = {}) {
+        const globalState = GlobalStateManager.getInstance();
+        if (!globalState.isSuperAdmin()) {
+            alert('Nur SuperAdmins haben Zugriff auf das System-Dashboard.');
+            return;
+        }
         if (document.querySelector('.user-info-overlay')) return;
 
         return new Promise(async (resolve) => {

@@ -22,6 +22,8 @@ export class GlobalStateManager {
     #favoritesFilterActive = false;
     #sessionNewGames = new Map(); // Track games created this session to prevent 'Deleted' status
     #selectedRows = new Map(); // tableId -> Set([rowIds])
+    #deletedRowIds = new Map(); // tableId -> Set([rowIds])
+    #dirtyRowIds = new Map(); // tableId -> Set([rowIds])
     #onSelectionChange = null;
 
     #tableConfigs = [];
@@ -154,7 +156,7 @@ export class GlobalStateManager {
     getEnumOptionsForColumn(colId, tableId) {
         const id = colId.toLowerCase();
         if (id === 'status') {
-            if (tableId === 'tbl_people') return this.getEnumOptions('status_enum');
+            if (tableId && tableId.includes('people')) return this.getEnumOptions('status_enum');
             return this.getEnumOptions('task_status_enum');
         }
         if (id === 'role' || id === 'rolle') return this.getEnumOptions('rolle_enum');
@@ -203,8 +205,34 @@ export class GlobalStateManager {
 
     markTableAsUnsaved(tableId) { this.#unsavedTableIds.add(tableId); this.#notifyUnsavedChange(); }
     markTableAsSaved(tableId) { this.#unsavedTableIds.delete(tableId); this.#notifyUnsavedChange(); }
-    clearAllUnsaved() { this.#unsavedTableIds.clear(); this.#notifyUnsavedChange(); }
+    clearAllUnsaved() { this.#unsavedTableIds.clear(); this.#deletedRowIds.clear(); this.#notifyUnsavedChange(); }
     getUnsavedTableIds() { return [...this.#unsavedTableIds]; }
+    
+    markRowAsDeleted(tableId, rowId) {
+        if (!this.#deletedRowIds.has(tableId)) this.#deletedRowIds.set(tableId, new Set());
+        this.#deletedRowIds.get(tableId).add(rowId);
+    }
+    getDeletedRowIds(tableId) {
+        return Array.from(this.#deletedRowIds.get(tableId) || []);
+    }
+    clearDeletedRowIds(tableId) {
+        this.#deletedRowIds.delete(tableId);
+    }
+
+    markRowAsDirty(tableId, rowId) {
+        if (!this.#dirtyRowIds.has(tableId)) this.#dirtyRowIds.set(tableId, new Set());
+        this.#dirtyRowIds.get(tableId).add(rowId);
+    }
+    isRowDirty(tableId, rowId) {
+        return this.#dirtyRowIds.get(tableId)?.has(rowId) || false;
+    }
+    getDirtyRowIds(tableId) {
+        return Array.from(this.#dirtyRowIds.get(tableId) || []);
+    }
+    clearDirtyRowIds(tableId) {
+        this.#dirtyRowIds.delete(tableId);
+    }
+
     onUnsavedChangeCallback(cb) { this.#onUnsavedChange = cb; }
 
     #notifyUnsavedChange() {

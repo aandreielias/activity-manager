@@ -34,6 +34,20 @@
     color: var(--text-primary);
 }
 
+.login-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+#login-user-dropdown {
+    flex: 1;
+}
+
+#login-team-dropdown {
+    flex: 0 0 115px;
+}
+
 .custom-login-select {
     position: relative;
     width: 100%;
@@ -51,6 +65,16 @@
     justify-content: space-between;
     align-items: center;
     transition: all var(--transition);
+    gap: 4px;
+    min-width: 0;
+}
+
+.login-select-display .selected-value {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
 }
 
 .custom-login-select.open .login-select-display {
@@ -102,6 +126,17 @@
     transition: background var(--transition);
 }
 
+.login-option.stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.login-option.stacked .option-role {
+    text-align: left;
+    max-width: 100%;
+}
+
 .login-option.is-inactive {
     opacity: 0.5;
     background: var(--bg-secondary);
@@ -130,6 +165,11 @@
     font-size: 0.75rem;
     color: var(--text-muted);
     font-weight: 500;
+    text-align: right;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .login-password {

@@ -31,7 +31,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.4.2';
+        return '2.5.1';
     }
 
     render() {
@@ -101,9 +101,10 @@ export class Header {
                 </div>
             </div>
             <div class="header-right">
+                ${globalState.isSuperAdmin() ? `
                 <button class="nav-btn user-info-btn" title="System-Stats">
                     Stats
-                </button>
+                </button>` : ''}
                 <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
                     Kalender
                 </button>
@@ -131,7 +132,7 @@ export class Header {
         // Show team dropdown for everyone
         return `
             <div class="dropdown-container split-btn-group">
-                <button class="nav-btn split-main-btn persons-toggle-btn" title="Alle Personen anzeigen">
+                <button class="nav-btn split-main-btn persons-toggle-btn" title="Personen-Seitenleiste umschalten">
                     Personen
                 </button>
                 <div class="split-divider"></div>
@@ -183,8 +184,24 @@ export class Header {
 
             if (btn && btn.dataset.team) {
                 const team = btn.dataset.team;
-                this.onPersonTeamSwitch?.(team);
-                this._closeAllDropdowns();
+                e.stopPropagation();
+
+                // Clear any existing timer to detect double click
+                if (this._teamClickTimer) {
+                    clearTimeout(this._teamClickTimer);
+                    this._teamClickTimer = null;
+                    // DOUBLE CLICK: Switch Main View
+                    this.onPersonTeamMainSwitch?.(team);
+                    this._closeAllDropdowns();
+                } else {
+                    // SINGLE CLICK: Toggle Sidebar
+                    this._teamClickTimer = setTimeout(() => {
+                        this.onPersonTeamSplitSwitch?.(team);
+                        this._teamClickTimer = null;
+                        this._closeAllDropdowns();
+                    }, 250); // 250ms threshold
+                }
+                return;
             }
 
             if (e.target.closest('.theme-toggle')) {

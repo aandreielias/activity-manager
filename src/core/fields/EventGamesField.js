@@ -6,8 +6,8 @@ import { Dialog } from '../../ui/Dialog.js';
 import { BaseDialog } from '../../ui/BaseDialog.js';
 
 /**
- * EventGamesField - Specialized field for selecting multiple games
- * and assigning a responsible person to each game.
+ * EventGamesField - Specialized field for defining a sequence (Reihenfolge)
+ * of items, each assigned to a team and a responsible person.
  */
 export class EventGamesField extends Field {
     updateDisplay() {
@@ -24,7 +24,7 @@ export class EventGamesField extends Field {
         try {
             data = JSON.parse(rawValue);
         } catch (e) {
-            data = rawValue.split(',').map(t => ({ name: t.trim(), responsible: null })).filter(d => d.name);
+            data = rawValue.split(',').map(t => ({ name: t.trim(), team: 'Aktivitäten', responsible: null })).filter(d => d.name);
         }
 
         if (!Array.isArray(data)) data = [];
@@ -36,17 +36,30 @@ export class EventGamesField extends Field {
         tagsContainer.style.gap = '6px';
 
         data.forEach(item => {
-            const status = this._getGameStatus(item.name);
-            let statusClass = status ? 'status-' + status.toLowerCase().replace(/\s+/g, '-') : '';
+            const team = item.team || 'Aktivitäten';
+            const isAktivitäten = team === 'Aktivitäten';
+            
+            const status = isAktivitäten ? this._getGameStatus(item.name) : 'To Do';
+            let statusClass = isAktivitäten && status ? 'status-' + status.toLowerCase().replace(/\s+/g, '-') : '';
             let isDeleted = false;
 
-            if (!this._getGameCategory(item.name)) {
+            if (isAktivitäten && !this._getGameCategory(item.name)) {
                 statusClass = 'status-deleted';
                 isDeleted = true;
             }
 
             const tag = document.createElement('span');
             tag.className = `event-game-tag ${statusClass}`;
+            tag.style.fontSize = '12px';
+
+            const teamSpan = document.createElement('span');
+            teamSpan.className = 'game-team';
+            teamSpan.style.opacity = '0.7';
+            teamSpan.style.fontSize = '10px';
+            teamSpan.style.marginRight = '4px';
+            teamSpan.style.fontWeight = 'bold';
+            teamSpan.textContent = `[${team}]`;
+            tag.appendChild(teamSpan);
 
             const nameSpan = document.createElement('span');
             nameSpan.className = 'game-name';
@@ -67,7 +80,8 @@ export class EventGamesField extends Field {
                 if (person) {
                     const respSpan = document.createElement('span');
                     respSpan.className = 'game-resp';
-                    respSpan.textContent = ` (${person.vorname} ${person.nachname.charAt(0)}.)`;
+                    respSpan.style.marginLeft = '4px';
+                    respSpan.textContent = `(${person.vorname} ${person.nachname.charAt(0)}.)`;
                     tag.appendChild(respSpan);
                 }
             }
@@ -89,15 +103,17 @@ export class EventGamesField extends Field {
         try {
             currentData = JSON.parse(rawValue);
         } catch (e) {
-            currentData = rawValue === '—' || !rawValue ? [] : rawValue.split(',').map(t => ({ name: t.trim(), responsible: null })).filter(d => d.name);
+            currentData = rawValue === '—' || !rawValue ? [] : rawValue.split(',').map(t => ({ name: t.trim(), team: 'Aktivitäten', responsible: null })).filter(d => d.name);
         }
         if (!Array.isArray(currentData)) currentData = [];
 
-        const globalState = GlobalStateManager.getInstance();
-        let availableGames = [...(this.colDef.availableTags || [])];
+        const gs = GlobalStateManager.getInstance();
+        const availableTeams = gs.getAvailableTeams();
+        const availableGames = [...(this.colDef.availableTags || [])];
+        
         const activePeople = (this.peopleData || [])
             .filter(p => (p.Status || '').toLowerCase() !== 'inaktiv')
-            .map(p => ({ id: p.id, name: `${p.vorname} ${p.nachname}` }));
+            .map(p => ({ id: p.id, name: `${p.vorname} ${p.nachname}`, teams: (p.Team || p.Teams || '').split(',').map(s => s.trim()).filter(Boolean) }));
 
         return BaseDialog.show({
             overlayClassName: 'picker-overlay',
@@ -106,11 +122,11 @@ export class EventGamesField extends Field {
             closeOnOutsideClick: true,
             onEscapeValue: null,
             render: (dialog, overlay, resolve, cleanup) => {
-                dialog.style.maxWidth = '500px';
+                dialog.style.maxWidth = '600px';
 
                 const header = document.createElement('div');
                 header.className = 'picker-header';
-                header.innerHTML = '<h2>Spiele & Verantwortliche</h2>';
+                header.innerHTML = '<h2>Reihenfolge & Verantwortliche</h2>';
                 dialog.appendChild(header);
 
                 const content = document.createElement('div');
@@ -149,19 +165,29 @@ export class EventGamesField extends Field {
 
                     const section = document.createElement('div');
                     section.className = 'picker-section selected-section';
-                    section.innerHTML = '<div class="picker-section-title">Ausgewählte Spiele</div>';
+                    section.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div class="picker-section-title">Aktuelle Reihenfolge</div>
+                            <button class="picker-btn primary" style="padding:4px 8px; font-size:10px;">+ Neuer Punkt</button>
+                        </div>
+                    `;
+
+                    section.querySelector('.primary').onclick = () => {
+                        internalSelected.push({ name: 'Neuer Punkt', team: 'Aktivitäten', responsible: null });
+                        refreshSelected();
+                    };
 
                     const list = document.createElement('div');
                     list.className = 'picker-list';
-                    list.style.gap = '10px';
+                    list.style.gap = '8px';
 
                     internalSelected.forEach((item, idx) => {
                         const itemRow = document.createElement('div');
                         itemRow.className = 'event-game-picker-row';
                         itemRow.style.display = 'flex';
-                        itemRow.style.alignItems = 'flex-end';
-                        itemRow.style.gap = '12px';
-                        itemRow.style.padding = '8px';
+                        itemRow.style.alignItems = 'center';
+                        itemRow.style.gap = '8px';
+                        itemRow.style.padding = '6px';
                         itemRow.style.borderBottom = '1px solid var(--border-light)';
 
                         // Drag/Nav controls
@@ -169,67 +195,55 @@ export class EventGamesField extends Field {
                         nav.style.display = 'flex';
                         nav.style.flexDirection = 'column';
                         nav.style.gap = '2px';
-
-                        const up = document.createElement('button');
-                        up.className = 'col-nav-btn';
-                        up.innerHTML = '▲';
-                        up.disabled = idx === 0;
-                        up.onclick = () => {
-                            const itm = internalSelected.splice(idx, 1)[0];
-                            internalSelected.splice(idx - 1, 0, itm);
-                            refreshSelected();
-                        };
-
-                        const down = document.createElement('button');
-                        down.className = 'col-nav-btn';
-                        down.innerHTML = '▼';
-                        down.disabled = idx === internalSelected.length - 1;
-                        down.onclick = () => {
-                            const itm = internalSelected.splice(idx, 1)[0];
-                            internalSelected.splice(idx + 1, 0, itm);
-                            refreshSelected();
-                        };
-
-                        nav.appendChild(up);
-                        nav.appendChild(down);
+                        const up = document.createElement('button'); up.className = 'col-nav-btn'; up.innerHTML = '▲'; up.disabled = idx === 0;
+                        up.onclick = () => { const itm = internalSelected.splice(idx, 1)[0]; internalSelected.splice(idx - 1, 0, itm); refreshSelected(); };
+                        const down = document.createElement('button'); down.className = 'col-nav-btn'; down.innerHTML = '▼'; down.disabled = idx === internalSelected.length - 1;
+                        down.onclick = () => { const itm = internalSelected.splice(idx, 1)[0]; internalSelected.splice(idx + 1, 0, itm); refreshSelected(); };
+                        nav.appendChild(up); nav.appendChild(down);
                         itemRow.appendChild(nav);
 
-                        const status = this._getGameStatus(item.name);
-                        const isDeleted = !this._getGameCategory(item.name);
-                        const statusClass = isDeleted ? 'status-deleted' : (status ? 'status-' + status.toLowerCase().replace(/\\s+/g, '-') : 'status-to-do');
+                        const isAktivitäten = (item.team || 'Aktivitäten') === 'Aktivitäten';
+                        const status = isAktivitäten ? this._getGameStatus(item.name) : 'To Do';
+                        const isDeleted = isAktivitäten && !this._getGameCategory(item.name);
+                        const statusClass = isDeleted ? 'status-deleted' : (status ? 'status-' + status.toLowerCase().replace(/\s+/g, '-') : 'status-to-do');
 
-                        const info = document.createElement('div');
-                        info.style.flex = '1';
-                        info.style.cursor = 'pointer';
-                        info.onclick = () => {
-                            if (!isDeleted) window.dispatchEvent(new CustomEvent('jump-to-game', { detail: { gameName: item.name } }));
+                        // Team select
+                        const teamSel = document.createElement('select');
+                        teamSel.className = 'dialog-input';
+                        teamSel.style.width = '100px';
+                        teamSel.style.fontSize = '11px';
+                        teamSel.innerHTML = availableTeams.map(t => `<option value="${t.name}" ${item.team === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
+                        teamSel.onchange = (e) => {
+                            item.team = e.target.value;
+                            item.responsible = null; // Reset person on team change
+                            refreshSelected();
                         };
+                        itemRow.appendChild(teamSel);
 
-                        const cat = document.createElement('div');
-                        cat.style.fontSize = '10px';
-                        cat.style.color = 'var(--text-muted)';
-                        cat.style.marginBottom = '2px';
-                        cat.textContent = isDeleted ? 'Eintrag wurde gelöscht' : this._getGameCategory(item.name);
-                        info.appendChild(cat);
+                        // Editable Name
+                        const nameInput = document.createElement('input');
+                        nameInput.className = 'dialog-input';
+                        nameInput.style.flex = '1';
+                        nameInput.style.fontSize = '12px';
+                        nameInput.style.fontWeight = '600';
+                        nameInput.value = item.name;
+                        nameInput.oninput = (e) => item.name = e.target.value;
+                        itemRow.appendChild(nameInput);
 
-                        const name = document.createElement('div');
-                        name.className = `event-game-tag-preview ${statusClass}`;
-                        name.style.fontWeight = '600';
-                        name.textContent = item.name;
-                        info.appendChild(name);
-
-                        itemRow.appendChild(info);
-
-                        const sel = document.createElement('select');
-                        sel.className = 'dialog-input';
-                        sel.style.width = '130px';
-                        sel.innerHTML = '<option value="">Verantw...</option>' +
-                            activePeople.map(p => `<option value="${p.id}" ${item.responsible === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
-                        sel.onchange = (e) => item.responsible = e.target.value;
-                        itemRow.appendChild(sel);
+                        // Person select (filtered by team)
+                        const filteredPeople = activePeople.filter(p => !item.team || item.team === 'all' || p.teams.includes(item.team));
+                        const personSel = document.createElement('select');
+                        personSel.className = 'dialog-input';
+                        personSel.style.width = '120px';
+                        personSel.style.fontSize = '11px';
+                        personSel.innerHTML = '<option value="">Person...</option>' +
+                            filteredPeople.map(p => `<option value="${p.id}" ${item.responsible === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
+                        personSel.onchange = (e) => item.responsible = e.target.value;
+                        itemRow.appendChild(personSel);
 
                         const del = document.createElement('button');
                         del.className = 'picker-btn secondary';
+                        del.style.padding = '4px 8px';
                         del.textContent = '✕';
                         del.onclick = () => { internalSelected.splice(idx, 1); refreshSelected(); };
                         itemRow.appendChild(del);
@@ -240,7 +254,7 @@ export class EventGamesField extends Field {
 
                     if (internalSelected.length === 0) {
                         const empty = document.createElement('div');
-                        empty.textContent = 'Keine Spiele ausgewählt';
+                        empty.textContent = 'Noch keine Einträge vorhanden.';
                         empty.style.padding = '20px';
                         empty.style.textAlign = 'center';
                         empty.style.color = 'var(--text-muted)';
@@ -265,7 +279,7 @@ export class EventGamesField extends Field {
                     headerRow.style.justifyContent = 'space-between';
                     headerRow.style.alignItems = 'center';
                     headerRow.style.marginBottom = '8px';
-                    headerRow.innerHTML = '<div class="picker-section-title" style="margin:0">Verfügbare Spiele</div>';
+                    headerRow.innerHTML = '<div class="picker-section-title" style="margin:0">Objekt hinzufügen (Aktivitäten)</div>';
 
                     const search = document.createElement('input');
                     search.className = 'dialog-input';
@@ -278,14 +292,13 @@ export class EventGamesField extends Field {
                             e.preventDefault();
                             const sVal = search.value.trim();
                             if (!sVal) return;
-                            if (availableGames.find(g => g.toLowerCase() === sVal.toLowerCase())) {
-                                internalSelected.push({ name: availableGames.find(g => g.toLowerCase() === sVal.toLowerCase()), responsible: null });
+                            const match = availableGames.find(g => g.toLowerCase() === sVal.toLowerCase());
+                            if (match) {
+                                internalSelected.push({ name: match, team: 'Aktivitäten', responsible: null });
                                 refreshSelected();
-                                search.value = '';
-                                _applySearch('');
+                                search.value = ''; _applySearch('');
                                 return;
                             }
-                            // Trigger Quick Add
                             await handleQuickAdd(sVal, search);
                         }
                     };
@@ -307,7 +320,7 @@ export class EventGamesField extends Field {
                         tag.style.padding = '6px 10px';
                         tag.style.cursor = 'pointer';
                         tag.innerHTML = `<span style="font-size:8px; opacity:0.6">${this._getGameCategory(game) || '&nbsp;'}</span><span style="font-weight:500">${game}</span>`;
-                        tag.onclick = () => { internalSelected.push({ name: game, responsible: null }); refreshSelected(); };
+                        tag.onclick = () => { internalSelected.push({ name: game, team: 'Aktivitäten', responsible: null }); refreshSelected(); };
                         tag.ondblclick = (e) => {
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent('jump-to-game', { detail: { gameName: game } }));
@@ -357,7 +370,7 @@ export class EventGamesField extends Field {
                             const inserted = await res.json();
                             const newGame = inserted[0];
                             GlobalStateManager.getInstance().trackSessionGame(newGame.name, c.label);
-                            internalSelected.push({ name: newGame.name, responsible: null });
+                            internalSelected.push({ name: newGame.name, team: 'Aktivitäten', responsible: null });
                             availableGames.push(newGame.name);
                             refreshSelected();
                             refreshAvailable();

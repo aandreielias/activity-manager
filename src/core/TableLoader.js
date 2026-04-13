@@ -40,8 +40,10 @@ export class TableLoader {
 
         // Post-processing to link games to events
         if (tables['tbl_events']) {
-            const gamesCol = tables['tbl_events'].instance.schema.find(c => c.id === 'games' || c.id === 'spiele' || c.header === 'Spiele');
+            const gamesCol = tables['tbl_events'].instance.schema.find(c => ['reihenfolge', 'games', 'spiele'].includes(c.id) || c.header === 'Spiele');
             if (gamesCol) {
+                gamesCol.header = 'Reihenfolge';
+                gamesCol.label = 'Reihenfolge';
                 // Remove duplicates and map to simple names
                 gamesCol.availableTags = [...new Set(allGames.map(g => g.name))].sort();
             }

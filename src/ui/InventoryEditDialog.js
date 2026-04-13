@@ -283,9 +283,10 @@ export class InventoryEditDialog extends BaseDialog {
                             row.data[id] = val;
                         });
                         
+                        row.isDirty = true;
                         gs.markTableAsUnsaved(tableId);
                         row.render(); 
-                        
+
                         cleanup();
                     } catch (e) {
                         alert(`Fehler: ${e.message}`);

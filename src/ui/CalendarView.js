@@ -3,6 +3,7 @@ import { contextMenu } from './ContextMenu.js';
 import { CalendarExport } from '../utils/CalendarExport.js';
 import { Dialog } from './Dialog.js';
 import { GlobalStateManager } from '../core/GlobalStateManager.js';
+import { Tooltip } from './Tooltip.js';
 
 export class CalendarView {
     constructor({ eventsTable, allTables }) {
@@ -128,14 +129,6 @@ export class CalendarView {
             };
         });
 
-        // Handle game tag clicks
-        this.element.querySelectorAll('.calendar-event-game-btn').forEach(el => {
-            el.onclick = (e) => {
-                e.stopPropagation();
-                const gameName = el.textContent.trim();
-                this.onGameClick?.(gameName);
-            };
-        });
 
         // Handle add event clicks
         this.element.querySelectorAll('.calendar-add-btn').forEach(el => {
@@ -145,6 +138,41 @@ export class CalendarView {
                 this.onAddEvent?.(dateStr);
             };
         });
+
+        // Attach Tooltips
+        this.element.querySelectorAll('.calendar-event-wrapper').forEach(wrapper => {
+            const row = this.eventsTable.rows.find(r => r.id === wrapper.dataset.eventId);
+            if (!row) return;
+
+            const items = this._getEventItems(row);
+            const locationName = row.data.location?.title || (typeof row.data.location === 'string' ? row.data.location : '');
+            const responsibleName = this._resolveResponsibleName(row.data.responsible);
+
+            let html = `<span class="tooltip-title">${row.data.name}</span>`;
+            if (locationName) html += `<div>${locationName}</div>`;
+            if (responsibleName) html += `<div>${responsibleName}</div>`;
+            
+            if (items.length > 0) {
+                html += `<div class="tooltip-section-title">Reihenfolge</div>`;
+                html += `<div class="tooltip-list">`;
+                items.forEach((itm, idx) => {
+                    html += `<div>${idx + 1}. ${itm.name}</div>`;
+                });
+                html += `</div>`;
+            }
+
+            Tooltip.attach(wrapper, html, 500); // 0.5s delay
+        });
+    }
+
+    _getEventItems(row) {
+        try {
+            const raw = row.data.reihenfolge || row.data.games || '[]';
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (err) {
+            return (row.data.reihenfolge || row.data.games || '').split(',').map(g => ({ name: g.trim() })).filter(g => g.name);
+        }
     }
 
     _generateDaysHTML() {
@@ -199,12 +227,13 @@ export class CalendarView {
                     </div>
                     <div class="calendar-events-list">
                         ${dayEvents.map(e => {
-        let games = [];
+        let items = [];
         try {
-            const parsed = JSON.parse(e.data.games || '[]');
-            games = Array.isArray(parsed) ? parsed.map(g => (typeof g === 'string' ? g : g.name)) : [];
+            const raw = e.data.reihenfolge || e.data.games || '[]';
+            const parsed = JSON.parse(raw);
+            items = Array.isArray(parsed) ? parsed : [];
         } catch (err) {
-            games = (e.data.games || '').split(',').map(g => g.trim()).filter(g => g);
+            items = (e.data.reihenfolge || e.data.games || '').split(',').map(g => ({ name: g.trim() })).filter(g => g.name);
         }
 
         const isFav = GlobalStateManager.getInstance().isFavorite(e.id);
@@ -214,29 +243,14 @@ export class CalendarView {
         const statusClass = (e.data.status || '').toLowerCase().replace(/\s+/g, '-');
         const pastClass = isPast ? 'is-past' : '';
 
-        let tooltip = e.data.name;
-        if (locationName) tooltip += ` @ ${locationName}`;
-        if (responsibleName) tooltip += ` w/ ${responsibleName}`;
-
         return `
-                                <div class="calendar-event-wrapper" data-event-id="${e.id}" draggable="true">
-                                    <button class="calendar-event-main ${statusClass ? 'status-' + statusClass : ''} ${pastClass}" title="${tooltip}">
-                                        <span class="calendar-event-name">${isFav ? '❤️ ' : ''}${e.data.name}</span>
-                                        ${locationName ? `<span class="calendar-event-location">${locationName}</span>` : ''}
-                                    </button>
-                                    <div class="calendar-event-games">
-                                        ${games.map(g => {
-        const gameStatus = this._getGameStatus(g);
-        const gameStatusClass = gameStatus ? 'status-' + gameStatus.toLowerCase().replace(/\s+/g, '-') : '';
-        return `
-                                                <button class="calendar-event-game-btn ${gameStatusClass}" title="Spiel ${g} anzeigen (Status: ${gameStatus || '?'})">
-                                                    ${g}
-                                                </button>
-                                            `;
-    }).join('')}
-                                    </div>
-                                </div>
-                            `;
+            <div class="calendar-event-wrapper" data-event-id="${e.id}" draggable="true">
+                <button class="calendar-event-main ${statusClass ? 'status-' + statusClass : ''} ${pastClass}">
+                    <span class="calendar-event-name">${isFav ? '❤️ ' : ''}${e.data.name}</span>
+                    ${locationName ? `<span class="calendar-event-location">${locationName}</span>` : ''}
+                </button>
+            </div>
+        `;
     }).join('')}
                     </div>
                 </div>`;
@@ -254,17 +268,6 @@ export class CalendarView {
         return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     }
 
-    _getGameStatus(gameName) {
-        if (!this.allTables) return null;
-        for (const [id, tableInfo] of Object.entries(this.allTables)) {
-            if (tableInfo.config.category !== 'spiele') continue;
-            const row = tableInfo.instance.rows.find(r => r.data.name === gameName);
-            if (row) {
-                return row.data.status || 'To Do';
-            }
-        }
-        return null;
-    }
 
     changeMonth(delta) {
         this.currentDate.setMonth(this.currentDate.getMonth() + delta);

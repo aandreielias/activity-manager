@@ -50,7 +50,8 @@ export class UIManager {
 
         this.header.onTableSwitch = (id, rowId, colId) => this._handleTableSwitch(id, rowId, colId);
         this.header.onPersonsToggle = () => this._handlePersonsToggle();
-        this.header.onPersonTeamSwitch = (team) => this._handlePersonTeamSwitch(team);
+        this.header.onPersonTeamSplitSwitch = (team) => this._handlePersonTeamSplitSwitch(team);
+        this.header.onPersonTeamMainSwitch = (team) => this._handlePersonTeamMainSwitch(team);
         this.header.onInventoryToggle = () => this._handleInventoryToggle();
         this.header.onPersonsFullView = () => this._handlePersonsFullView();
         this.header.onInventoryFullView = () => this._handleInventoryFullView();
@@ -282,33 +283,61 @@ export class UIManager {
                 const teams = gs.getAvailableTeams();
                 let teamData = this._groupPeopleByTeam(peopleData, teams);
                 
-                // DATA ISOLATION REMOVED - Everyone sees all teams
-
                 const container = document.createElement('div');
                 container.className = 'people-multi-table-container';
                 
                 this.personsTeamTables = {};
                 
+                // Unified Table: All persons grouped by Status
+                const unifiedTable = new Table({
+                    ...config,
+                    id: 'tbl_people',
+                    title: 'Alle Personen',
+                    schema: config.schema,
+                    rows: peopleData,
+                    peopleData: peopleData,
+                    sourceData: peopleData,
+                    tableConfig: { 
+                        ...config, 
+                        id: 'tbl_people',
+                        defaultRowData: { Status: 'Aktiv', role: 'User' } // Core defaults
+                    },
+                });
+                this.personsUnifiedTable = unifiedTable;
+                unifiedTable.localFilters.groupBy = 'Status';
+                unifiedTable.onDataChange(() => this._refreshAllPeopleViews(peopleData));
+                
+                const unifiedEl = unifiedTable.render();
+                unifiedEl.dataset.team = 'all';
+                container.appendChild(unifiedEl);
+
                 Object.entries(teamData).forEach(([teamName, rows]) => {
                     const table = new Table({
                         ...config,
-                        id: 'tbl_people', // Use common ID for saving
+                        id: 'tbl_people', 
                         title: `Team: ${teamName}`,
                         schema: config.schema,
                         rows: rows,
-                        peopleData: rows,
-                        tableConfig: { ...config, id: 'tbl_people' },
+                        peopleData: peopleData,
+                        sourceData: peopleData,
+                        tableConfig: { 
+                            ...config, 
+                            id: 'tbl_people',
+                            defaultRowData: { 
+                                Team: teamName, 
+                                Status: 'Aktiv', 
+                                role: 'User' 
+                            } 
+                        },
                     });
                     
                     this.personsTeamTables[teamName] = table;
-                    table.localFilters.groupBy = 'Status'; // Restore automatic grouping
-                    
-                    // SYNC: Refresh all people tables when data changes
+                    table.localFilters.groupBy = 'Status';
                     table.onDataChange(() => this._refreshAllPeopleViews(peopleData));
                     
                     const tableEl = table.render();
+                    tableEl.dataset.team = teamName;
                     
-                    // Auto-collapse if empty
                     if (rows.length === 0) {
                         tableEl.classList.add('collapsed');
                         const icon = tableEl.querySelector('.collapse-icon');
@@ -319,7 +348,7 @@ export class UIManager {
                 });
                 
                 wrapper.appendChild(container);
-                tables[tableId].instances = Object.values(this.personsTeamTables);
+                tables[tableId].instances = [unifiedTable, ...Object.values(this.personsTeamTables)];
             } else {
                 wrapper.appendChild(instance.render());
             }
@@ -442,23 +471,42 @@ export class UIManager {
         return groups;
     }
 
-    _handlePersonTeamSwitch(team) {
-        // Ensure the split view is open for persons
+    _handlePersonTeamSplitSwitch(team) {
+        // Ensure split view is open for persons
         if (!this.header.personsSplitOpen) {
             this._handlePersonsToggle();
         }
         
-        // Filter the tables inside the split container
-        const tables = this.splitSideContainer.querySelectorAll('.table-wrapper');
-        
-        if (team === 'all') {
-            tables.forEach(t => t.style.display = 'block');
-        } else {
+        // Filter the split container
+        const updateContainer = (container) => {
+            if (!container) return;
+            const tables = container.querySelectorAll('.table-wrapper');
             tables.forEach(t => {
-                const title = t.querySelector('.table-title')?.textContent || '';
-                const isMatch = title.toLowerCase().includes(team.toLowerCase());
+                const isMatch = (team === 'all' && t.dataset.team === 'all') || (t.dataset.team === team);
                 t.style.display = isMatch ? 'block' : 'none';
             });
+        };
+        updateContainer(this.personsSplitElement);
+    }
+
+    _handlePersonTeamMainSwitch(team) {
+        // Switch main view to people
+        this.header.switchTo('tbl_people');
+        this._handleTableSwitch('tbl_people');
+
+        // Filter the main container
+        const container = this.mainContent.querySelector('.people-multi-table-container');
+        if (container) {
+            const tables = container.querySelectorAll('.table-wrapper');
+            tables.forEach(t => {
+                const isMatch = (team === 'all' && t.dataset.team === 'all') || (t.dataset.team === team);
+                t.style.display = isMatch ? 'block' : 'none';
+            });
+        }
+        
+        // Auto-close sidebar if it was showing the same thing
+        if (this.header.personsSplitOpen) {
+            this._handlePersonsToggle();
         }
     }
 
@@ -504,6 +552,16 @@ export class UIManager {
                 table.renderer?.update();
             });
         }
+
+        // Update Unified View (Main and Split)
+        if (this.personsUnifiedTable) {
+            this.personsUnifiedTable.rows = toRows(peopleData, this.personsUnifiedTable);
+            this.personsUnifiedTable.renderer?.update();
+        }
+        if (this.personsSplitUnifiedTable) {
+            this.personsSplitUnifiedTable.rows = toRows(peopleData, this.personsSplitUnifiedTable);
+            this.personsSplitUnifiedTable.renderer?.update();
+        }
     }
 
     _initSplitViewTables(tables, peopleData) {
@@ -522,25 +580,58 @@ export class UIManager {
             container.className = 'people-split-multi-container';
             
             this.personsSplitTeamTables = {};
+
+            const peopleConfig = tables['tbl_people']?.config || { id: 'tbl_people', schema: [] };
+
+            // Unified Table for Split View
+            const unifiedTable = new Table({
+                ...peopleConfig,
+                id: 'tbl_people',
+                title: 'Alle Personen',
+                schema: peopleConfig.schema,
+                rows: peopleData,
+                peopleData: peopleData,
+                sourceData: peopleData,
+                tableConfig: { 
+                    ...peopleConfig, 
+                    id: 'tbl_people',
+                    defaultRowData: { Status: 'Aktiv', role: 'User' }
+                },
+            });
+            this.personsSplitUnifiedTable = unifiedTable;
+            unifiedTable.localFilters.groupBy = 'Status';
+            unifiedTable.onDataChange(() => this._refreshAllPeopleViews(peopleData));
+
+            const unifiedEl = unifiedTable.render();
+            unifiedEl.dataset.team = 'all';
+            container.appendChild(unifiedEl);
             
             Object.entries(teamData).forEach(([teamName, rows]) => {
-                const peopleConfig = tables['tbl_people']?.config || { id: 'tbl_people', schema: [] };
                 const table = new Table({
-                    id: 'tbl_people', // Use common ID for saving
+                    id: 'tbl_people', 
                     title: `Team: ${teamName}`,
                     schema: peopleConfig.schema,
                     rows: rows,
-                    peopleData: rows,
-                    tableConfig: { ...peopleConfig, id: `tbl_people` },
+                    peopleData: peopleData,
+                    sourceData: peopleData,
+                    tableConfig: { 
+                        ...peopleConfig, 
+                        id: `tbl_people`,
+                        defaultRowData: { 
+                            Team: teamName, 
+                            Status: 'Aktiv', 
+                            role: 'User' 
+                        }
+                    },
                 });
                 
                 this.personsSplitTeamTables[teamName] = table;
-                table.localFilters.groupBy = 'Status'; // Restore automatic grouping
+                table.localFilters.groupBy = 'Status';
                 
-                // SYNC: Refresh all people tables when data changes
                 table.onDataChange(() => this._refreshAllPeopleViews(peopleData));
                 
                 const tableEl = table.render();
+                tableEl.dataset.team = teamName;
                 
                 if (rows.length === 0) {
                     tableEl.classList.add('collapsed');
@@ -675,6 +766,18 @@ export class UIManager {
                 el.style.display = this.app.tableConfigs.find(c => c.id === id)?.category === 'spiele' ? 'block' : 'none';
             } else if (tableId === 'all-sportarten') {
                 el.style.display = this.app.tableConfigs.find(c => c.id === id)?.category === 'sportarten' ? 'block' : 'none';
+            } else if (tableId === 'tbl_people') {
+                el.style.display = id === 'tbl_people' ? 'block' : 'none';
+                if (id === 'tbl_people') {
+                    // Default to showing only the unified table when manually switching
+                    const container = el.querySelector('.people-multi-table-container');
+                    if (container) {
+                        const tables = container.querySelectorAll('.table-wrapper');
+                        tables.forEach(t => {
+                            t.style.display = t.dataset.team === 'all' ? 'block' : 'none';
+                        });
+                    }
+                }
             } else {
                 el.style.display = id === tableId ? 'block' : 'none';
             }
@@ -745,6 +848,25 @@ export class UIManager {
 
             let currentY = 15;
 
+            // Helper to load image as base64 for PDF
+            const getBase64Image = async (imgUrl) => {
+                if (!imgUrl) return null;
+                try {
+                    const isFull = imgUrl.includes('://') || imgUrl.startsWith('data:');
+                    const fullUrl = isFull ? imgUrl : `https://kmsdsymoehleonxzcbnm.supabase.co/storage/v1/object/public/inventory_picture_bucket/${imgUrl}`;
+                    const response = await fetch(fullUrl);
+                    const blob = await response.blob();
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (e) {
+                    console.warn('[PDF Export] Failed to fetch image:', imgUrl);
+                    return null;
+                }
+            };
+
             // Render Global Filter Info at the very top
             if (isFiltered) {
                 doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
@@ -812,8 +934,18 @@ export class UIManager {
                     doc.setTextColor(0);
                 }
 
-                const exportSchema = tableInstance.schema.filter(col => !ignoreCols.includes(col.label) && !ignoreCols.includes(col.id));
-                const head = [exportSchema.map(col => col.label)];
+                const isInventory = tableInstance.id === 'tbl_inventory';
+                let exportSchema = tableInstance.schema.filter(col => {
+                    if (ignoreCols.includes(col.label) || ignoreCols.includes(col.id)) return false;
+                    return true;
+                });
+
+                // Ensure image_url is included for inventory
+                if (isInventory && !exportSchema.find(c => c.id === 'image_url')) {
+                    exportSchema.unshift({ id: 'image_url', label: 'Bild' });
+                }
+
+                const head = [exportSchema.map(col => col.id === 'image_url' ? 'Bild' : col.label)];
 
                 // Filter rows for this specific table instance
                 let rowsToExport = tableInstance.rows;
@@ -822,21 +954,53 @@ export class UIManager {
                     rowsToExport = rowsToExport.filter(row => FilterEngine.matchesFilters(row, globalFilter.filters));
                 }
 
+                // Pre-load images if inventory
+                const imageCache = {};
+                if (isInventory) {
+                    const imagePromises = rowsToExport.map(async (row) => {
+                        const url = row.data.image_url;
+                        if (url) {
+                            const base64 = await getBase64Image(url);
+                            if (base64) imageCache[row.id] = base64;
+                        }
+                    });
+                    await Promise.all(imagePromises);
+                }
+
                 const body = rowsToExport.map(row => exportSchema.map(col => {
+                    if (col.id === 'image_url') return ''; // Handled by didDrawCell
                     let val = row.data[col.id];
                     if (val === null || val === undefined) return '';
                     let strVal = typeof val === 'object' ? (Array.isArray(val) ? val.map(v => typeof v === 'object' ? v.name || v.id : v).join(', ') : (val.title || val.name || JSON.stringify(val))) : String(val);
                     return strVal.length > 250 ? strVal.substring(0, 247) + '...' : strVal;
                 }));
 
-                autoTable(doc, { 
-                    head, 
-                    body, 
-                    startY: currentY, 
-                    styles: { fontSize: usePortrait ? 7 : 8, cellPadding: 2, overflow: 'linebreak', valign: 'middle' }, 
-                    headStyles: { fillColor: ColourFactory.getBrandBlueRGB(), fontSize: usePortrait ? 8 : 9 }, 
-                    margin: { left: 14, right: 14 } 
-                });
+            const imgColIdx = exportSchema.findIndex(c => c.id === 'image_url');
+
+            autoTable(doc, { 
+                head, 
+                body, 
+                startY: currentY, 
+                styles: { 
+                    fontSize: usePortrait ? 7 : 8, 
+                    cellPadding: 2, 
+                    overflow: 'linebreak', 
+                    valign: 'middle',
+                    minCellHeight: isInventory ? 30 : 0 
+                }, 
+                headStyles: { fillColor: ColourFactory.getBrandBlueRGB(), fontSize: usePortrait ? 8 : 9 }, 
+                columnStyles: isInventory && imgColIdx !== -1 ? { [imgColIdx]: { cellWidth: 32 } } : {},
+                margin: { left: 14, right: 14 },
+                didDrawCell: (data) => {
+                    if (isInventory && data.section === 'body' && data.column.index === imgColIdx) {
+                        const rowId = rowsToExport[data.row.index].id;
+                        const base64 = imageCache[rowId];
+                        if (base64) {
+                            doc.addImage(base64, 'JPEG', data.cell.x + 3.5, data.cell.y + 2.5, 25, 25);
+                        }
+                    }
+                }
+            });
                 
                 currentY = doc.lastAutoTable.finalY + 16;
             }
@@ -935,9 +1099,11 @@ export class UIManager {
                 this.header.inventorySplitOpen = false; 
                 this.header.calendarSplitOpen = false;
                 this._setSplitContent('people'); 
-                // Ensure all team tables are visible when toggled via main button
+                // Default to unified view when toggled via main button
                 if (this.personsSplitElement) {
-                    this.personsSplitElement.querySelectorAll('.table-wrapper').forEach(t => t.style.display = 'block');
+                    this.personsSplitElement.querySelectorAll('.table-wrapper').forEach(t => {
+                        t.style.display = t.dataset.team === 'all' ? 'block' : 'none';
+                    });
                 }
             }
         }
@@ -1026,6 +1192,12 @@ export class UIManager {
 
     _handlePersonsFullView() {
         this._setSplitContent('people');
+        // Show only unified table in full view
+        if (this.personsSplitElement) {
+            this.personsSplitElement.querySelectorAll('.table-wrapper').forEach(t => {
+                t.style.display = t.dataset.team === 'all' ? 'block' : 'none';
+            });
+        }
         this.splitSideWrapper.classList.add('full-view');
         this.header.personsSplitOpen = true; 
         this.header.inventorySplitOpen = false;
@@ -1077,6 +1249,10 @@ export class UIManager {
     }
 
     async _handleUserInfo() {
+        if (!GlobalStateManager.getInstance().isSuperAdmin()) {
+            alert('Nur SuperAdmins haben Zugriff auf das System-Dashboard.');
+            return;
+        }
         await UserInfoPage.show(this.app.peopleData, this.app.tableConfigs, this.tables);
     }
 

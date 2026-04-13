@@ -89,8 +89,9 @@ export class DataService {
      * @param {string} tableId  Front-end table ID
      * @param {string} _filename  Legacy param (ignored)
      * @param {Array}  rows  Array of Row instances or plain objects
+     * @param {Array}  deletedIds  Optional list of IDs to delete
      */
-    static async saveTable(tableId, _filename, rows) {
+    static async saveTable(tableId, _filename, rows, deletedIds = []) {
         const { supaTable, category } = this._resolveTable(tableId);
 
         if (supaTable === 'events') {
@@ -105,8 +106,10 @@ export class DataService {
             return this._toDb(supaTable, plain, category);
         });
 
-        // Delete rows that no longer exist (full replace strategy)
-        await this._deleteRemovedRows(supaTable, category, dbRows, tableId);
+        // Delete rows that were explicitly removed
+        if (deletedIds && deletedIds.length > 0) {
+            await this._deleteRemovedRows(supaTable, category, deletedIds, tableId);
+        }
 
         // Upsert all current rows
         if (dbRows.length > 0) {
@@ -196,15 +199,10 @@ export class DataService {
     /**
      * Delete rows from the DB that are no longer present in the current dataset.
      */
-    static async _deleteRemovedRows(supaTable, category, dbRows, tableId) {
-        const currentIds = dbRows.map(r => r.id).filter(Boolean);
-        let deleteQuery;
-
-        if (currentIds.length > 0) {
-            deleteQuery = `?id=not.in.(${currentIds.map(id => `"${id}"`).join(',')})`;
-        } else {
-            deleteQuery = '?id=not.is.null';
-        }
+    static async _deleteRemovedRows(supaTable, category, deletedIds, tableId) {
+        if (!deletedIds || deletedIds.length === 0) return;
+        
+        let deleteQuery = `?id=in.(${deletedIds.map(id => `"${id}"`).join(',')})`;
 
         if (supaTable === 'activities' && category) {
             deleteQuery += `&category=eq.${category}`;
@@ -230,8 +228,8 @@ export class DataService {
                 responsibility_1: row.responsibility_1 ? row.responsibility_1.toLowerCase() : null,
                 responsibility_2: row.responsibility_2 ? row.responsibility_2.toLowerCase() : null,
                 spez_zustaendigkeit: row['Spez. Zuständigkeit'] || row.spez_zustaendigkeit || '',
-                created_by: row.createdBy || null,
-                created_at: row.createdAt || new Date().toISOString()
+                created_by: row.id ? undefined : (row.createdBy || null),
+                created_at: row.id ? undefined : (row.createdAt || new Date().toISOString())
             };
 
         case 'activities':
@@ -252,8 +250,8 @@ export class DataService {
                 team_tasks: row.team_tasks || '',
                 responsible_id: row.responsible || row.responsible_id || null,
                 status: row.status || 'To Do',
-                created_by: row.createdBy || null,
-                created_at: row.createdAt || new Date().toISOString()
+                created_by: row.id ? undefined : (row.createdBy || null),
+                created_at: row.id ? undefined : (row.createdAt || new Date().toISOString())
             };
 
         case 'inventory':
@@ -297,12 +295,12 @@ export class DataService {
                 date: row.date || null,
                 time: row.time || '18:30',
                 location: row.location?.id || null,
-                games: row.games || '',
+                reihenfolge: row.reihenfolge || '',
                 status: row.status || 'To Do',
                 responsible_id: row.responsible || row.responsible_id || null,
                 notes: row.notes || '',
-                created_by: row.createdBy || null,
-                created_at: row.createdAt || new Date().toISOString()
+                created_by: row.id ? undefined : (row.createdBy || null),
+                created_at: row.id ? undefined : (row.createdAt || new Date().toISOString())
             };
 
         case 'ort':
@@ -408,7 +406,7 @@ export class DataService {
                 date: row.date || '',
                 time: row.time || '',
                 location: row.location || '',
-                games: row.games || '',
+                reihenfolge: row.reihenfolge || '',
                 status: row.status || 'To Do',
                 responsible: row.responsible_id || '',
                 notes: row.notes || '',

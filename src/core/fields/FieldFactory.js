@@ -36,6 +36,7 @@ export class FieldFactory {
                 return new LocationField(params);
             }
             break;
+        case 'reihenfolge':
         case 'games':
             if (tableId === 'tbl_events') {
                 return new EventGamesField(params);

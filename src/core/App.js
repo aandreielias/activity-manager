@@ -123,6 +123,7 @@ export class App {
 
         try {
             this.peopleData = await DataService.loadPeople();
+            await this.globalState.loadAvailableTeams();
         } catch (e) {
             this.peopleData = [];
         }
@@ -203,7 +204,6 @@ export class App {
 
         await this.globalState.loadFavorites();
         await this.globalState.loadGlobalEnums();
-        await this.globalState.loadAvailableTeams();
     }
 
     // ── Interaction Handlers ─────────────────────────────────────
@@ -254,17 +254,13 @@ export class App {
                     } else if (entry.instance?.editor) {
                         await entry.instance.editor._saveTable(entry.instance);
                     }
-                } else if (id === 'people_table') {
-                    const allRows = [];
-                    if (this.uiManager.personsTable) allRows.push(...this.uiManager.personsTable.rows);
-                    if (this.uiManager.inactivePersonsTable) allRows.push(...this.uiManager.inactivePersonsTable.rows);
-
-                    if (this.uiManager.personsTable?.editor) {
-                        const originalRows = this.uiManager.personsTable.rows;
-                        this.uiManager.personsTable.rows = allRows;
-                        await this.uiManager.personsTable.editor._saveTable(this.uiManager.personsTable);
-                        this.uiManager.personsTable.rows = originalRows;
-                    }
+                } else if (id === 'people_table' || id === 'tbl_people') {
+                    const dirtyRowIds = this.globalState.getDirtyRowIds('tbl_people');
+                    const deletedIds = this.globalState.getDeletedRowIds('tbl_people');
+                    const dirtyRows = (this.peopleData || []).filter(p => dirtyRowIds.includes(p.id)).map(d => ({...d}));
+                    await DataService.saveTable('tbl_people', 'people.json', dirtyRows, deletedIds);
+                    this.globalState.clearDirtyRowIds('tbl_people');
+                    this.globalState.clearDeletedRowIds('tbl_people');
                 }
                 this.globalState.markTableAsSaved(id);
             }

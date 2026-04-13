@@ -81,11 +81,6 @@ export class Field {
     }
 
     startEditing() {
-        const globalState = GlobalStateManager.getInstance();
-        if (!globalState.canEditColumn(this.tableId, this.colDef.id)) {
-            return;
-        }
-
         this.td.classList.add('editing');
         this.td.classList.remove('expanded'); // Remove expanded state on double-click/editing
         this.contentWrap.style.display = 'none';

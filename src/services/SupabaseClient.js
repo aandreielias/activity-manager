@@ -84,4 +84,27 @@ export class SupabaseClient {
             headers: this.headers(),
         });
     }
+
+    /**
+     * Upload a file to a Supabase bucket.
+     * @param {string} bucket - Bucket name.
+     * @param {string} path - Remote path (filename).
+     * @param {Blob|File} file - File content.
+     * @returns {Promise<Response>}
+     */
+    static upload(bucket, path, file) {
+        const url = `${SUPABASE_CONFIG.URL}/storage/v1/object/${bucket}/${path}`;
+        const headers = {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+            'x-upsert': 'true',
+            'Content-Type': file.type || 'image/jpeg'
+        };
+        
+        return fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: file
+        });
+    }
 }

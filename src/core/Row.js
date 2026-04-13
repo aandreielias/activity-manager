@@ -96,6 +96,7 @@ export class Row {
         this.element.appendChild(favTd);
 
         this.schema.forEach(col => {
+            if (col.hidden) return;
             const field = this.fields[col.id];
             this.element.appendChild(field.render());
         });
@@ -132,6 +133,10 @@ export class Row {
             contextMenu.show(e.clientX, e.clientY, {
                 onDelete: onDelete,
                 onEdit: onEdit,
+                onEditRow: this.tableId === 'tbl_inventory' ? async () => {
+                    const { InventoryEditDialog } = await import('../ui/InventoryEditDialog.js');
+                    await InventoryEditDialog.show(this);
+                } : null,
                 onToggleFavorite: () => this.toggleFavorite(),
                 isFavorite: GlobalStateManager.getInstance().isFavorite(this.id),
                 onExportToCalendar: this.tableId === 'tbl_events' ? () => CalendarExport.exportEvent(this.data, GlobalStateManager.getInstance().getTables()) : null,
@@ -182,6 +187,10 @@ export class Row {
         this.schema.forEach(col => {
             result[col.id] = this.data[col.id] ?? null;
         });
+
+        // Ensure internal fields are preserved even if not in schema
+        if (this.data.image_url !== undefined) result.image_url = this.data.image_url;
+        if (this.data.updated_at !== undefined) result.updated_at = this.data.updated_at;
 
         if (this.createdBy) result.createdBy = this.createdBy;
         if (this.createdAt) result.createdAt = this.createdAt;

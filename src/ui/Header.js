@@ -3,7 +3,8 @@ import { GlobalStateManager } from '../core/GlobalStateManager.js';
 import { AuditLogsDialog } from './AuditLogsDialog.js';
 
 /**
- * Header - Main application header with navigation and theme toggle
+ * Header - Main application header with navigation and theme toggle (Cleaned).
+ * All Edit Mode and administrative creation tools have been removed.
  */
 export class Header {
     constructor({ appName = 'Activity Manager', onThemeToggle, onTableSwitch, tableConfigs = [], tables = {} }) {
@@ -30,7 +31,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.4.1';
+        return '2.4.2';
     }
 
     render() {
@@ -59,21 +60,14 @@ export class Header {
 
     _getHeaderHTML() {
         const globalState = GlobalStateManager.getInstance();
+        const viewableConfigs = this.tableConfigs;
 
-        // Filter configurations based on current view permissions
-        const viewableConfigs = this.tableConfigs.filter(t => globalState.canView(t.id));
-
-        // Categories
         const spieleTables = viewableConfigs.filter(t => t.category === 'spiele');
         const sportTables = viewableConfigs.filter(t => t.category === 'sportarten');
         const otherTables = viewableConfigs.filter(t => !t.category && !['tbl_people', 'tbl_inventory', 'tbl_ort'].includes(t.id));
 
-        // Permissions for split-views
-        const canViewPeople = globalState.canView('people_table') || globalState.canView('tbl_people');
-        const canViewInventory = globalState.canView('tbl_inventory');
-
         return `
-            <div class="header-left" title="do NOT double click">
+            <div class="header-left">
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
@@ -87,17 +81,11 @@ export class Header {
             `<button class="nav-btn ${idx === 0 && spieleTables.length === 0 ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`
         ).join('')}
                 
-                ${canViewPeople ? this._renderPersonenButton(globalState.getCurrentTeams()) : ''}
+                ${this._renderPersonenButton()}
                 
-                ${canViewInventory ? `
                 <button class="nav-btn inventory-toggle-btn" title="Inventar-Ansicht umschalten">
                     Inventar
-                </button>` : ''}
-
-                ${globalState.isEditModeActive() ? `
-                <button class="nav-btn orte-btn" data-table="tbl_ort" title="Orte verwalten">
-                    Orte
-                </button>` : ''}
+                </button>
             </nav>
             <div class="header-center">
                 <div class="header-search-container">
@@ -113,21 +101,9 @@ export class Header {
                 </div>
             </div>
             <div class="header-right">
-                ${globalState.canViewLogs() ? `
-                    <button class="nav-btn audit-logs-btn" title="Audit Logs ansehen" style="border-color:var(--text-secondary); color:var(--text-secondary)">
-                        Logs
-                    </button>
-                ` : ''}
-                ${globalState.canSeeStats() ? `
-                    <button class="nav-btn user-info-btn" title="System-Stats und Berechtigungen">
-                        Stats
-                    </button>
-                ` : ''}
-                ${globalState.isEditModeActive() ? `
-                    <button class="nav-btn add-table-btn" style="border-color:var(--warning); color:var(--warning)" title="Neue Kategorie erstellen">
-                        + Kategorie
-                    </button>
-                ` : ''}
+                <button class="nav-btn user-info-btn" title="System-Stats">
+                    Stats
+                </button>
                 <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
                     Kalender
                 </button>
@@ -136,11 +112,6 @@ export class Header {
                         ${globalState.getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
                     </button>
                     <div class="dropdown-menu user-dropdown-menu">
-                        ${globalState.canUseEditMode() ? `
-                            <button class="dropdown-item edit-mode-btn ${globalState.isEditModeActive() ? 'active' : ''}">
-                                ${globalState.isEditModeActive() ? 'Edit-Modus deaktivieren' : 'Edit-Modus aktivieren'}
-                            </button>
-                        ` : ''}
                         <button class="dropdown-item favorites-toggle-btn">Favoriten</button>
                         <button class="dropdown-item change-password-btn">Passwort ändern</button>
                         <button class="dropdown-item logout-btn">Abmelden</button>
@@ -155,19 +126,9 @@ export class Header {
 
     _renderPersonenButton() {
         const gs = GlobalStateManager.getInstance();
-        const isAdmin = gs.isAdmin() || gs.isSuperAdmin();
         const allTeams = gs.getAvailableTeams();
-        
-        if (!isAdmin) {
-            // Simple button for regular users/supervisors: No dropdown
-            return `
-                <button class="nav-btn persons-toggle-btn" title="Mein Team anzeigen">
-                    Personen
-                </button>
-            `;
-        }
 
-        // Full dropdown for Admins
+        // Show team dropdown for everyone
         return `
             <div class="dropdown-container split-btn-group">
                 <button class="nav-btn split-main-btn persons-toggle-btn" title="Alle Personen anzeigen">
@@ -187,13 +148,11 @@ export class Header {
     _renderCategoryButton(categoryTables, categoryId, categoryLabel) {
         if (categoryTables.length === 0) return '';
 
-        // If only ONE table is allowed in this category, show it as a simple button
         if (categoryTables.length === 1) {
             const table = categoryTables[0];
             return `<button class="nav-btn ${this.currentTable === table.id ? 'active' : ''}" data-table="${table.id}">${table.title}</button>`;
         }
 
-        // Multiple tables allowed -> Show split-button dropdown
         return `
             <div class="dropdown-container split-btn-group">
                 <button class="nav-btn split-main-btn" data-table="all-${categoryId}">
@@ -212,7 +171,6 @@ export class Header {
 
     _attachEventListeners() {
         if (!this.element) return;
-
 
         this.element.addEventListener('click', async (e) => {
             const btn = e.target.closest('.nav-btn, .dropdown-item');
@@ -245,34 +203,12 @@ export class Header {
                 this.onInventoryToggle?.();
             }
 
-            if (e.target.closest('.orte-btn')) {
-                this.onTableSwitch?.('tbl_ort');
-            }
-
             if (e.target.closest('.user-info-btn')) {
                 this.onUserInfo?.();
             }
 
-            if (e.target.closest('.add-table-btn')) {
-                const name = prompt('Name für die neue Kategorie (z.B. Escape Rooms):');
-                if (name) {
-                    try {
-                        const gs = GlobalStateManager.getInstance();
-                        const slug = name.toLowerCase().replace(/\s+/g, '_');
-                        // 1. Add to activity_category_enum
-                        await gs.addEnumOption('activity_category_enum', slug);
-                        // 2. Update local tables.json (simulated or instructions given)
-                        alert(`Kategorie '${name}' in DB erstellt. Bitte füge 'tbl_activities_${slug}' zu tables.json hinzu.`);
-                        window.location.reload();
-                    } catch (err) {
-                        alert(`Fehler: ${err.message}`);
-                    }
-                }
-            }
-
             if (e.target.closest('.calendar-toggle-btn')) {
                 this._closeAllDropdowns();
-                // Simple click handles split view toggle
                 this.onCalendarToggle?.();
             }
 
@@ -284,33 +220,15 @@ export class Header {
                 this.onChangePassword?.();
             }
 
-            if (e.target.closest('.edit-mode-btn')) {
-                const btn = e.target.closest('.edit-mode-btn');
-                const isActive = btn.textContent.includes('deaktivieren');
-                if (isActive) {
-                    btn.textContent = 'Edit-Modus aktivieren';
-                    btn.classList.remove('active');
-                } else {
-                    btn.textContent = 'Edit-Modus deaktivieren';
-                    btn.classList.add('active');
-                }
-                this.onEditModeToggle?.(!isActive);
-            }
-
             if (e.target.closest('.favorites-toggle-btn')) {
                 this.favoritesActive = !this.favoritesActive;
                 e.target.closest('.favorites-toggle-btn').classList.toggle('active', this.favoritesActive);
                 this.onFavoritesToggle?.(this.favoritesActive);
             }
 
-            if (e.target.closest('.audit-logs-btn')) {
-                await AuditLogsDialog.show();
-            }
-
-            // Dropdown toggles
             const dropdownBtn = e.target.closest('.dropdown-btn, .user-menu-btn');
             if (dropdownBtn) {
-                e.stopPropagation(); // Prevent global window click from closing it immediately
+                e.stopPropagation();
                 const container = dropdownBtn.closest('.dropdown-container');
                 const isShowing = container.classList.contains('show');
                 this._closeAllDropdowns();
@@ -320,7 +238,6 @@ export class Header {
             }
         });
 
-        // Logo double click for Blackjack
         const logo = this.element.querySelector('.header-left');
         if (logo) {
             logo.addEventListener('dblclick', () => {
@@ -328,7 +245,6 @@ export class Header {
             });
         }
 
-        // Split view buttons double click for full screen
         const personsBtn = this.element.querySelector('.persons-toggle-btn');
         if (personsBtn) {
             personsBtn.addEventListener('dblclick', () => {
@@ -351,7 +267,6 @@ export class Header {
             });
         }
 
-        // Unsaved changes banner
         const saveBtn = this.element.querySelector('.save-btn-header');
         if (saveBtn) {
             saveBtn.addEventListener('click', () => {
@@ -366,7 +281,6 @@ export class Header {
             });
         }
 
-        // Search bar
         const searchInput = this.element.querySelector('.header-search-input');
         const resultsDropdown = this.element.querySelector('.search-results-dropdown');
 
@@ -408,14 +322,12 @@ export class Header {
             });
         }
 
-        // Close search results on outside click
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.header-search-container')) {
                 resultsDropdown?.classList.remove('show');
             }
         });
 
-        // Handle result clicks
         resultsDropdown?.addEventListener('click', (e) => {
             const item = e.target.closest('.search-result-item');
             if (item && item.dataset.tableId) {
@@ -429,7 +341,6 @@ export class Header {
             }
         });
 
-        // Update selected index on mouse move
         resultsDropdown?.addEventListener('mouseover', (e) => {
             const item = e.target.closest('.search-result-item');
             if (item && item.dataset.index) {
@@ -454,7 +365,6 @@ export class Header {
         const results = [];
         const globalState = GlobalStateManager.getInstance();
 
-        // Iterate over all tables
         Object.entries(this.tables).forEach(([tableId, data]) => {
             if (!globalState.canView(tableId)) return;
 
@@ -472,7 +382,6 @@ export class Header {
                         const strValue = String(value).toLowerCase();
                         const colDef = inst.schema.find(c => c.id === colId);
 
-                        // Exact match (weight 2)
                         if (strValue === trimmedQuery) {
                             results.push({
                                 tableId, tableTitle, colId,
@@ -481,7 +390,6 @@ export class Header {
                                 score: 100, type: 'exact'
                             });
                         }
-                        // Starts with (weight 1.5)
                         else if (strValue.startsWith(trimmedQuery)) {
                             results.push({
                                 tableId, tableTitle, colId,
@@ -490,7 +398,6 @@ export class Header {
                                 score: 75, type: 'start'
                             });
                         }
-                        // Contains (weight 1)
                         else if (strValue.includes(trimmedQuery)) {
                             results.push({
                                 tableId, tableTitle, colId,
@@ -499,7 +406,6 @@ export class Header {
                                 score: 50, type: 'contains'
                             });
                         }
-                        // Fuzzy match (weight 0.5) - check if all chars present in order
                         else if (this._fuzzyMatch(trimmedQuery, strValue)) {
                             results.push({
                                 tableId, tableTitle, colId,
@@ -513,7 +419,6 @@ export class Header {
             });
         });
 
-        // Sort by score (highest first) and deduplicate
         const unique = new Map();
         results.sort((a, b) => b.score - a.score);
         results.forEach(r => {
@@ -593,7 +498,7 @@ export class Header {
         const banner = this.element.querySelector('.unsaved-banner');
         if (banner) {
             banner.style.display = 'flex';
-            this.setLoading(false); // Reset loading state when showing banner
+            this.setLoading(false);
         }
     }
 

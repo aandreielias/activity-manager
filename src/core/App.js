@@ -1,6 +1,5 @@
 import { SupabaseClient } from '../services/SupabaseClient.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
-import { PermissionService } from '../services/PermissionService.js';
 import { LoginDialog } from '../ui/LoginDialog.js';
 import { Blackjack } from '../games/blackjack/games/Blackjack.js';
 import { BlackjackUI } from '../games/blackjack/ui/BlackjackUI.js';
@@ -186,7 +185,14 @@ export class App {
             const isInactiveDir = (person.Status || '').toLowerCase() === 'inaktiv';
             if (isInactiveDir || (authRole || '').toLowerCase() === 'inaktiv') {
                 authRole = 'Inaktiv';
-                perms = PermissionService.getPermissionsForRole('Inaktiv');
+                // Initialize default permission object for inactive users
+                perms = {
+                    type: 'all',
+                    managementAccess: 'stats_only',
+                    canEditRoles: true,
+                    canUseEditMode: false,
+                    canViewLogs: true
+                };
             }
 
             const rawTeams = person.Team || '';

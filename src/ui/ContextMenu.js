@@ -41,6 +41,14 @@ export class ContextMenu {
             });
             this.element.appendChild(editItem);
 
+            if (options.onEditRow) {
+                const editRowItem = this._createMenuItem('Eintrag bearbeiten', () => {
+                    this.close();
+                    options.onEditRow();
+                });
+                this.element.appendChild(editRowItem);
+            }
+
             const separator = document.createElement('div');
             separator.className = 'context-menu-separator';
             this.element.appendChild(separator);

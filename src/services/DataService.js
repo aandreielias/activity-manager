@@ -1,7 +1,6 @@
 import { SupabaseClient } from './SupabaseClient.js';
 import { InventoryService } from './InventoryService.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
-import { AccessGuard } from './AccessGuard.js';
 
 /**
  * DataService — CRUD operations against the relational Supabase schema.
@@ -45,7 +44,6 @@ export class DataService {
      * Replaces the old app_config JSON approach.
      */
     static async loadTableDefinitions() {
-        // This follows the new bootstrap exemption in AccessGuard
         const res = await SupabaseClient.get('table_definitions', '?order=order_index.asc');
         if (!res.ok) {
             console.warn('[DataService] Structured table_definitions not found or inaccessible.');
@@ -59,22 +57,21 @@ export class DataService {
      * Returns an array of plain objects.
      */
     static async loadRows(tableId) {
-        return AccessGuard.run('READ', tableId, async () => {
-            const { supaTable, category } = this._resolveTable(tableId);
+        const { supaTable, category } = this._resolveTable(tableId);
 
-            let query = '?select=*';
-            if (supaTable === 'people') {
-                query = '?select=*,person_teams(teams(name))';
-            } else if (supaTable === 'activities' && category) {
-                query = `?select=*,activity_required_items(*,inventory(name))&category=eq.${category}`;
-            } else if (supaTable === 'sport_venues') {
-                query = '?select=*,address:ort(*)';
-                if (category) query += `&sport_type=eq.${category}`;
-            } else if (supaTable === 'events') {
-                query = '?select=*,location:ort(*)';
-            }
+        let query = '?select=*';
+        if (supaTable === 'people') {
+            query = '?select=*,person_teams(teams(name))';
+        } else if (supaTable === 'activities' && category) {
+            query = `?select=*,activity_required_items(*,inventory(name))&category=eq.${category}`;
+        } else if (supaTable === 'sport_venues') {
+            query = '?select=*,address:ort(*)';
+            if (category) query += `&sport_type=eq.${category}`;
+        } else if (supaTable === 'events') {
+            query = '?select=*,location:ort(*)';
+        }
 
-            const res = await SupabaseClient.get(supaTable, query);
+        const res = await SupabaseClient.get(supaTable, query);
 
         if (!res.ok) {
             const txt = await res.text();
@@ -83,7 +80,6 @@ export class DataService {
 
         const rows = await res.json();
         return rows.map(r => this._fromDb(supaTable, r));
-        });
     }
 
     // ── SAVE (full table upsert) ──────────────────────────────
@@ -95,27 +91,26 @@ export class DataService {
      * @param {Array}  rows  Array of Row instances or plain objects
      */
     static async saveTable(tableId, _filename, rows) {
-        return AccessGuard.run('WRITE', tableId, async () => {
-            const { supaTable, category } = this._resolveTable(tableId);
+        const { supaTable, category } = this._resolveTable(tableId);
 
-            if (supaTable === 'events') {
-                await this._checkConflicts(rows);
-            }
+        if (supaTable === 'events') {
+            await this._checkConflicts(rows);
+        }
 
-            // Check for concurrent edits
-            await this._checkConcurrentEdits(tableId, rows);
+        // Check for concurrent edits
+        await this._checkConcurrentEdits(tableId, rows);
 
-            const dbRows = rows.map(row => {
-                const plain = row.toJSON ? row.toJSON() : row;
-                return this._toDb(supaTable, plain, category);
-            });
+        const dbRows = rows.map(row => {
+            const plain = row.toJSON ? row.toJSON() : row;
+            return this._toDb(supaTable, plain, category);
+        });
 
-            // Delete rows that no longer exist (full replace strategy)
-            await this._deleteRemovedRows(supaTable, category, dbRows, tableId);
+        // Delete rows that no longer exist (full replace strategy)
+        await this._deleteRemovedRows(supaTable, category, dbRows, tableId);
 
-            // Upsert all current rows
-            if (dbRows.length > 0) {
-                const res = await SupabaseClient.post(supaTable, dbRows, { 'Prefer': 'resolution=merge-duplicates' });
+        // Upsert all current rows
+        if (dbRows.length > 0) {
+            const res = await SupabaseClient.post(supaTable, dbRows, { 'Prefer': 'resolution=merge-duplicates' });
 
             if (!res.ok) {
                 const txt = await res.text();
@@ -137,10 +132,9 @@ export class DataService {
             }
         }
         
-            await this.logAudit('UPSERT', supaTable, { affected: dbRows.length, category: category || 'none' });
+        await this.logAudit('UPSERT', supaTable, { affected: dbRows.length, category: category || 'none' });
 
-            return { success: true, message: `Table ${tableId} saved` };
-        });
+        return { success: true, message: `Table ${tableId} saved` };
     }
 
     static async _checkConflicts(rows) {
@@ -203,24 +197,22 @@ export class DataService {
      * Delete rows from the DB that are no longer present in the current dataset.
      */
     static async _deleteRemovedRows(supaTable, category, dbRows, tableId) {
-        return AccessGuard.run('WRITE', tableId, async () => {
-            const currentIds = dbRows.map(r => r.id).filter(Boolean);
-            let deleteQuery;
+        const currentIds = dbRows.map(r => r.id).filter(Boolean);
+        let deleteQuery;
 
-            if (currentIds.length > 0) {
-                deleteQuery = `?id=not.in.(${currentIds.map(id => `"${id}"`).join(',')})`;
-            } else {
-                deleteQuery = '?id=not.is.null';
-            }
+        if (currentIds.length > 0) {
+            deleteQuery = `?id=not.in.(${currentIds.map(id => `"${id}"`).join(',')})`;
+        } else {
+            deleteQuery = '?id=not.is.null';
+        }
 
-            if (supaTable === 'activities' && category) {
-                deleteQuery += `&category=eq.${category}`;
-            } else if (supaTable === 'sport_venues' && category) {
-                deleteQuery += `&sport_type=eq.${category}`;
-            }
+        if (supaTable === 'activities' && category) {
+            deleteQuery += `&category=eq.${category}`;
+        } else if (supaTable === 'sport_venues' && category) {
+            deleteQuery += `&sport_type=eq.${category}`;
+        }
 
-            await SupabaseClient.delete(supaTable, deleteQuery);
-        });
+        await SupabaseClient.delete(supaTable, deleteQuery);
     }
 
     // ── Column Mapping: App → DB ──────────────────────────────
@@ -265,14 +257,20 @@ export class DataService {
             };
 
         case 'inventory':
+            // Auto-capitalize condition to match Postgres enum (Neu, Gut, Gebraucht, Defekt)
+            let condition = row.condition;
+            if (typeof condition === 'string' && condition.length > 0) {
+                condition = condition.charAt(0).toUpperCase() + condition.slice(1).toLowerCase();
+            }
             return {
                 id: row.id,
                 name: row.name || '',
                 quantity: row.quantity ? parseInt(row.quantity, 10) || 0 : 0,
                 storage_location: row.storage_location || '',
-                condition: row.condition || 'Gut',
+                condition: condition || 'Gut',
                 last_checked: row.last_checked || null,
                 notes: row.notes || '',
+                image_url: row.image_url || null,
                 created_by: row.createdBy || null,
                 created_at: row.createdAt || new Date().toISOString()
             };
@@ -379,9 +377,10 @@ export class DataService {
                 name: row.name || '',
                 quantity: row.quantity ?? '',
                 storage_location: row.storage_location || '',
-                condition: row.condition || 'gut',
+                condition: row.condition ? this._capitalizeFirst(row.condition) : 'Gut',
                 last_checked: row.last_checked || '',
                 notes: row.notes || '',
+                image_url: row.image_url || null,
                 createdBy: row.created_by || 'Unbekannt',
                 createdAt: row.created_at || null,
                 last_updated: row.updated_at || null,
@@ -511,21 +510,19 @@ export class DataService {
 
     static async createActivity(name, category = 'sonstige') {
         const tableId = `tbl_activities_${category}`;
-        return AccessGuard.run('WRITE', tableId, async () => {
-            const payload = {
-                name,
-                category,
-                status: 'To Do',
-                created_at: new Date().toISOString()
-            };
-            const res = await SupabaseClient.post('activities', payload, { 'Prefer': 'return=representation' });
-            if (!res.ok) {
-                const txt = await res.text();
-                throw new Error(`Failed to create activity: ${txt}`);
-            }
-            const rows = await res.json();
-            return rows[0];
-        });
+        const payload = {
+            name,
+            category,
+            status: 'To Do',
+            created_at: new Date().toISOString()
+        };
+        const res = await SupabaseClient.post('activities', payload, { 'Prefer': 'return=representation' });
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`Failed to create activity: ${txt}`);
+        }
+        const rows = await res.json();
+        return rows[0];
     }
 
     // ── Utility ───────────────────────────────────────────────
@@ -542,19 +539,17 @@ export class DataService {
     }
 
     static async createTeam(name) {
-        return AccessGuard.run('WRITE', 'teams', async () => {
-            const payload = {
-                name: name,
-                color: ColourFactory.getRandomPremiumColor()
-            };
-            const res = await SupabaseClient.post('teams', [payload], { 'Prefer': 'return=representation' });
-            if (!res.ok) {
-                const txt = await res.text();
-                throw new Error(`Failed to create team: ${txt}`);
-            }
-            const rows = await res.json();
-            return rows[0];
-        });
+        const payload = {
+            name: name,
+            color: ColourFactory.getRandomPremiumColor()
+        };
+        const res = await SupabaseClient.post('teams', [payload], { 'Prefer': 'return=representation' });
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`Failed to create team: ${txt}`);
+        }
+        const rows = await res.json();
+        return rows[0];
     }
 
     static async _checkConcurrentEdits(tableId, rows) {

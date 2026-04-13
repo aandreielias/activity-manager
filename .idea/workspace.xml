@@ -5,26 +5,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.env.local.example" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/copilotDiffState.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/services/ErrorHandler.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/services/ValidationService.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env.local.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.local.example" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/copilotDiffState.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/config.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/App.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/App.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/GlobalStateManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/GlobalStateManager.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/TableRenderer.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableRenderer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/UIManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/UIManager.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/fields/EnumField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/EnumField.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/fields/Field.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/Field.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/fields/LocationField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/LocationField.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/AccessGuard.js" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/services/AuthService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/AuthService.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/services/DataService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/DataService.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/PermissionService.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/ValidationService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/ValidationService.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/styles/CalendarView.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/CalendarView.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/styles/Dialog.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/Dialog.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/styles/FilterBar.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/FilterBar.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/styles/Header.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/Header.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/styles/LoginDialog.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/LoginDialog.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/styles/Table.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/Table.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/main.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/styles/UserInfoPage.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/UserInfoPage.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/ui/Dialog.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Dialog.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/ui/Header.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Header.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/UserInfoPage.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/UserInfoPage.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -88,7 +93,6 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "master",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/home/andrei/IdeaProjects/activity-manager/public",
@@ -146,6 +150,7 @@
       <workItem from="1775481803922" duration="1967000" />
       <workItem from="1775650753329" duration="5181000" />
       <workItem from="1775820711342" duration="4461000" />
+      <workItem from="1776084419352" duration="690000" />
     </task>
     <servers />
   </component>

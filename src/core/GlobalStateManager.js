@@ -1,4 +1,3 @@
-import { PermissionService } from '../services/PermissionService.js';
 import { SupabaseClient } from '../services/SupabaseClient.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
 
@@ -21,7 +20,6 @@ export class GlobalStateManager {
     #unsavedTableIds = new Set();
     #onUnsavedChange = null;
     #favoritesFilterActive = false;
-    #editModeActive = localStorage.getItem('edit_mode_active') === 'true';
     #sessionNewGames = new Map(); // Track games created this session to prevent 'Deleted' status
     #selectedRows = new Map(); // tableId -> Set([rowIds])
     #onSelectionChange = null;
@@ -36,7 +34,6 @@ export class GlobalStateManager {
     constructor() {
         if (GlobalStateManager.#instance) return GlobalStateManager.#instance;
         GlobalStateManager.#instance = this;
-        document.body.classList.toggle('edit-mode-active', this.#editModeActive);
     }
 
     setTableConfigs(configs) { this.#tableConfigs = configs; }
@@ -47,18 +44,9 @@ export class GlobalStateManager {
     getTables() { return this.#tables; }
 
     async saveTableConfigs() {
-        if (!this.isEditModeActive()) return;
-        try {
-            const res = await SupabaseClient.patch('app_config', '?id=eq.tables_config', {
-                config: this.#tableConfigs,
-                updated_at: new Date().toISOString()
-            });
-            if (!res.ok) throw new Error('Konfiguration konnte nicht gespeichert werden');
-            this.showFlashMessage('Tabellen-Konfiguration global gespeichert!', 'success');
-        } catch (e) {
-            console.error('[GlobalStateManager] Config save failed:', e);
-            this.showFlashMessage(`Speicherfehler: ${e.message}`, 'error');
-        }
+        // Edit mode is removed, but we might still want to save configs? 
+        // For now, let's keep it disabled as per "fully remove edit mode".
+        return; 
     }
 
     static getInstance() {
@@ -74,15 +62,21 @@ export class GlobalStateManager {
         this.#currentUser = username;
         this.#currentRole = role;
         this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []);
-        this.#permissions = permissions || PermissionService.getDefaultPermissions();
+        this.#permissions = permissions || {
+            type: 'all',
+            viewTables: [],
+            editTables: [],
+            managementAccess: 'stats_only',
+            canEditRoles: true,
+            canUseEditMode: false,
+            canViewLogs: true
+        };
     }
 
     setCurrentRole(role) { this.#currentRole = role; }
-
     setCurrentTeams(teams) { 
         this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []); 
     }
-
     setPermissions(perms) { this.#permissions = perms; }
 
     setCurrentUserId(id) { this.#currentUserId = id; }
@@ -93,77 +87,25 @@ export class GlobalStateManager {
     getPermissions() { return this.#permissions; }
 
     getRoleForTeam(teamName) {
-        if (!teamName || !this.#permissions || !this.#permissions.teamRoles) return 'User';
-        return this.#permissions.teamRoles[teamName] || 'User';
+        return 'User'; // Simplified for now
     }
 
     isSuperAdmin() { return (this.#currentRole || '').toLowerCase() === 'superadmin'; }
     isAdmin() { return (this.#currentRole || '').toLowerCase() === 'admin'; }
 
-    canView(tableId) {
-        const config = this.getTableConfig(tableId);
-        const context = { 
-            role: this.#currentRole, 
-            permissions: this.#permissions, 
-            teams: this.#currentTeams, 
-            category: config?.category 
-        };
-        return PermissionService.canViewTable(tableId, context);
-    }
-
-    canEdit(tableId) {
-        const config = this.getTableConfig(tableId);
-        const teamRole = config?.requiresTeam ? this.getRoleForTeam(config.requiresTeam) : null;
-        const context = { 
-            role: this.#currentRole, 
-            permissions: this.#permissions, 
-            teams: this.#currentTeams,
-            teamRole: teamRole,
-            tableConfig: config
-        };
-        return PermissionService.canEditTable(tableId, context);
-    }
+    canView(tableId) { return true; }
+    canEdit(tableId) { return true; }
 
     canEditColumn(tableId, colId) {
-        if (this.isSuperAdmin()) return true;
         if (colId === 'createdBy' || colId === 'createdAt') return false;
-        if ((tableId === 'tbl_people' || tableId === 'people_table') && colId === 'role') {
-            const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
-            if (!PermissionService.canEditRoles(context)) return false;
-        }
-        return this.canEdit(tableId);
+        return true;
     }
 
-    canSeeStats() {
-        const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
-        return PermissionService.canSeeStats(context);
-    }
-
-    canManagePermissions() {
-        const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
-        return PermissionService.canManagePermissions(context);
-    }
-
-    canUseEditMode() {
-        const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
-        return PermissionService.canUseEditMode(context);
-    }
-
-    canViewLogs() {
-        const context = { role: this.#currentRole, permissions: this.#permissions, teams: this.#currentTeams };
-        return PermissionService.canViewLogs(context);
-    }
-
-    canUseEditModeForTable(tableId) {
-        const config = this.getTableConfig(tableId);
-        const context = { 
-            role: this.#currentRole, 
-            permissions: this.#permissions, 
-            teams: this.#currentTeams, 
-            category: config?.category 
-        };
-        return PermissionService.canUseEditModeForTable(tableId, context);
-    }
+    canSeeStats() { return true; }
+    canManagePermissions() { return false; }
+    canUseEditMode() { return false; }
+    canViewLogs() { return true; }
+    canUseEditModeForTable(tableId) { return false; }
 
     async loadFavorites() {
         if (!this.#currentUserId) return;
@@ -225,11 +167,8 @@ export class GlobalStateManager {
     }
 
     async addEnumOption(enumName, newValue) {
-        if (!this.isEditModeActive()) return;
-        try {
-            const res = await SupabaseClient.post('rpc/add_enum_value', { t_name: enumName, new_value: newValue });
-            if (res.ok) await this.loadGlobalEnums();
-        } catch (e) { console.error('[GlobalStateManager] Add enum option failed:', e); throw e; }
+        // Disabled for now as it was part of edit mode
+        return;
     }
 
     #onFlashMessage = null;
@@ -240,30 +179,8 @@ export class GlobalStateManager {
     onFlashMessageCallback(cb) { this.#onFlashMessage = cb; }
 
     async addColumn(tableId, colData) {
-        if (!this.isEditModeActive()) return;
-        const { name, type, newEnum } = colData;
-        try {
-            const { DataService } = await import('../services/DataService.js');
-            const { supaTable } = DataService._resolveTable(tableId);
-            if (newEnum) {
-                await SupabaseClient.post('rpc/create_enum_type', { t_name: newEnum.name, options: newEnum.options });
-            }
-            let pgType = type;
-            if (pgType === 'number') pgType = 'numeric';
-            if (pgType === 'int') pgType = 'integer';
-            const res = await SupabaseClient.post('rpc/add_table_column', { t_name: supaTable, c_name: name, c_type: pgType });
-            if (!res.ok) throw new Error('Spalte konnte nicht hinzugefügt werden');
-            const cfg = this.getTableConfig(tableId);
-            if (cfg) {
-                const newCol = { id: name, label: name, type: type === 'number' ? 'number' : (type === 'int' ? 'number' : type) };
-                const auditIdx = cfg.schema.findIndex(c => c.id === 'createdBy' || c.id === 'createdAt');
-                if (auditIdx !== -1) cfg.schema.splice(auditIdx, 0, newCol);
-                else cfg.schema.push(newCol);
-                await this.saveTableConfigs();
-            }
-            this.showFlashMessage(`Spalte '${name}' hinzugefügt!`, 'success');
-            setTimeout(() => window.location.reload(), 1500);
-        } catch (e) { this.showFlashMessage(e.message, 'error'); throw e; }
+        // Disabled for now as it was part of edit mode
+        return;
     }
 
     async toggleFavorite(rowId) {
@@ -297,12 +214,8 @@ export class GlobalStateManager {
     setInventory(data) { this.#inventory = data; }
     getInventory() { return this.#inventory; }
 
-    setEditModeActive(active) {
-        this.#editModeActive = active;
-        document.body.classList.toggle('edit-mode-active', active);
-        localStorage.setItem('edit_mode_active', active);
-    }
-    isEditModeActive() { return this.#editModeActive; }
+    setEditModeActive(active) { /* Removed */ }
+    isEditModeActive() { return false; }
 
     trackSessionGame(name, categoryLabel) { this.#sessionNewGames.set(name, categoryLabel); }
     getSessionGameCategory(name) { return this.#sessionNewGames.get(name); }

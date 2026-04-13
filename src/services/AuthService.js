@@ -80,32 +80,10 @@ export class AuthService {
 
     /**
      * Save/Update permissions for a specific user.
-     * Persists to Supabase for global synchronization.
+     * (Disabled - Permission system is currently being reimagined)
      */
     static async savePermissions(targetUsername, permissions) {
-        // 1. Local fallback (optional, for immediate feedback if needed)
-        const permissionsMap = JSON.parse(localStorage.getItem('app_permissions_map') || '{}');
-        permissionsMap[targetUsername] = permissions;
-        localStorage.setItem('app_permissions_map', JSON.stringify(permissionsMap));
-
-        // 2. Persist to Supabase
-        try {
-            const res = await SupabaseClient.patch(
-                'users',
-                `?username=eq.${encodeURIComponent(targetUsername)}`,
-                { permissions: permissions }
-            );
-
-            if (!res.ok) {
-                console.warn('[AuthService] Supabase patch for permissions failed. Column might be missing or network error.');
-            }
-        } catch (e) {
-            console.error('[AuthService] Global permission save failed:', e);
-        }
-
-        const globalState = GlobalStateManager.getInstance();
-        if (globalState.getCurrentUser() === targetUsername) {
-            globalState.setPermissions(permissions);
-        }
+        console.warn(`[AuthService] savePermissions called for ${targetUsername}, but permission system is disabled.`);
+        return;
     }
 }

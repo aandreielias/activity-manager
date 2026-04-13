@@ -187,14 +187,25 @@
 
 .unsaved-banner {
     display: none;
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     background: var(--warning-light);
     border: 1px solid var(--warning);
-    border-radius: var(--radius-sm);
-    padding: 8px 12px;
-    position: relative;
+    border-radius: 20px;
+    padding: 10px 24px;
+    box-shadow: var(--shadow-lg);
+    z-index: 10000;
     overflow: hidden;
+    animation: banner-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes banner-pop {
+    from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
 .save-loading-bar {
@@ -476,24 +487,3 @@
     min-width: 180px;
 }
 
-/* ── Mobile Responsiveness ───────────────────────────── */
-@media (max-width: 768px) {
-    .app-header {
-        padding: 0 16px;
-    }
-
-    .header-left {
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .nav-btn, .save-btn-header, .discard-btn-header, .persons-toggle-btn, .theme-toggle {
-        padding: 8px 16px;
-    }
-}
-
-@media (max-width: 480px) {
-    .header-nav {
-        display: none;
-    }
-}

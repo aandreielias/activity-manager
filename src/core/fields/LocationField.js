@@ -40,9 +40,6 @@ export class LocationField extends Field {
     }
 
     async startEditing() {
-        const globalState = GlobalStateManager.getInstance();
-        if (!globalState.canEditColumn(this.tableId, this.colDef.id)) return;
-
         this._showLocationDialog();
     }
 
@@ -247,42 +244,7 @@ export class LocationField extends Field {
                         lbl.textContent = col.label;
                         labelRow.appendChild(lbl);
 
-                        // Edit Mode Controls for Rearrange
-                        if (GlobalStateManager.getInstance().isEditModeActive()) {
-                            const controls = document.createElement('div');
-                            controls.style.display = 'flex';
-                            controls.style.gap = '4px';
-
-                            const upBtn = document.createElement('button');
-                            upBtn.className = 'col-nav-btn';
-                            upBtn.textContent = '↑';
-                            upBtn.onclick = (e) => {
-                                e.preventDefault();
-                                if (index > 0) {
-                                    const item = schema.splice(index, 1)[0];
-                                    schema.splice(index - 1, 0, item);
-                                    renderFields();
-                                    GlobalStateManager.getInstance().saveTableConfigs();
-                                }
-                            };
-
-                            const downBtn = document.createElement('button');
-                            downBtn.className = 'col-nav-btn';
-                            downBtn.textContent = '↓';
-                            downBtn.onclick = (e) => {
-                                e.preventDefault();
-                                if (index < schema.length - 1) {
-                                    const item = schema.splice(index, 1)[0];
-                                    schema.splice(index + 1, 0, item);
-                                    renderFields();
-                                    GlobalStateManager.getInstance().saveTableConfigs();
-                                }
-                            };
-
-                            controls.appendChild(upBtn);
-                            controls.appendChild(downBtn);
-                            labelRow.appendChild(controls);
-                        }
+                        // Rearrange controls removed (part of edit mode)
 
                         const input = document.createElement(isTextArea ? 'textarea' : 'input');
                         input.className = 'dialog-input';

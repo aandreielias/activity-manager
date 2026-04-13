@@ -12,6 +12,8 @@ import { DateField } from './DateField.js';
 import { TimeField } from './TimeField.js';
 import { LocationField } from './LocationField.js';
 
+import { ConditionField } from './ConditionField.js';
+
 export class FieldFactory {
     static fields = {
         number: NumberField,
@@ -26,6 +28,9 @@ export class FieldFactory {
 
         // Handle specific known columns that require customized logic
         switch (colDef.id) {
+        case 'condition':
+        case 'zustand':
+            return new ConditionField(params);
         case 'location':
             if (tableId === 'tbl_events') {
                 return new LocationField(params);

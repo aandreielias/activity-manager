@@ -97,23 +97,7 @@ export class TableRenderer {
         titleGroup.appendChild(icon);
         titleGroup.appendChild(title);
 
-        // Edit Mode: Rename Table Button
-        if (GlobalStateManager.getInstance().isEditModeActive()) {
-            const renameBtn = document.createElement('div');
-            renameBtn.className = 'table-title-edit-btn';
-            renameBtn.innerHTML = '✎';
-            renameBtn.title = 'Tabelle umbenennen';
-            renameBtn.onclick = (e) => {
-                e.stopPropagation();
-                const newTitle = prompt('Neuer Tabellentitel:', this.table.title);
-                if (newTitle && newTitle.trim()) {
-                    this.table.title = newTitle.trim();
-                    title.textContent = newTitle.trim();
-                    GlobalStateManager.getInstance().saveTableConfigs();
-                }
-            };
-            titleGroup.appendChild(renameBtn);
-        }
+        // Rename Table Button removed (part of edit mode)
 
         const metaGroup = document.createElement('div');
         metaGroup.style.display = 'flex';
@@ -126,22 +110,7 @@ export class TableRenderer {
         meta.textContent = `${this.table.rows.length} Zeilen`;
         metaGroup.appendChild(meta);
 
-        // Edit Mode: Add Column Button next to row count
-        if (GlobalStateManager.getInstance().isEditModeActive()) {
-            const addColBtn = document.createElement('button');
-            addColBtn.className = 'edit-mode-action-btn';
-            addColBtn.innerHTML = '+ Spalte hinzufügen';
-            addColBtn.onclick = async (e) => {
-                e.stopPropagation();
-                const gs = GlobalStateManager.getInstance();
-                const enums = Object.keys(gs.getEnums());
-                const res = await Dialog.showAddColumnDialog(this.table.id, enums);
-                if (res) {
-                    try { await gs.addColumn(this.table.id, res); } catch (err) {}
-                }
-            };
-            metaGroup.appendChild(addColBtn);
-        }
+        // Add Column Button removed (part of edit mode)
 
         header.appendChild(titleGroup);
         header.appendChild(metaGroup);
@@ -282,6 +251,7 @@ export class TableRenderer {
         tr.appendChild(favTh);
 
         this.table.schema.forEach((col, index) => {
+            if (col.hidden) return;
             const th = document.createElement('th');
             th.dataset.colId = col.id;
             th.dataset.type = col.type || 'text';
@@ -293,17 +263,7 @@ export class TableRenderer {
             content.appendChild(textSpan);
             th.appendChild(content);
 
-            if (GlobalStateManager.getInstance().isEditModeActive()) {
-                const controls = document.createElement('div');
-                controls.className = 'col-edit-controls';
-                const leftBtn = document.createElement('button'); leftBtn.textContent = '←'; leftBtn.onclick = (e) => { e.stopPropagation(); this._moveColumn(index, -1); };
-                const renameBtn = document.createElement('button'); renameBtn.textContent = '✎'; renameBtn.onclick = (e) => { e.stopPropagation(); const l = prompt('Name:', col.label); if (l) { col.label = l.trim(); this.render(); GlobalStateManager.getInstance().saveTableConfigs(); } };
-                const rightBtn = document.createElement('button'); rightBtn.textContent = '→'; rightBtn.onclick = (e) => { e.stopPropagation(); this._moveColumn(index, 1); };
-                    const deleteBtn = document.createElement('button'); deleteBtn.textContent = '✖'; deleteBtn.onclick = async (e) => { e.stopPropagation(); if (await Dialog.confirm({ message: 'Löschen?' })) { try { await GlobalStateManager.getInstance().removeColumn(this.table.id, col.id); } catch(err){} } };
-
-                controls.append(leftBtn, renameBtn, rightBtn, deleteBtn);
-                th.appendChild(controls);
-            }
+            // Column controls removed (part of edit mode)
             const resizer = document.createElement('div');
             resizer.className = 'col-resizer';
             this._setupColumnResizing(th, resizer);

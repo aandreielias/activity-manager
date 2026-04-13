@@ -53,30 +53,7 @@ export class EnumField extends Field {
             menu.appendChild(item);
         });
 
-        // Edit Mode: Add new option button
-        if (globalState.isEditModeActive() && globalEnumName) {
-            const separator = document.createElement('div');
-            separator.className = 'context-menu-separator';
-            menu.appendChild(separator);
-
-            const addBtn = document.createElement('button');
-            addBtn.className = 'enum-dropdown-item add-enum-option-btn';
-            addBtn.innerHTML = '<span style="color:var(--warning)">+ Option hinzufügen</span>';
-            addBtn.style.fontStyle = 'italic';
-            addBtn.onclick = async (e) => {
-                e.stopPropagation();
-                const newValue = prompt(`Neue Auswahl für '${this.colDef.label}' (${globalEnumName}):`);
-                if (newValue && newValue.trim()) {
-                    try {
-                        await globalState.addEnumOption(globalEnumName, newValue.trim());
-                        container.closeMenu();
-                    } catch (err) {
-                        alert(`Fehler: ${err.message}`);
-                    }
-                }
-            };
-            menu.appendChild(addBtn);
-        }
+        // Add new option button removed (part of edit mode)
 
         if (!textSpan.textContent) {
             textSpan.textContent = '-- Auswählen --';

@@ -9,32 +9,9 @@ import { CalendarView } from '../ui/CalendarView.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { UserStatsService } from '../services/UserStatsService.js';
-import { FilterEngine } from '../utils/FilterEngine.js';import { FilterBar } from '../ui/FilterBar.js';
+import { FilterEngine } from '../utils/FilterEngine.js';
+import { FilterBar } from '../ui/FilterBar.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
-
-
-const PEOPLE_SCHEMA = Object.freeze([
-
-    { id: 'vorname', label: 'Vorname', type: 'text' },
-    { id: 'nachname', label: 'Nachname', type: 'text' },
-    { id: 'Tel.', label: 'Telefon', type: 'text' },
-    { id: 'Status', label: 'Status', type: 'enum', options: ['Aktiv', 'Inaktiv'] },
-    { id: 'role', label: 'Rolle', type: 'enum', options: ['Superadmin', 'Admin', 'Supervisor', 'User', 'Inaktiv'] },
-    { id: 'responsibility_1', label: 'Verantwortlich 1', type: 'enum', options: ['Gruppenspiele', 'Zwischendurch', 'Icebreaker', 'Sport', 'Sonstige'] },
-    { id: 'responsibility_2', label: 'Verantwortlich 2', type: 'enum', options: ['Gruppenspiele', 'Zwischendurch', 'Icebreaker', 'Sport', 'Sonstige'] },
-    { id: 'Spez. Zuständigkeit', label: 'Spez. Zuständigkeit', type: 'text' },
-    { id: 'Team', label: 'Team', type: 'tag' },
-    { id: 'createdBy', label: 'Erstellt von', type: 'text' },
-    { id: 'createdAt', label: 'Erstellt am', type: 'date' },
-]);
-
-const INVENTORY_SCHEMA = Object.freeze([
-    { id: 'name', label: 'Name', type: 'text' },
-    { id: 'Menge', label: 'Menge', type: 'number' },
-    { id: 'Kategorie', label: 'Kategorie', type: 'enum', options: ['Spiele', 'Zubehör', 'Technik', 'Möbel', 'Sonstiges'] },
-    { id: 'Status', label: 'Status', type: 'enum', options: ['O.K.', 'Defekt', 'Vermisst'] },
-    { id: 'Lagerort', label: 'Lagerort', type: 'text' },
-]);
 
 /**
  * UIManager - Handles UI layout, rendering, and user interactions.
@@ -84,12 +61,7 @@ export class UIManager {
         this.header.onDiscardAll = () => this.app._handleDiscardAll();
         this.header.onFavoritesToggle = (active) => this._handleFavoritesToggle(active);
         this.header.onCategoryExport = (categoryId) => this._exportCategoryPDF(categoryId);
-        this.header.onEditModeToggle = (active) => {
-            this.globalState.setEditModeActive(active);
-            this.reloadTables();
-            document.body.classList.add('global-loading');
-            window.location.reload(); 
-        };
+        // Removed Edit Mode toggle (part of edit mode)
         this.header.onCalendarToggle = () => this._handleCalendarToggle();
         this.header.onCalendarFull = () => this._handleCalendarFullView();
         this.header.onLogoDoubleClick = () => this.app._launchBlackjack();
@@ -174,20 +146,16 @@ export class UIManager {
         
         // Resolve schema for the current table
         let schema = [];
-        if (tableId === 'tbl_people') schema = PEOPLE_SCHEMA;
-        else if (tableId === 'tbl_inventory') schema = INVENTORY_SCHEMA;
-        else {
-            let targetTableId = tableId;
-            // Virtual IDs like 'all-spiele'
-            if (tableId.startsWith('all-')) {
-                const category = tableId.replace('all-', '');
-                const found = Object.values(this.tables).find(t => t.config.category === category);
-                if (found) targetTableId = found.config.id;
-            }
-
-            const tableWrap = this.tables[targetTableId];
-            schema = tableWrap?.instance?.schema || tableWrap?.config?.schema || [];
+        let targetTableId = tableId;
+        // Virtual IDs like 'all-spiele'
+        if (tableId.startsWith('all-')) {
+            const category = tableId.replace('all-', '');
+            const found = Object.values(this.tables).find(t => t.config.category === category);
+            if (found) targetTableId = found.config.id;
         }
+
+        const tableWrap = this.tables[targetTableId];
+        schema = tableWrap?.instance?.schema || tableWrap?.config?.schema || [];
 
         // Hardcoded localized types for specific columns if not in schema
         schema = schema.map(c => {
@@ -237,6 +205,7 @@ export class UIManager {
         this.app.tableElements = {};
 
         if (tables['tbl_inventory']) {
+            this.inventoryTable = tables['tbl_inventory'].instance;
             this.globalState.setInventory(tables['tbl_inventory'].instance.rows);
             // After setting inventory, we MUST refresh schemas of all tables that might have inventory filters
             Object.values(this.tables).forEach(tw => {
@@ -310,19 +279,10 @@ export class UIManager {
 
             if (tableId === 'tbl_people') {
                 const gs = GlobalStateManager.getInstance();
-                const isAdmin = gs.isAdmin() || gs.isSuperAdmin();
-                const userTeams = gs.getCurrentTeams();
                 const teams = gs.getAvailableTeams();
                 let teamData = this._groupPeopleByTeam(peopleData, teams);
                 
-                // DATA ISOLATION: Filter teams for non-admins
-                if (!isAdmin) {
-                    const filteredData = {};
-                    userTeams.forEach(tName => {
-                        if (teamData[tName]) filteredData[tName] = teamData[tName];
-                    });
-                    teamData = filteredData;
-                }
+                // DATA ISOLATION REMOVED - Everyone sees all teams
 
                 const container = document.createElement('div');
                 container.className = 'people-multi-table-container';
@@ -334,7 +294,7 @@ export class UIManager {
                         ...config,
                         id: 'tbl_people', // Use common ID for saving
                         title: `Team: ${teamName}`,
-                        schema: [...PEOPLE_SCHEMA],
+                        schema: config.schema,
                         rows: rows,
                         peopleData: rows,
                         tableConfig: { ...config, id: 'tbl_people' },
@@ -369,12 +329,7 @@ export class UIManager {
             renderedCount++;
         });
 
-        if (renderedCount === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'empty-state-container';
-            empty.innerHTML = '<h2>Kein Zugriff</h2><p>Sie haben keine Berechtigung, Tabellen in diesem Bereich anzuzeigen.</p>';
-            fragment.appendChild(empty);
-        }
+        // No more permission filtering - everyone can see everything
 
         this.tablesContainer.replaceChildren(fragment);
         this._initSplitViewTables(tables, peopleData);
@@ -403,7 +358,7 @@ export class UIManager {
     setupEventListeners() {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                document.querySelectorAll('.custom-dialog-overlay, .permission-overlay, .user-info-overlay, .blackjack-overlay, .picker-overlay').forEach(el => el.remove());
+                document.querySelectorAll('.custom-dialog-overlay, .user-info-overlay, .blackjack-overlay, .picker-overlay').forEach(el => el.remove());
                 if (this.header.personsSplitOpen) this._handlePersonsToggle();
                 if (this.header.inventorySplitOpen) this._handleInventoryToggle();
                 if (this.header.calendarSplitOpen) this._handleCalendarToggle();
@@ -452,7 +407,7 @@ export class UIManager {
         return new Table({
             ...config,
             title,
-            schema: [...PEOPLE_SCHEMA],
+            schema: config.schema,
             rows,
             peopleData: this.app.peopleData,
             tableConfig: { ...config, defaultRowData },
@@ -552,21 +507,16 @@ export class UIManager {
     }
 
     _initSplitViewTables(tables, peopleData) {
+        if (tables['tbl_inventory']) {
+            this.inventoryTable = tables['tbl_inventory'].instance;
+        }
+
         if (peopleData.length > 0) {
             const gs = GlobalStateManager.getInstance();
-            const isAdmin = gs.isAdmin() || gs.isSuperAdmin();
-            const userTeams = gs.getCurrentTeams();
             const teams = gs.getAvailableTeams();
             let teamData = this._groupPeopleByTeam(peopleData, teams);
             
-            // DATA ISOLATION: Filter teams for non-admins
-            if (!isAdmin) {
-                const filteredData = {};
-                userTeams.forEach(tName => {
-                    if (teamData[tName]) filteredData[tName] = teamData[tName];
-                });
-                teamData = filteredData;
-            }
+            // DATA ISOLATION REMOVED - Everyone sees all teams
 
             const container = document.createElement('div');
             container.className = 'people-split-multi-container';
@@ -574,13 +524,14 @@ export class UIManager {
             this.personsSplitTeamTables = {};
             
             Object.entries(teamData).forEach(([teamName, rows]) => {
+                const peopleConfig = tables['tbl_people']?.config || { id: 'tbl_people', schema: [] };
                 const table = new Table({
                     id: 'tbl_people', // Use common ID for saving
                     title: `Team: ${teamName}`,
-                    schema: [...PEOPLE_SCHEMA],
+                    schema: peopleConfig.schema,
                     rows: rows,
                     peopleData: rows,
-                    tableConfig: { id: `tbl_people`, schema: [...PEOPLE_SCHEMA] },
+                    tableConfig: { ...peopleConfig, id: `tbl_people` },
                 });
                 
                 this.personsSplitTeamTables[teamName] = table;
@@ -734,51 +685,9 @@ export class UIManager {
         headerEl.querySelector('.inventory-toggle-btn')?.classList.toggle('active', tableId === 'tbl_inventory' || this.header.inventorySplitOpen);
         headerEl.querySelector('.calendar-toggle-btn')?.classList.toggle('active', tableId === 'calendar' || this.header.calendarSplitOpen);
 
-        this._updateAddCategoryButton(tableId);
-
         if (rowId) {
             this._highlightRow(rowId, colId);
         }
-    }
-
-    _updateAddCategoryButton(tableId) {
-        let btn = document.getElementById('add-category-footer-btn');
-        const isEditMode = this.globalState.isEditModeActive();
-        const isCollectiveView = (tableId === 'all-spiele' || tableId === 'all-sportarten');
-
-        if (!btn && isEditMode && isCollectiveView) {
-            btn = document.createElement('button');
-            btn.id = 'add-category-footer-btn';
-            btn.className = 'add-category-footer-btn';
-            btn.innerHTML = `<div class="add-cat-plus">+</div><div class="add-cat-text">Neue Kategorie hinzufügen...</div>`;
-            btn.onclick = () => this._handleCreateNewCategory(tableId);
-            this.tablesContainer.appendChild(btn);
-
-            const style = document.createElement('style');
-            style.textContent = `.add-category-footer-btn { width: 100%; padding: 24px; background: var(--bg-secondary); border: 2px dashed var(--warning); border-radius: var(--radius); color: var(--warning); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; margin-top: 24px; margin-bottom: 48px; transition: all 0.2s; } .add-category-footer-btn:hover { background: var(--warning-light); border-style: solid; } .add-cat-plus { font-size: 32px; font-weight: bold; } .add-cat-text { font-size: 14px; font-weight: 600; }`;
-            document.head.appendChild(style);
-        }
-
-        if (btn) {
-            btn.style.display = (isEditMode && isCollectiveView) ? 'flex' : 'none';
-            if (isCollectiveView) {
-                btn.querySelector('.add-cat-text').textContent = `Neue Kategorie in ${tableId === 'all-spiele' ? 'Spiele' : 'Sportarten'} hinzufügen...`;
-            }
-        }
-    }
-
-    async _handleCreateNewCategory(viewId) {
-        const name = prompt(`Name der neuen Kategorie (z.B. New Category):`);
-        if (!name || !name.trim()) return;
-
-        try {
-            const slug = name.toLowerCase().replace(/\s+/g, '_');
-            const enumName = viewId === 'all-spiele' ? 'activity_category_enum' : 'sport_type_enum';
-            await this.globalState.addEnumOption(enumName, slug);
-            const schemaSnippet = viewId === 'all-spiele' ? 'ACTIVITIES_SCHEMA' : 'SPORTS_SCHEMA';
-            alert(`✅ Kategorie '${name}' in der DB erstellt!\n\nBitte füge dies zu tables.json hinzu:\n\n{ "id": "tbl_activities_${slug}", "title": "${name}", "category": "${viewId === 'all-spiele' ? 'spiele' : 'sportarten'}", "schema": ${schemaSnippet} }`);
-            window.location.reload();
-        } catch (err) { alert(`Fehler: ${err.message}`); }
     }
 
     async _exportCategoryPDF(categoryId) {
@@ -1169,9 +1078,6 @@ export class UIManager {
 
     async _handleUserInfo() {
         await UserInfoPage.show(this.app.peopleData, this.app.tableConfigs, this.tables);
-        this.globalState.updatePermissionsFromStorage();
-        await this.reloadTables();
-        this._handleTableSwitch(this.currentTableId);
     }
 
     async reloadTables() {

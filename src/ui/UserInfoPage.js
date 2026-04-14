@@ -220,7 +220,8 @@ export class UserInfoPage {
     static async _renderPermissionsTab(container, person) {
         container.innerHTML = '<div class="empty-state-small">Lade Berechtigungen...</div>';
         
-        const user = await AuthService.getUserByUsername(`${person.vorname || ''} ${person.nachname || ''}`.trim().toLowerCase());
+        const targetUsername = `${person.vorname || ''} ${person.nachname || ''}`.trim().toLowerCase();
+        const user = await AuthService.getUserByUsername(targetUsername);
         const perms = (user && user.permissions) ? user.permissions : { overwrites: {} };
         const overwrites = perms.overwrites || {};
 
@@ -328,7 +329,7 @@ export class UserInfoPage {
             try {
                 saveBtn.disabled = true;
                 saveBtn.textContent = 'Speichere...';
-                await AuthService.savePermissions(user.username, { overwrites: newOverwrites });
+                await AuthService.savePermissions(targetUsername, { overwrites: newOverwrites }, person.id);
                 GlobalStateManager.getInstance().showFlashMessage('Berechtigungen erfolgreich aktualisiert.');
                 saveBtn.textContent = 'Gespeichert!';
                 setTimeout(() => {

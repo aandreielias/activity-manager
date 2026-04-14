@@ -38,6 +38,17 @@ export class AuthService {
         }
 
         const user = rows[0];
+        
+        // If the user was pre-created by an admin but has no password yet
+        if (!user.password_hash || user.password_hash === '__UNSET__') {
+            const updateRes = await SupabaseClient.patch(
+                'users',
+                `?id=eq.${user.id}`,
+                { password_hash: password }
+            );
+            if (!updateRes.ok) throw new Error('Initiales Passwort konnte nicht gesetzt werden');
+            user.password_hash = password;
+        }
 
         if (user.password_hash !== password) {
             throw new Error('Ungültiges Passwort');
@@ -94,15 +105,35 @@ export class AuthService {
 
     /**
      * Save/Update permissions for a specific user.
+     * If the user does not exist, create a stub record.
      */
-    static async savePermissions(targetUsername, permissions) {
-        const res = await SupabaseClient.patch(
-            'users',
-            `?username=eq.${encodeURIComponent(targetUsername)}`,
-            { permissions: permissions }
-        );
+    static async savePermissions(targetUsername, permissions, personId = null) {
+        // Check if user exists
+        const userRes = await SupabaseClient.get('users', `?username=eq.${encodeURIComponent(targetUsername)}&select=id`);
+        const users = userRes.ok ? await userRes.json() : [];
 
-        if (!res.ok) throw new Error('Fehler beim Speichern der Berechtigungen');
+        if (users.length > 0) {
+            // Update existing
+            const res = await SupabaseClient.patch(
+                'users',
+                `?username=eq.${encodeURIComponent(targetUsername)}`,
+                { permissions: permissions }
+            );
+            if (!res.ok) throw new Error('Fehler beim Speichern der Berechtigungen');
+        } else {
+            // Create new record
+            const res = await SupabaseClient.post('users', {
+                username: targetUsername,
+                password_hash: '__UNSET__', // First login will set the password
+                role: 'User',
+                permissions: permissions,
+                person_id: personId
+            });
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(`Konnte Nutzer-Datensatz nicht anlegen: ${txt}`);
+            }
+        }
         return { success: true };
     }
 }

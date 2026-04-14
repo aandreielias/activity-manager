@@ -31,7 +31,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.6.0';
+        return '2.6.1';
     }
 
     render() {

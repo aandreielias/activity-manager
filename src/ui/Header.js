@@ -31,7 +31,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.5.2';
+        return '2.6.0';
     }
 
     render() {
@@ -60,11 +60,12 @@ export class Header {
 
     _getHeaderHTML() {
         const globalState = GlobalStateManager.getInstance();
-        const viewableConfigs = this.tableConfigs;
+        const viewableConfigs = this.tableConfigs.filter(t => globalState.canView(t.id));
 
         const spieleTables = viewableConfigs.filter(t => t.category === 'spiele');
         const sportTables = viewableConfigs.filter(t => t.category === 'sportarten');
-        const otherTables = viewableConfigs.filter(t => !t.category && !['tbl_people', 'tbl_inventory', 'tbl_ort'].includes(t.id));
+        const organisationTables = viewableConfigs.filter(t => t.category === 'organisation' && !t.id.includes('people'));
+        const otherTables = viewableConfigs.filter(t => !['spiele', 'sportarten', 'organisation'].includes(t.category));
 
         return `
             <div class="header-left">
@@ -77,15 +78,13 @@ export class Header {
             <nav class="header-nav">
                 ${this._renderCategoryButton(spieleTables, 'spiele', 'Spiele')}
                 ${this._renderCategoryButton(sportTables, 'sportarten', 'Sportarten')}
+                ${this._renderCategoryButton(organisationTables, 'organisation', 'Organisation')}
+                
+                ${this._renderPersonenButton()}
+
                 ${otherTables.map((config, idx) =>
             `<button class="nav-btn ${idx === 0 && spieleTables.length === 0 ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`
         ).join('')}
-                
-                ${this._renderPersonenButton()}
-                
-                <button class="nav-btn inventory-toggle-btn" title="Inventar-Ansicht umschalten">
-                    Inventar
-                </button>
             </nav>
             <div class="header-center">
                 <div class="header-search-container">
@@ -101,7 +100,7 @@ export class Header {
                 </div>
             </div>
             <div class="header-right">
-                ${globalState.isSuperAdmin() ? `
+                ${globalState.canSeeStats() ? `
                 <button class="nav-btn user-info-btn" title="System-Stats">
                     Stats
                 </button>` : ''}
@@ -127,9 +126,14 @@ export class Header {
 
     _renderPersonenButton() {
         const gs = GlobalStateManager.getInstance();
+        const userTeams = gs.getCurrentTeams();
         const allTeams = gs.getAvailableTeams();
 
-        // Show team dropdown for everyone
+        // If user is restricted to specific teams, only show those in dropdown
+        const viewableTeams = (userTeams.length > 0 && !gs.isAdmin() && !gs.isSuperAdmin())
+            ? allTeams.filter(t => userTeams.includes(t.name))
+            : allTeams;
+
         return `
             <div class="dropdown-container split-btn-group">
                 <button class="nav-btn split-main-btn persons-toggle-btn" title="Personen-Seitenleiste umschalten">
@@ -140,7 +144,7 @@ export class Header {
                     <span class="dropdown-arrow">▼</span>
                 </button>
                 <div class="dropdown-menu">
-                    ${allTeams.map(t => `<button class="dropdown-item" data-team="${t.name}">Team ${t.name}</button>`).join('')}
+                    ${viewableTeams.map(t => `<button class="dropdown-item" data-team="${t.name}">Team ${t.name}</button>`).join('')}
                 </div>
             </div>
         `;

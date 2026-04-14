@@ -1,5 +1,6 @@
 import { SupabaseClient } from '../services/SupabaseClient.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
+import { PermissionHub } from './PermissionHub.js';
 
 /**
  * GlobalStateManager - Standardized state management.
@@ -62,17 +63,9 @@ export class GlobalStateManager {
 
     setCurrentUser(username, role, permissions = null, teams = []) {
         this.#currentUser = username;
-        this.#currentRole = role;
+        this.#currentRole = role || 'User';
         this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []);
-        this.#permissions = permissions || {
-            type: 'all',
-            viewTables: [],
-            editTables: [],
-            managementAccess: 'stats_only',
-            canEditRoles: true,
-            canUseEditMode: false,
-            canViewLogs: true
-        };
+        this.#permissions = permissions || { overwrites: {} };
     }
 
     setCurrentRole(role) { this.#currentRole = role; }
@@ -95,18 +88,33 @@ export class GlobalStateManager {
     isSuperAdmin() { return (this.#currentRole || '').toLowerCase() === 'superadmin'; }
     isAdmin() { return (this.#currentRole || '').toLowerCase() === 'admin'; }
 
-    canView(tableId) { return true; }
-    canEdit(tableId) { return true; }
+    getPermissionContext() {
+        return {
+            role: this.#currentRole,
+            teams: this.#currentTeams,
+            perms: this.#permissions
+        };
+    }
+
+    canView(objectId) { 
+        return PermissionHub.canRead(this.getPermissionContext(), objectId); 
+    }
+    
+    canEdit(objectId) { 
+        return PermissionHub.canWrite(this.getPermissionContext(), objectId); 
+    }
 
     canEditColumn(tableId, colId) {
         if (colId === 'createdBy' || colId === 'createdAt') return false;
-        return true;
+        return PermissionHub.canWrite(this.getPermissionContext(), `col_${tableId}.${colId}`);
     }
 
-    canSeeStats() { return true; }
-    canManagePermissions() { return false; }
+    canSeeStats() { return PermissionHub.canRead(this.getPermissionContext(), 'btn_stats'); }
+    canManagePermissions() { 
+        return (this.isSuperAdmin() || this.isAdmin()); 
+    }
     canUseEditMode() { return false; }
-    canViewLogs() { return true; }
+    canViewLogs() { return PermissionHub.canRead(this.getPermissionContext(), 'btn_audit_logs'); }
     canUseEditModeForTable(tableId) { return false; }
 
     async loadFavorites() {

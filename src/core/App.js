@@ -105,6 +105,7 @@ export class App {
 
             if (configs) {
                 this.tableConfigs = configs;
+                this.globalState.setTableConfigs(configs);
             } else {
                 throw new Error('Database config is empty or unreachable.');
             }
@@ -122,9 +123,14 @@ export class App {
         }
 
         try {
-            this.peopleData = await DataService.loadPeople();
+            // Find the ID for the people table from configs (it might have a prefix now)
+            const peopleConfig = this.tableConfigs.find(c => c.supa_table === 'people');
+            const peopleId = peopleConfig ? peopleConfig.id : 'tbl_people';
+            
+            this.peopleData = await DataService.loadRows(peopleId);
             await this.globalState.loadAvailableTeams();
         } catch (e) {
+            console.error('[App] Failed to load people or teams:', e);
             this.peopleData = [];
         }
     }

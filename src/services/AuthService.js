@@ -34,7 +34,7 @@ export class AuthService {
 
             const newUser = (await insertRes.json())[0];
             await UserStatsService.recordLogin(newUser.id);
-            return { success: true, username, userId: newUser.id, role: 'User', permissions: null, personId: newUser.person_id };
+            return { success: true, username, userId: newUser.id, role: 'User', permissions: null, personId: newUser.person_id, teams: [] };
         }
 
         const user = rows[0];
@@ -43,6 +43,8 @@ export class AuthService {
             throw new Error('Ungültiges Passwort');
         }
 
+        const teams = await this._fetchUserTeams(user.person_id);
+
         await UserStatsService.recordLogin(user.id);
         return { 
             success: true, 
@@ -50,8 +52,20 @@ export class AuthService {
             userId: user.id, 
             role: user.role || 'User',
             permissions: user.permissions || null,
-            personId: user.person_id
+            personId: user.person_id,
+            teams
         };
+    }
+
+    /**
+     * Fetch team names for a given person.
+     */
+    static async _fetchUserTeams(personId) {
+        if (!personId) return [];
+        const res = await SupabaseClient.get('person_teams', `?person_id=eq.${personId}&select=teams(name)`);
+        if (!res.ok) return [];
+        const rows = await res.json();
+        return rows.map(r => r.teams?.name).filter(Boolean);
     }
 
     /**
@@ -80,10 +94,15 @@ export class AuthService {
 
     /**
      * Save/Update permissions for a specific user.
-     * (Disabled - Permission system is currently being reimagined)
      */
     static async savePermissions(targetUsername, permissions) {
-        console.warn(`[AuthService] savePermissions called for ${targetUsername}, but permission system is disabled.`);
-        return;
+        const res = await SupabaseClient.patch(
+            'users',
+            `?username=eq.${encodeURIComponent(targetUsername)}`,
+            { permissions: permissions }
+        );
+
+        if (!res.ok) throw new Error('Fehler beim Speichern der Berechtigungen');
+        return { success: true };
     }
 }

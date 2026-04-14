@@ -1,6 +1,7 @@
 import { SupabaseClient } from './SupabaseClient.js';
 import { InventoryService } from './InventoryService.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
+import { GlobalStateManager } from '../core/GlobalStateManager.js';
 
 /**
  * DataService — CRUD operations against the relational Supabase schema.
@@ -15,18 +16,21 @@ export class DataService {
      * and supply additional defaults (e.g. the activity category).
      */
     static _resolveTable(tableId) {
-        // Resolve virtual people tables to the real 'people' table
+        const config = GlobalStateManager.getInstance().getTableConfig(tableId);
+
+        if (config && config.supa_table) {
+            return { 
+                supaTable: config.supa_table, 
+                category: config.team_identifier || null 
+            };
+        }
+
+        // Fallback for legacy IDs or internal tables
         if (tableId.startsWith('people_') || tableId.startsWith('split_people_') || tableId === 'tbl_people') {
             return { supaTable: 'people', category: null };
         }
         if (tableId === 'tbl_inventory') {
             return { supaTable: 'inventory', category: null };
-        }
-        if (tableId.startsWith('tbl_sport_')) {
-            return { supaTable: 'sport_venues', category: tableId.replace('tbl_sport_', '') };
-        }
-        if (tableId.startsWith('tbl_activities_')) {
-            return { supaTable: 'activities', category: tableId.replace('tbl_activities_', '') };
         }
         if (tableId === 'tbl_events') {
             return { supaTable: 'events', category: null };
@@ -34,6 +38,7 @@ export class DataService {
         if (tableId === 'tbl_ort') {
             return { supaTable: 'ort', category: null };
         }
+        
         return { supaTable: tableId, category: null };
     }
 
@@ -57,18 +62,37 @@ export class DataService {
      * Returns an array of plain objects.
      */
     static async loadRows(tableId) {
+        const gs = GlobalStateManager.getInstance();
+        if (!gs.canView(tableId)) {
+            console.warn(`[DataService] Access denied for table: ${tableId}`);
+            return [];
+        }
+
         const { supaTable, category } = this._resolveTable(tableId);
 
         let query = '?select=*';
         if (supaTable === 'people') {
             query = '?select=*,person_teams(teams(name))';
+            
+            // Filter by team if user is restricted
+            const teams = gs.getCurrentTeams();
+            if (teams.length > 0 && !gs.isAdmin() && !gs.isSuperAdmin()) {
+                // This is a complex filter in Supabase (filtering by junction table value)
+                // For simplicity, we'll fetch all and filter in memory, 
+                // OR use a proper joined filter if supported.
+                // query += `&person_teams.teams.name=in.(${teams.map(t => `"${t}"`).join(',')})`;
+            }
         } else if (supaTable === 'activities' && category) {
             query = `?select=*,activity_required_items(*,inventory(name))&category=eq.${category}`;
+        } else if (supaTable === 'inventory' && category) {
+            // Check if we should filter - only if migration has likely run
+            query = `?select=*&category=eq.${category}`;
         } else if (supaTable === 'sport_venues') {
             query = '?select=*,address:ort(*)';
             if (category) query += `&sport_type=eq.${category}`;
         } else if (supaTable === 'events') {
             query = '?select=*,location:ort(*)';
+            if (category) query += `&category=eq.${category}`;
         }
 
         const res = await SupabaseClient.get(supaTable, query);
@@ -78,7 +102,19 @@ export class DataService {
             throw new Error(`Load failed for ${tableId}: ${res.status} ${txt}`);
         }
 
-        const rows = await res.json();
+        let rows = await res.json();
+        
+        // Post-fetch filtering for teams if necessary
+        if (supaTable === 'people') {
+            const teams = gs.getCurrentTeams();
+            if (teams.length > 0 && !gs.isAdmin() && !gs.isSuperAdmin()) {
+                rows = rows.filter(r => {
+                    const rowTeams = (r.person_teams || []).map(pt => pt.teams?.name).filter(Boolean);
+                    return rowTeams.some(t => teams.includes(t));
+                });
+            }
+        }
+
         return rows.map(r => this._fromDb(supaTable, r));
     }
 
@@ -92,6 +128,11 @@ export class DataService {
      * @param {Array}  deletedIds  Optional list of IDs to delete
      */
     static async saveTable(tableId, _filename, rows, deletedIds = []) {
+        const gs = GlobalStateManager.getInstance();
+        if (!gs.canEdit(tableId)) {
+            throw new Error('Keine Berechtigung zum Speichern dieser Tabelle.');
+        }
+
         const { supaTable, category } = this._resolveTable(tableId);
 
         if (supaTable === 'events') {
@@ -204,7 +245,7 @@ export class DataService {
         
         let deleteQuery = `?id=in.(${deletedIds.map(id => `"${id}"`).join(',')})`;
 
-        if (supaTable === 'activities' && category) {
+        if ((supaTable === 'activities' || supaTable === 'inventory' || supaTable === 'events') && category) {
             deleteQuery += `&category=eq.${category}`;
         } else if (supaTable === 'sport_venues' && category) {
             deleteQuery += `&sport_type=eq.${category}`;
@@ -263,6 +304,7 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
+                category,
                 quantity: row.quantity ? parseInt(row.quantity, 10) || 0 : 0,
                 storage_location: row.storage_location || '',
                 condition: condition || 'Gut',
@@ -292,6 +334,7 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
+                category,
                 date: row.date || null,
                 time: row.time || '18:30',
                 location: row.location?.id || null,
@@ -438,11 +481,13 @@ export class DataService {
     // ── People-specific helpers ───────────────────────────────
 
     static async loadPeople() {
-        return this.loadRows('tbl_people');
+        const config = GlobalStateManager.getInstance().getAllTableConfigs().find(c => c.supa_table === 'people');
+        return this.loadRows(config ? config.id : 'tbl_people');
     }
 
     static async savePeople(rows) {
-        return this.saveTable('tbl_people', null, rows);
+        const config = GlobalStateManager.getInstance().getAllTableConfigs().find(c => c.supa_table === 'people');
+        return this.saveTable(config ? config.id : 'tbl_people', null, rows);
     }
 
     // ── Junction Sync Helpers ────────────────────────────────

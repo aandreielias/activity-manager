@@ -180,7 +180,11 @@ export class UIManager {
         else if (tableId === 'tbl_inventory') consolidatedRows = this.inventoryTable?.rows || [];
         else if (tableId.startsWith('all-')) {
             const category = tableId.replace('all-', '');
-            this.app.tableConfigs.filter(c => c.category === category).forEach(config => {
+            // Only include tables in this category, and specifically exclude people from the Organisation all-view
+            const configs = this.app.tableConfigs.filter(c => 
+                c.category === category && !(category === 'organisation' && c.supa_table === 'people')
+            );
+            configs.forEach(config => {
                 const tw = this.tables[config.id];
                 if (tw && tw.instance) consolidatedRows.push(...tw.instance.rows);
             });
@@ -766,6 +770,9 @@ export class UIManager {
                 el.style.display = this.app.tableConfigs.find(c => c.id === id)?.category === 'spiele' ? 'block' : 'none';
             } else if (tableId === 'all-sportarten') {
                 el.style.display = this.app.tableConfigs.find(c => c.id === id)?.category === 'sportarten' ? 'block' : 'none';
+            } else if (tableId === 'all-organisation') {
+                const config = this.app.tableConfigs.find(c => c.id === id);
+                el.style.display = (config?.category === 'organisation' && config?.supa_table !== 'people') ? 'block' : 'none';
             } else if (tableId === 'tbl_people') {
                 el.style.display = id === 'tbl_people' ? 'block' : 'none';
                 if (id === 'tbl_people') {

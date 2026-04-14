@@ -365,3 +365,41 @@ body.global-loading::after {
     box-shadow: 0 0 0 3px var(--accent-light);
 }
 
+.no-access-message {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    padding: 40px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.no-access-content {
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    animation: fadeIn 0.5s ease;
+}
+
+.no-access-content h2 {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.no-access-content p {
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0;
+    opacity: 0.8;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

@@ -31,7 +31,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.6.2';
+        return '2.6.3';
     }
 
     render() {
@@ -78,9 +78,9 @@ export class Header {
             <nav class="header-nav">
                 ${this._renderCategoryButton(spieleTables, 'spiele', 'Spiele')}
                 ${this._renderCategoryButton(sportTables, 'sportarten', 'Sportarten')}
-                ${this._renderCategoryButton(organisationTables, 'organisation', 'Organisation')}
+                ${organisationTables.length > 0 ? this._renderCategoryButton(organisationTables, 'organisation', 'Organisation') : ''}
                 
-                ${this._renderPersonenButton()}
+                ${globalState.canView('tbl_people') ? this._renderPersonenButton() : ''}
 
                 ${otherTables.map((config, idx) =>
             `<button class="nav-btn ${idx === 0 && spieleTables.length === 0 ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`
@@ -104,9 +104,10 @@ export class Header {
                 <button class="nav-btn user-info-btn" title="System-Stats">
                     Stats
                 </button>` : ''}
+                ${globalState.canView('btn_calendar') ? `
                 <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
                     Kalender
-                </button>
+                </button>` : ''}
                 <div class="dropdown-container user-dropdown-container">
                     <button class="header-user user-menu-btn">
                         ${globalState.getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>

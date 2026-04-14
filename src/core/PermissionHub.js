@@ -20,11 +20,12 @@ export class PermissionHub {
             'col_people.password': 0
         },
         'Supervisor': {
-            'tbl_people': 2,
-            'tbl_inventory': 2,
-            'tbl_activities': 2,
-            'tbl_events': 2,
-            'tbl_ort': 2,
+            'tbl_people': 1,
+            'tbl_inventory': 1,
+            'tbl_activities': 1,
+            'tbl_events': 1,
+            'tbl_ort': 1,
+            'btn_calendar': 1,
             'btn_stats': 1,
             'btn_audit_logs': 0
         },
@@ -34,6 +35,7 @@ export class PermissionHub {
             'tbl_activities': 1,
             'tbl_events': 1,
             'tbl_ort': 1,
+            'btn_calendar': 1,
             'btn_stats': 0,
             'btn_audit_logs': 0
         },
@@ -68,7 +70,7 @@ export class PermissionHub {
             return perms.overwrites[`cat_${category}`];
         }
 
-        // 3. Workspace / Team Isolation Logic
+        // 4. Team-Scoped Auto-Upgrade (Default for Supervisors to their own teams)
         if (teamContext || this._isTeamScoped(objectId)) {
             const TARGET_TEAM = teamContext || this._extractTeamFromId(objectId);
             
@@ -76,11 +78,8 @@ export class PermissionHub {
                 // User has teams -> restricted to those teams
                 if (!teams.includes(TARGET_TEAM)) return this.LEVELS.NONE;
                 
-                // SUPERVISOR AUTO-UPGRADE
+                // SUPERVISOR AUTO-UPGRADE for their assigned team
                 if (role === 'Supervisor') return this.LEVELS.WRITE;
-            } else {
-                // User has NO teams -> Auditor Mode
-                return this.LEVELS.READ; 
             }
         }
 
@@ -120,18 +119,29 @@ export class PermissionHub {
     }
 
     static _getCategoryForId(objectId) {
-        if (!objectId.startsWith('tbl_')) return null;
-        const parts = objectId.split('_');
+        if (!objectId) return null;
+        const lowerId = objectId.toLowerCase();
+        
+        if (!lowerId.startsWith('tbl_')) {
+            // Check for explicit system buttons
+            if (lowerId.startsWith('btn_')) return 'system';
+            return null;
+        }
+
+        const parts = lowerId.split('_');
         if (parts.length < 2) return null;
         
-        const type = parts[1]; // e.g., 'activities', 'sport', 'people', 'inventory'
-        if (['activities', 'sport'].includes(type) || objectId.startsWith('tbl_activities_') || objectId.startsWith('tbl_sport_')) {
-            // Simplified: in this app, activities mapping to 'spiele' and sport to 'sportarten' 
-            // is usually handled in the database, but for a pure hub logic we can use prefixes.
-            if (type === 'sport' || parts[2] === 'sport') return 'sportarten';
+        const type = parts[1]; // e.g., 'activities', 'sport', 'people', 'inventory', 'ort', 'events'
+        
+        if (['activities', 'sport'].includes(type) || lowerId.includes('activities_') || lowerId.includes('sport_')) {
+            if (type === 'sport' || parts[2] === 'sport' || lowerId.includes('_sport_')) return 'sportarten';
             return 'spiele';
         }
-        if (['people', 'inventory', 'events', 'ort'].includes(type)) return 'organisation';
+
+        if (['people', 'inventory', 'events', 'ort'].includes(type)) {
+            return 'organisation';
+        }
+
         return null;
     }
 }

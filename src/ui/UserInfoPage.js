@@ -15,8 +15,8 @@ import { Dialog } from './Dialog.js';
 export class UserInfoPage {
     static async show(peopleData, tableConfigs, allTables = {}) {
         const globalState = GlobalStateManager.getInstance();
-        if (!globalState.isSuperAdmin()) {
-            alert('Nur SuperAdmins haben Zugriff auf das System-Dashboard.');
+        if (!globalState.canSeeStats()) {
+            alert('Sie haben keine Berechtigung für das System-Dashboard.');
             return;
         }
         if (document.querySelector('.user-info-overlay')) return;
@@ -297,6 +297,7 @@ export class UserInfoPage {
                     <div class="perm-category-card">
                         <div class="category-title">System</div>
                         ${this._renderPermSlider('btn_stats', 'System-Dashboard', 'Statistiken & Nutzerverwaltung', overwrites)}
+                        ${this._renderPermSlider('btn_calendar', 'Kalender', 'Event-Kalender & Zeitplan', overwrites)}
                         ${this._renderPermSlider('btn_audit_logs', 'Audit-Logs', 'System-Protokolle & Änderungen', overwrites)}
                     </div>
                 </div>

@@ -362,9 +362,19 @@ export class UIManager {
             renderedCount++;
         });
 
-        // No more permission filtering - everyone can see everything
-
-        this.tablesContainer.replaceChildren(fragment);
+        if (renderedCount === 0) {
+            const noAccess = document.createElement('div');
+            noAccess.className = 'no-access-message';
+            noAccess.innerHTML = `
+                <div class="no-access-content">
+                    <h2>Kein Zugriff</h2>
+                    <p>Sie haben derzeit keine Berechtigung, Daten in diesem Bereich einzusehen.</p>
+                </div>
+            `;
+            this.tablesContainer.replaceChildren(noAccess);
+        } else {
+            this.tablesContainer.replaceChildren(fragment);
+        }
         this._initSplitViewTables(tables, peopleData);
 
         if (preserveState && previousTableId) {
@@ -586,11 +596,13 @@ export class UIManager {
     }
 
     _initSplitViewTables(tables, peopleData) {
-        if (tables['tbl_inventory']) {
+        const gs = GlobalStateManager.getInstance();
+        
+        if (tables['tbl_inventory'] && gs.canView('tbl_inventory')) {
             this.inventoryTable = tables['tbl_inventory'].instance;
         }
 
-        if (peopleData.length > 0) {
+        if (peopleData.length > 0 && gs.canView('tbl_people')) {
             const gs = GlobalStateManager.getInstance();
             const teams = gs.getAvailableTeams();
             let teamData = this._groupPeopleByTeam(peopleData, teams);

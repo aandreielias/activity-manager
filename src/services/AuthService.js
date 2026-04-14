@@ -108,15 +108,24 @@ export class AuthService {
      * If the user does not exist, create a stub record.
      */
     static async savePermissions(targetUsername, permissions, personId = null) {
-        // Check if user exists
-        const userRes = await SupabaseClient.get('users', `?username=eq.${encodeURIComponent(targetUsername)}&select=id`);
+        // 1. Try to find user by person_id (most reliable link)
+        let userRes = null;
+        if (personId) {
+            userRes = await SupabaseClient.get('users', `?person_id=eq.${personId}&select=id,username`);
+        }
+
+        // 2. Fallback to username check if no person_id match found
+        if (!userRes || !userRes.ok || (await userRes.clone().json()).length === 0) {
+            userRes = await SupabaseClient.get('users', `?username=ilike.${encodeURIComponent(targetUsername)}&select=id,username`);
+        }
+
         const users = userRes.ok ? await userRes.json() : [];
 
         if (users.length > 0) {
-            // Update existing
+            const userId = users[0].id;
             const res = await SupabaseClient.patch(
                 'users',
-                `?username=eq.${encodeURIComponent(targetUsername)}`,
+                `?id=eq.${userId}`,
                 { permissions: permissions }
             );
             if (!res.ok) throw new Error('Fehler beim Speichern der Berechtigungen');
@@ -124,7 +133,7 @@ export class AuthService {
             // Create new record
             const res = await SupabaseClient.post('users', {
                 username: targetUsername,
-                password_hash: '__UNSET__', // First login will set the password
+                password_hash: '__UNSET__',
                 role: 'User',
                 permissions: permissions,
                 person_id: personId

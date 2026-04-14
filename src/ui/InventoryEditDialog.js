@@ -306,27 +306,20 @@ export class InventoryEditDialog extends BaseDialog {
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 1200;
-                    const MAX_HEIGHT = 1200;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
                     const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // 1:1 Cropping logic
+                    const size = Math.min(img.width, img.height);
+                    const sourceX = (img.width - size) / 2;
+                    const sourceY = (img.height - size) / 2;
+                    
+                    // Target size (max 800x800 for good quality/size balance)
+                    const targetSize = Math.min(size, 800);
+                    canvas.width = targetSize;
+                    canvas.height = targetSize;
+
+                    // Draw the cropped portion to the canvas
+                    ctx.drawImage(img, sourceX, sourceY, size, size, 0, 0, targetSize, targetSize);
 
                     canvas.toBlob((blob) => {
                         if (blob) resolve(blob);

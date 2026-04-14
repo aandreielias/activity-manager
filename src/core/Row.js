@@ -3,6 +3,8 @@ import { Dialog } from '../ui/Dialog.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
 import { contextMenu } from '../ui/ContextMenu.js';
 import { CalendarExport } from '../utils/CalendarExport.js';
+import { Tooltip } from '../ui/Tooltip.js';
+import { SUPABASE_CONFIG } from '../config.js';
 
 /**
  * Row - Represents a single table row serving as a container for Field variants
@@ -164,6 +166,19 @@ export class Row {
                 }
             });
         });
+
+        // Tooltip for Inventory Table
+        if (this.tableId === 'tbl_inventory') {
+            const data = this.data;
+            if (data.image_url) {
+                const isFull = data.image_url.includes('://') || data.image_url.startsWith('data:');
+                const imgUrl = isFull ? data.image_url : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/inventory_picture_bucket/${data.image_url}`;
+                
+                // Framed photo tooltip matching standard themed box (no newlines to avoid pre-wrap space)
+                const html = `<div style="display: block; width: 220px; height: 220px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);"><img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;"></div>`;
+                Tooltip.attach(this.element, html, 400);
+            }
+        }
     }
 
     toggleFavorite() {

@@ -384,8 +384,25 @@ export class UIManager {
     }
 
     showInitialView() {
-        this.header.switchTo('all-spiele');
-        this._handleTableSwitch('all-spiele');
+        const gs = GlobalStateManager.getInstance();
+        const teams = gs.getCurrentTeams() || [];
+        
+        let targetView = 'all-spiele'; // Default fallback
+
+        if (teams.length > 0) {
+            const teamNamesParsed = teams.map(t => t.toLowerCase());
+            
+            if (teamNamesParsed.some(t => t.includes('organisation'))) {
+                targetView = 'all-organisation';
+            } else if (teamNamesParsed.some(t => t.includes('sport'))) {
+                targetView = 'all-sportarten';
+            } else if (teamNamesParsed.some(t => t.includes('aktivität') || t.includes('activity') || t.includes('spiele'))) {
+                targetView = 'all-spiele';
+            }
+        }
+
+        this.header.switchTo(targetView);
+        this._handleTableSwitch(targetView);
     }
 
     setupEventListeners() {

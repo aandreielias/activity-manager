@@ -31,7 +31,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.6.3';
+        return '2.6.4';
     }
 
     render() {
@@ -59,14 +59,6 @@ export class Header {
     }
 
     _getHeaderHTML() {
-        const globalState = GlobalStateManager.getInstance();
-        const viewableConfigs = this.tableConfigs.filter(t => globalState.canView(t.id));
-
-        const spieleTables = viewableConfigs.filter(t => t.category === 'spiele');
-        const sportTables = viewableConfigs.filter(t => t.category === 'sportarten');
-        const organisationTables = viewableConfigs.filter(t => t.category === 'organisation' && !t.id.includes('people'));
-        const otherTables = viewableConfigs.filter(t => !['spiele', 'sportarten', 'organisation'].includes(t.category));
-
         return `
             <div class="header-left">
                 <span class="header-logo">⬡</span>
@@ -76,15 +68,13 @@ export class Header {
                 </div>
             </div>
             <nav class="header-nav">
-                ${this._renderCategoryButton(spieleTables, 'spiele', 'Spiele')}
-                ${this._renderCategoryButton(sportTables, 'sportarten', 'Sportarten')}
-                ${organisationTables.length > 0 ? this._renderCategoryButton(organisationTables, 'organisation', 'Organisation') : ''}
+                ${this._renderCategoryButton('spiele', 'Spiele')}
+                ${this._renderCategoryButton('sportarten', 'Sportarten')}
+                ${this._renderCategoryButton('organisation', 'Organisation', ['people'])}
                 
-                ${globalState.canView('tbl_people') ? this._renderPersonenButton() : ''}
+                ${this._renderPersonenButton()}
 
-                ${otherTables.map((config, idx) =>
-            `<button class="nav-btn ${idx === 0 && spieleTables.length === 0 ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`
-        ).join('')}
+                ${this._renderOtherTables()}
             </nav>
             <div class="header-center">
                 <div class="header-search-container">
@@ -100,17 +90,11 @@ export class Header {
                 </div>
             </div>
             <div class="header-right">
-                ${globalState.canSeeStats() ? `
-                <button class="nav-btn user-info-btn" title="System-Stats">
-                    Stats
-                </button>` : ''}
-                ${globalState.canView('btn_calendar') ? `
-                <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
-                    Kalender
-                </button>` : ''}
+                ${this._renderSystemStatsButton()}
+                ${this._renderCalendarButton()}
                 <div class="dropdown-container user-dropdown-container">
                     <button class="header-user user-menu-btn">
-                        ${globalState.getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
+                        ${GlobalStateManager.getInstance().getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
                     </button>
                     <div class="dropdown-menu user-dropdown-menu">
                         <button class="dropdown-item favorites-toggle-btn">Favoriten</button>
@@ -127,6 +111,8 @@ export class Header {
 
     _renderPersonenButton() {
         const gs = GlobalStateManager.getInstance();
+        if (!gs.canView('tbl_people')) return ''; // Self-gated check
+
         const userTeams = gs.getCurrentTeams();
         const allTeams = gs.getAvailableTeams();
 
@@ -135,9 +121,20 @@ export class Header {
             ? allTeams.filter(t => userTeams.includes(t.name))
             : allTeams;
 
+        // If user is restricted to exactly ONE team (typical for Supervisors), 
+        // return a simple direct button instead of a complex split dropdown
+        if (viewableTeams.length === 1 && !gs.isAdmin() && !gs.isSuperAdmin()) {
+            const team = viewableTeams[0].name;
+            return `
+                <button class="nav-btn persons-toggle-btn ${this.currentTable === 'tbl_people' ? 'active' : ''}" data-team="${team}" title="Ihre Team-Personen (${team})">
+                    Personen
+                </button>
+            `;
+        }
+
         return `
             <div class="dropdown-container split-btn-group">
-                <button class="nav-btn split-main-btn persons-toggle-btn" title="Personen-Seitenleiste umschalten">
+                <button class="nav-btn split-main-btn persons-toggle-btn ${this.currentTable === 'tbl_people' ? 'active' : ''}" title="Personen-Seitenleiste umschalten">
                     Personen
                 </button>
                 <div class="split-divider"></div>
@@ -151,7 +148,16 @@ export class Header {
         `;
     }
 
-    _renderCategoryButton(categoryTables, categoryId, categoryLabel) {
+    _renderCategoryButton(categoryName, label, exclusions = []) {
+        const gs = GlobalStateManager.getInstance();
+
+        // Filter internally: Category is responsible for its own access
+        const categoryTables = this.tableConfigs.filter(t =>
+            t.category === categoryName &&
+            !exclusions.some(exc => t.id.includes(exc)) &&
+            gs.canView(t.id)
+        );
+
         if (categoryTables.length === 0) return '';
 
         if (categoryTables.length === 1) {
@@ -161,11 +167,11 @@ export class Header {
 
         return `
             <div class="dropdown-container split-btn-group">
-                <button class="nav-btn split-main-btn" data-table="all-${categoryId}">
-                    ${categoryLabel}
+                <button class="nav-btn split-main-btn" data-table="all-${categoryName}">
+                    ${label}
                 </button>
                 <div class="split-divider"></div>
-                <button class="nav-btn split-arrow-btn dropdown-btn" aria-label="${categoryLabel} Menü öffnen">
+                <button class="nav-btn split-arrow-btn dropdown-btn" aria-label="${label} Menü öffnen">
                     <span class="dropdown-arrow">▼</span>
                 </button>
                 <div class="dropdown-menu">
@@ -173,6 +179,40 @@ export class Header {
                 </div>
             </div>
         `;
+    }
+
+    _renderSystemStatsButton() {
+        const gs = GlobalStateManager.getInstance();
+        if (!gs.canSeeStats()) return '';
+        return `
+            <button class="nav-btn user-info-btn" title="System-Stats">
+                Stats
+            </button>
+        `;
+    }
+
+    _renderCalendarButton() {
+        const gs = GlobalStateManager.getInstance();
+        if (!gs.canView('btn_calendar')) return '';
+        return `
+            <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
+                Kalender
+            </button>
+        `;
+    }
+
+    _renderOtherTables() {
+        const gs = GlobalStateManager.getInstance();
+        const knownCategories = ['spiele', 'sportarten', 'organisation'];
+        const otherTables = this.tableConfigs.filter(t =>
+            !knownCategories.includes(t.category) &&
+            gs.canView(t.id)
+        );
+
+        return otherTables.map((config, idx) => {
+            const isSpieleEmpty = this.tableConfigs.filter(t => t.category === 'spiele' && gs.canView(t.id)).length === 0;
+            return `<button class="nav-btn ${idx === 0 && isSpieleEmpty ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`;
+        }).join('');
     }
 
     _attachEventListeners() {
@@ -218,7 +258,12 @@ export class Header {
             }
 
             if (e.target.closest('.persons-toggle-btn')) {
-                this.onPersonsToggle?.();
+                const btn = e.target.closest('.persons-toggle-btn');
+                if (btn.dataset.team) {
+                    this.onPersonTeamMainSwitch?.(btn.dataset.team);
+                } else {
+                    this.onPersonsToggle?.();
+                }
             }
 
             if (e.target.closest('.inventory-toggle-btn')) {
@@ -401,6 +446,9 @@ export class Header {
                     Object.entries(row.data).forEach(([colId, value]) => {
                         if (value === null || value === undefined) return;
 
+                        // COLUMN SECURITY: Don't search restricted columns
+                        if (!globalState.canView(`col_${tableId}.${colId}`)) return;
+
                         const strValue = String(value).toLowerCase();
                         const colDef = inst.schema.find(c => c.id === colId);
 
@@ -576,5 +624,20 @@ export class Header {
                 banner.style.display = 'none';
             }, 300);
         }, 3000);
+    }
+
+    hasVisibleItems() {
+        if (!this.element) return false;
+
+        // Check Navigation (Games, Sports, Org, People)
+        const nav = this.element.querySelector('.header-nav');
+        const hasNav = nav && nav.querySelectorAll('.nav-btn, .dropdown-container').length > 0;
+
+        // Check Admin/Utility (Stats, Calendar)
+        const stats = this.element.querySelector('.stats-btn');
+        const calendar = this.element.querySelector('.calendar-toggle-btn');
+        const hasUtils = !!stats || !!calendar;
+
+        return hasNav || hasUtils;
     }
 }

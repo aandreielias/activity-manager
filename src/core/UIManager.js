@@ -395,8 +395,22 @@ export class UIManager {
 
     showInitialView() {
         const gs = GlobalStateManager.getInstance();
-        const teams = gs.getCurrentTeams() || [];
         
+        // SECURITY CHECK: If no items in header, show "No Access" screen
+        if (!this.header.hasVisibleItems()) {
+            this.mainContent.innerHTML = `
+                <div class="no-access-screen anim-fade-in" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; color: var(--text-muted);">
+                    <h2 style="color: var(--text-color); margin-bottom: 12px;">Kein Zugriff</h2>
+                    <p style="max-width: 400px; line-height: 1.6;">Sie haben aktuell keine Berechtigungen für Team-Tabellen oder System-Funktionen. Bitte wenden Sie sich an einen Administrator.</p>
+                </div>
+            `;
+            // Hide side containers if open
+            if (this.resizer) this.resizer.style.display = 'none';
+            if (this.splitSideWrapper) this.splitSideWrapper.style.display = 'none';
+            return;
+        }
+
+        const teams = gs.getCurrentTeams() || [];
         let targetView = 'all-spiele'; // Default fallback
 
         if (teams.length > 0) {

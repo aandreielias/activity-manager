@@ -3,6 +3,7 @@ import { TableRenderer } from './TableRenderer.js';
 import { TableSorter } from './TableSorter.js';
 import { TableEditor } from './TableEditor.js';
 import { TableDataManager } from './TableDataManager.js';
+import { GlobalStateManager } from './GlobalStateManager.js';
 
 export class Table {
     /**
@@ -57,6 +58,22 @@ export class Table {
     }
 
     render() {
+        const gs = GlobalStateManager.getInstance();
+        
+        // Final UI safeguard: Table is responsible for its own access
+        if (gs && !gs.canView(this.id)) {
+            const el = document.createElement('div');
+            el.className = 'table-access-denied-wrapper';
+            el.innerHTML = `
+                <div class="access-denied-message" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px; text-align: center; color: var(--text-muted);">
+                    <h3 style="color: var(--text-color); margin-bottom: 8px;">Zugriff verweigert</h3>
+                    <p>Wenden Sie sich an den Administrator, um Freigaben für "${this.title}" zu erhalten.</p>
+                </div>
+            `;
+            this.element = el;
+            return el;
+        }
+
         this.element = this.renderer.render();
         return this.element;
     }

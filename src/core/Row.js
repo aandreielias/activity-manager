@@ -114,6 +114,10 @@ export class Row {
 
         this.schema.forEach(col => {
             if (col.hidden) return;
+            
+            // COLUMN SECURITY
+            if (!globalState.canView(`col_${this.tableId}.${col.id}`)) return;
+
             const field = this.fields[col.id];
             this.element.appendChild(field.render());
         });

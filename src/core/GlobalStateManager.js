@@ -97,6 +97,9 @@ export class GlobalStateManager {
     }
 
     canView(objectId) { 
+        // Anonymous/Login Bypass: Allow reading people list only for the login screen
+        if (!this.#currentUser && objectId === 'tbl_people') return true;
+        
         return PermissionHub.canRead(this.getPermissionContext(), objectId); 
     }
     

@@ -256,6 +256,10 @@ export class TableRenderer {
 
         this.table.schema.forEach((col, index) => {
             if (col.hidden) return;
+            
+            // COLUMN SECURITY
+            if (!GlobalStateManager.getInstance().canView(`col_${this.table.id}.${col.id}`)) return;
+
             const th = document.createElement('th');
             th.dataset.colId = col.id;
             th.dataset.type = col.type || 'text';

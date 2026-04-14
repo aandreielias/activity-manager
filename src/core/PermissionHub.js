@@ -20,22 +20,12 @@ export class PermissionHub {
             'col_people.password': 0
         },
         'Supervisor': {
-            'tbl_people': 1,
-            'tbl_inventory': 1,
-            'tbl_activities': 1,
-            'tbl_events': 1,
-            'tbl_ort': 1,
-            'btn_calendar': 1,
-            'btn_stats': 1,
+            'btn_calendar': 0,
+            'btn_stats': 0,
             'btn_audit_logs': 0
         },
         'User': {
-            'tbl_people': 1,
-            'tbl_inventory': 1,
-            'tbl_activities': 1,
-            'tbl_events': 1,
-            'tbl_ort': 1,
-            'btn_calendar': 1,
+            'btn_calendar': 0,
             'btn_stats': 0,
             'btn_audit_logs': 0
         },
@@ -51,48 +41,53 @@ export class PermissionHub {
      * @param {string} teamContext - Optional team context
      */
     static getEffectiveLevel(context, objectId, teamContext = null) {
-        const { role, teams = [], perms = {} } = context;
+        const { role, teams = [], perms } = context;
 
-        // 0. Inaktiv short-circuit
-        if (role === 'Inaktiv') return this.LEVELS.NONE;
-
-        // 1. Superadmin bypass
-        if (role === 'Superadmin') return this.LEVELS.WRITE;
-
-        // 2. Individual Object Overwrites
-        if (perms && perms.overwrites && perms.overwrites[objectId] !== undefined) {
-            return perms.overwrites[objectId];
+        // --- STAGE 1: GLOBAL HARD-BLOCKS ---
+        if ((objectId.includes('.role') || objectId.includes('.rolle')) && !this._isAdmin(role)) {
+            return this.LEVELS.NONE;
         }
+        if (this._isAdmin(role)) return this.LEVELS.WRITE;
 
-        // 3. Workspace (Category) Overwrites
+        // --- STAGE 2: EXPLICIT OVERWRITES (WINS OVER DEFAULTS) ---
+        const specificLevel = perms?.overwrites?.[objectId];
+        if (specificLevel !== undefined) return specificLevel;
+
         const category = this._getCategoryForId(objectId);
-        if (category && perms && perms.overwrites && perms.overwrites[`cat_${category}`] !== undefined) {
-            return perms.overwrites[`cat_${category}`];
+        if (category) {
+            const categoryLevel = perms?.overwrites?.[`cat_${category}`];
+            if (categoryLevel !== undefined) return categoryLevel;
         }
 
-        // 4. Team-Scoped Auto-Upgrade (Default for Supervisors to their own teams)
-        if (teamContext || this._isTeamScoped(objectId)) {
-            const TARGET_TEAM = teamContext || this._extractTeamFromId(objectId);
-            
-            if (teams.length > 0) {
-                // User has teams -> restricted to those teams
-                if (!teams.includes(TARGET_TEAM)) return this.LEVELS.NONE;
-                
-                // SUPERVISOR AUTO-UPGRADE for their assigned team
-                if (role === 'Supervisor') return this.LEVELS.WRITE;
+        // --- STAGE 3: ROLE-BASED CONTEXT (LEAST PRIVILEGE) ---
+        // Block restricted admin tools for non-admins early
+        if (['btn_stats', 'btn_audit_logs'].includes(objectId)) return this.LEVELS.NONE;
+
+        const isTeamScoped = this._isTeamScoped(objectId);
+        
+        // A) TEAM ISOLATION: If in a team, only that team's specific context is allowed
+        if (teams.length > 0) {
+            if (isTeamScoped) {
+                const targetTeam = teamContext || this._extractTeamFromId(objectId);
+                if (teams.includes(targetTeam)) {
+                    return role === 'Supervisor' ? this.LEVELS.WRITE : this.LEVELS.READ;
+                }
             }
+            // All other tables/buttons (including Events) default to NONE unless in Role Defaults
+        } 
+        // B) UNASSIGNED FLEX: Only Activities are granted by default
+        else if (role === 'User' || role === 'Supervisor') {
+            const isActivity = category === 'spiele' || category === 'sportarten';
+            if (isActivity || isTeamScoped) return this.LEVELS.WRITE;
         }
 
-        // 4. Role Defaults
-        const rolePerms = this.ROLE_DEFAULTS[role] || this.ROLE_DEFAULTS['User'];
-        let level = rolePerms[objectId] !== undefined ? rolePerms[objectId] : (rolePerms['*'] || this.LEVELS.NONE);
+        // --- STAGE 4: ROLE DEFAULTS (THE SAFETY NET) ---
+        const roleConfig = this.ROLE_DEFAULTS[role] || this.ROLE_DEFAULTS['User'];
+        return roleConfig[objectId] !== undefined ? roleConfig[objectId] : (roleConfig['*'] || this.LEVELS.NONE);
+    }
 
-        // 5. Auditor Mode Enforcement (No teams = No Write access)
-        if (teams.length === 0 && role !== 'Superadmin' && role !== 'Admin') {
-            if (level > this.LEVELS.READ) level = this.LEVELS.READ;
-        }
-
-        return level;
+    static _isAdmin(role) {
+        return ['SuperAdmin', 'Admin', 'Superadmin'].includes(role);
     }
 
     static canRead(context, objectId, teamContext = null) {
@@ -104,41 +99,46 @@ export class PermissionHub {
     }
 
     static _isTeamScoped(objectId) {
-        if (!objectId.startsWith('tbl_')) return false;
-        // A team-scoped ID follows the pattern tbl_[Type]_[TeamName]
-        // where Type is one of (activities, sport, inventory, people, events, ort)
-        const parts = objectId.split('_');
+        if (!objectId) return false;
+        let id = objectId.startsWith('col_') ? objectId.replace('col_', '').split('.')[0] : objectId;
+        
+        if (!id.startsWith('tbl_')) return false;
+        const parts = id.split('_');
         return parts.length >= 3;
     }
 
     static _extractTeamFromId(objectId) {
         if (!this._isTeamScoped(objectId)) return null;
-        const parts = objectId.split('_');
-        // The team name is the last segment (or joined segments if team name contains underscores)
+        let id = objectId.startsWith('col_') ? objectId.replace('col_', '').split('.')[0] : objectId;
+        const parts = id.split('_');
         return parts.slice(2).join('_');
     }
 
     static _getCategoryForId(objectId) {
         if (!objectId) return null;
-        const lowerId = objectId.toLowerCase();
+        let id = objectId.toLowerCase();
         
-        if (!lowerId.startsWith('tbl_')) {
-            // Check for explicit system buttons
-            if (lowerId.startsWith('btn_')) return 'system';
+        // Handle column-to-table mapping
+        if (id.startsWith('col_')) {
+            id = id.replace('col_', '').split('.')[0];
+        }
+
+        if (!id.startsWith('tbl_')) {
+            if (id.startsWith('btn_')) return 'system';
             return null;
         }
 
-        const parts = lowerId.split('_');
+        const parts = id.split('_');
         if (parts.length < 2) return null;
         
-        const type = parts[1]; // e.g., 'activities', 'sport', 'people', 'inventory', 'ort', 'events'
+        const type = parts[1];
         
-        if (['activities', 'sport'].includes(type) || lowerId.includes('activities_') || lowerId.includes('sport_')) {
-            if (type === 'sport' || parts[2] === 'sport' || lowerId.includes('_sport_')) return 'sportarten';
+        if (['activities', 'sport'].includes(type) || id.includes('activities_') || id.includes('sport_')) {
+            if (type === 'sport' || parts[2] === 'sport' || id.includes('_sport_')) return 'sportarten';
             return 'spiele';
         }
 
-        if (['people', 'inventory', 'events', 'ort'].includes(type)) {
+        if (['people', 'inventory', 'events', 'ort', 'calendar'].includes(type)) {
             return 'organisation';
         }
 

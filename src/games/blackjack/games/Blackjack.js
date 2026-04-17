@@ -26,6 +26,8 @@ export class Blackjack extends AGame {
     #lastResults = [];
     #isDoubleDown = false;
     #isInsuranceTaken = false;
+    #bets = [];
+    #insuranceBet = 0;
     onRoundUpdate = null;
 
     constructor() {
@@ -72,7 +74,9 @@ export class Blackjack extends AGame {
             canInsurance: this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands[0].length === 2 && this.#dealerHand[0].getRank() === Rank.ACE && !this.#isInsuranceTaken,
             canSplit: this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands.length === 1 && this.#playerHands[0].length === 2 &&
                      this.#playerHands[0][0].getRank().defaultValue === this.#playerHands[0][1].getRank().defaultValue,
-            isInsuranceTaken: this.#isInsuranceTaken
+            canHit: this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands[this.#activeHandIndex] && this.#calculateScore(this.#playerHands[this.#activeHandIndex]) < 21,
+            isInsuranceTaken: this.#isInsuranceTaken,
+            bets: this.#bets
         };
     }
 
@@ -80,7 +84,7 @@ export class Blackjack extends AGame {
         switch (type) {
         case 'deal':
             if (this.#phase === Blackjack.PHASES.IDLE || this.#phase === Blackjack.PHASES.RESULT) {
-                this.#deal();
+                this.#deal(payload.bet || 10);
             }
             break;
         case 'hit':
@@ -96,6 +100,7 @@ export class Blackjack extends AGame {
         case 'double':
             if (this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands[this.#activeHandIndex].length === 2) {
                 this.#isDoubleDown = true;
+                this.#bets[this.#activeHandIndex] *= 2;
                 this.#playerHit();
                 if (this.#phase !== Blackjack.PHASES.RESULT && this.#phase !== Blackjack.PHASES.DEALER_TURN) {
                     this.#playerStand();
@@ -105,6 +110,7 @@ export class Blackjack extends AGame {
         case 'insurance':
             if (this.#phase === Blackjack.PHASES.PLAYER_TURN && this.#playerHands[0].length === 2 && this.#dealerHand[0].getRank() === Rank.ACE) {
                 this.#isInsuranceTaken = true;
+                this.#insuranceBet = this.#bets[0] / 2;
             }
             break;
         case 'continue':
@@ -131,7 +137,7 @@ export class Blackjack extends AGame {
         this.#deadCards = [];
     }
 
-    #deal() {
+    #deal(betAmount) {
         // Shoe management
         if (this.#shoe.size() < 60) {
             this.#resetShoe();
@@ -145,6 +151,8 @@ export class Blackjack extends AGame {
         this.#lastResults = [];
         this.#isDoubleDown = false;
         this.#isInsuranceTaken = false;
+        this.#bets = [betAmount];
+        this.#insuranceBet = 0;
 
         // One burn card
         const burnCard = this.#shoe.draw();
@@ -185,6 +193,7 @@ export class Blackjack extends AGame {
 
         const card2 = main.pop();
         this.#playerHands.push([card2]);
+        this.#bets.push(this.#bets[0]);
 
         // Draw one card for each
         this.#playerHands[0].push(this.#shoe.draw());
@@ -291,6 +300,8 @@ export class Blackjack extends AGame {
         const dScore = this.#calculateScore(this.#dealerHand);
         const dBJ = this.#isBlackJack(this.#dealerHand);
 
+        let netChips = 0;
+
         this.#playerHands.forEach((hand, idx) => {
             const pScore = this.#calculateScore(hand);
             const pBJ = this.#isBlackJack(hand);
@@ -299,24 +310,30 @@ export class Blackjack extends AGame {
             if (pScore > 21) {
                 res = 'BUST';
                 this.#stats.losses++;
+                netChips -= this.#bets[idx];
             } else if (pBJ && dBJ) {
                 res = 'PUSH';
                 this.#stats.pushes++;
             } else if (pBJ) {
                 res = 'BLACKJACK';
                 this.#stats.wins++;
+                netChips += this.#bets[idx] * 1.5;
             } else if (dBJ) {
                 res = 'LOSS';
                 this.#stats.losses++;
+                netChips -= this.#bets[idx];
             } else if (dScore > 21) {
                 res = 'WIN';
                 this.#stats.wins++;
+                netChips += this.#bets[idx];
             } else if (pScore > dScore) {
                 res = 'WIN';
                 this.#stats.wins++;
+                netChips += this.#bets[idx];
             } else if (dScore > pScore) {
                 res = 'LOSS';
                 this.#stats.losses++;
+                netChips -= this.#bets[idx];
             } else {
                 res = 'PUSH';
                 this.#stats.pushes++;
@@ -326,6 +343,14 @@ export class Blackjack extends AGame {
         });
 
         // Handle Insurance
+        if (this.#isInsuranceTaken) {
+            if (dBJ) {
+                netChips += this.#insuranceBet * 2;
+            } else {
+                netChips -= this.#insuranceBet;
+            }
+        }
+
         if (this.#isInsuranceTaken && dBJ) {
             // Simplified summary
             this.#lastResults = ['INSURANCE PAYOUT', ...this.#lastResults];
@@ -337,7 +362,7 @@ export class Blackjack extends AGame {
 
         // Notify
         if (this.onRoundUpdate) {
-            this.onRoundUpdate(this.#lastResults[0] || 'RESULT', { ...this.#stats });
+            this.onRoundUpdate(this.#lastResults[0] || 'RESULT', { ...this.#stats, netChips });
         }
     }
 }

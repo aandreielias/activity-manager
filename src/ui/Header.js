@@ -31,7 +31,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.6.4';
+        return '2.7.1';
     }
 
     render() {
@@ -307,8 +307,9 @@ export class Header {
 
         const logo = this.element.querySelector('.header-left');
         if (logo) {
-            logo.addEventListener('dblclick', () => {
-                this.onLogoDoubleClick?.();
+            logo.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this._showGamesMenu(e.clientX, e.clientY);
             });
         }
 
@@ -415,6 +416,51 @@ export class Header {
                 this._updateSelectedResultUI();
             }
         });
+    }
+
+    _showGamesMenu(x, y) {
+        document.querySelectorAll('.games-context-menu').forEach(el => el.remove());
+        const menu = document.createElement('div');
+        menu.className = 'dropdown-menu games-context-menu show';
+        menu.style.position = 'fixed';
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        menu.style.zIndex = '100000';
+        menu.style.display = 'flex';
+        menu.style.flexDirection = 'column';
+        menu.style.background = 'var(--bg-secondary)';
+        menu.style.border = '1px solid var(--border)';
+        menu.style.borderRadius = '8px';
+        menu.style.padding = '8px';
+        menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+
+        const bjBtn = document.createElement('button');
+        bjBtn.className = 'dropdown-item';
+        bjBtn.style.textAlign = 'left';
+        bjBtn.textContent = 'Blackjack';
+        bjBtn.onclick = () => { this.onLogoDoubleClick?.(); menu.remove(); };
+
+        const pokerBtn = document.createElement('button');
+        pokerBtn.className = 'dropdown-item';
+        pokerBtn.style.textAlign = 'left';
+        pokerBtn.textContent = 'Texas Holdem';
+        pokerBtn.onclick = () => { this.onLogoRightClick?.(); menu.remove(); };
+
+        menu.appendChild(bjBtn);
+        menu.appendChild(pokerBtn);
+        document.body.appendChild(menu);
+
+        setTimeout(() => {
+            const closeMenu = (ev) => {
+                if (!menu.contains(ev.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                    document.removeEventListener('contextmenu', closeMenu);
+                }
+            };
+            document.addEventListener('click', closeMenu);
+            document.addEventListener('contextmenu', closeMenu);
+        }, 10);
     }
 
     _handleSearch(query) {

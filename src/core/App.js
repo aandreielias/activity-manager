@@ -3,6 +3,8 @@ import { GlobalStateManager } from './GlobalStateManager.js';
 import { LoginDialog } from '../ui/LoginDialog.js';
 import { Blackjack } from '../games/blackjack/games/Blackjack.js';
 import { BlackjackUI } from '../games/blackjack/ui/BlackjackUI.js';
+import { TexasHoldem } from '../games/poker/games/TexasHoldem.js';
+import { TexasHoldemUI } from '../games/poker/ui/TexasHoldemUI.js';
 import { Dialog } from '../ui/Dialog.js';
 import { UserStatsService } from '../services/UserStatsService.js';
 import { DataService } from '../services/DataService.js';
@@ -324,6 +326,13 @@ export class App {
         const userId = this.globalState.getCurrentUserId();
         game.onRoundUpdate = (res) => UserStatsService.recordBlackjackResult(userId, res);
         const ui = new BlackjackUI(game, () => overlay.remove());
+        const overlay = ui.render();
+        document.body.appendChild(overlay);
+    }
+
+    async _launchTexasHoldem() {
+        const game = new TexasHoldem();
+        const ui = new TexasHoldemUI(game, () => overlay.remove());
         const overlay = ui.render();
         document.body.appendChild(overlay);
     }

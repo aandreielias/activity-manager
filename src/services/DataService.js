@@ -171,11 +171,15 @@ export class DataService {
                 if (supaTable === 'people' && plain.Team !== undefined) {
                     await this._syncPersonTeams(rowId, plain.Team);
                 } else if (supaTable === 'activities' && plain.required_items !== undefined) {
-                    await this._syncActivityInventory(rowId, plain.required_items);
+                    await this._syncActivityInventory(rowId, plain.required_items, category);
                 }
             }
         }
         
+        if (supaTable === 'inventory') {
+            await this._reconcileMissingRequiredItems();
+        }
+
         await this.logAudit('UPSERT', supaTable, { affected: dbRows.length, category: category || 'none' });
 
         return { success: true, message: `Table ${tableId} saved` };
@@ -277,7 +281,7 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
-                category,
+                category: row.category || category,
                 short_description: row.short_description || '',
                 rules: row.rules || '',
                 duration_minutes: this._parseIntOrNull(row.duration_minutes),
@@ -304,7 +308,7 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
-                category,
+                category: row.category || category,
                 quantity: row.quantity ? parseInt(row.quantity, 10) || 0 : 0,
                 storage_location: row.storage_location || '',
                 condition: condition || 'Gut',
@@ -318,7 +322,7 @@ export class DataService {
         case 'sport_venues':
             return {
                 id: row.id,
-                sport_type: row.category || null,
+                sport_type: row.category || category || null,
                 name: row.name || '',
                 address: row.address?.id || null,
                 phone: row.phone || '',
@@ -334,7 +338,7 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
-                category,
+                category: row.category || category,
                 date: row.date || null,
                 time: row.time || '18:30',
                 location: row.location?.id || null,
@@ -390,8 +394,13 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
+                category: row.category || '',
                 required_items: (row.activity_required_items || [])
-                    .map(ari => ari.quantity_needed ? `${ari.inventory?.name} (${ari.quantity_needed})` : ari.inventory?.name)
+                    .map(ari => {
+                        const name = ari.inventory?.name || ari.not_availible_text;
+                        if (!name) return null;
+                        return ari.quantity_needed ? `${name} (${ari.quantity_needed})` : name;
+                    })
                     .filter(Boolean)
                     .join(', '),
                 short_description: row.short_description || '',
@@ -416,6 +425,7 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
+                category: row.category || '',
                 quantity: row.quantity ?? '',
                 storage_location: row.storage_location || '',
                 condition: row.condition ? this._capitalizeFirst(row.condition) : 'Gut',
@@ -431,6 +441,7 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
+                category: row.sport_type || '',
                 address: row.address || '',
                 phone: row.phone || '',
                 type: row.venue_type || '',
@@ -446,6 +457,7 @@ export class DataService {
             return {
                 id: row.id,
                 name: row.name || '',
+                category: row.category || '',
                 date: row.date || '',
                 time: row.time || '',
                 location: row.location || '',
@@ -518,13 +530,14 @@ export class DataService {
         }
     }
 
-    static async _syncActivityInventory(activityId, inventoryString) {
+    static async _syncActivityInventory(activityId, inventoryString, category = null) {
         await SupabaseClient.delete('activity_required_items', `?activity_id=eq.${activityId}`);
 
         const items = InventoryService.parseInventoryString(inventoryString);
         if (items.length === 0) return;
 
         const names = items.map(i => i.name);
+        // Fetch existing inventory by name
         const invRes = await SupabaseClient.get(
             'inventory',
             `?name=in.(${names.map(n => `"${n}"`).join(',')})`
@@ -535,19 +548,69 @@ export class DataService {
         }
         const inventory = await invRes.json();
 
-        const junctionRows = items.map(item => {
-            const match = inventory.find(inv => inv.name.toLowerCase() === item.name.toLowerCase());
-            if (!match) return null;
-            return {
-                activity_id: activityId,
-                inventory_id: match.id,
-                quantity_needed: item.quantity ? parseInt(item.quantity, 10) || 0 : 0,
-            };
-        }).filter(Boolean);
+        const junctionRows = [];
+        for (const item of items) {
+            let match = inventory.find(inv => inv.name.toLowerCase() === item.name.toLowerCase());
+            
+            if (match) {
+                junctionRows.push({
+                    activity_id: activityId,
+                    inventory_id: match.id,
+                    quantity_needed: item.quantity ? parseInt(item.quantity, 10) || 0 : 0,
+                    not_availible_text: null
+                });
+            } else {
+                // Not in inventory - store as text in the new column
+                junctionRows.push({
+                    activity_id: activityId,
+                    inventory_id: null,
+                    quantity_needed: item.quantity ? parseInt(item.quantity, 10) || 0 : 0,
+                    not_availible_text: item.name
+                });
+            }
+        }
 
         if (junctionRows.length > 0) {
             const res = await SupabaseClient.post('activity_required_items', junctionRows);
             if (!res.ok) console.error('[DataService] Sync ActivityInventory failed:', await res.text());
+        }
+    }
+
+    /**
+     * Automatically links activity requirement placeholders (not_availible_text)
+     * to real inventory items once they are created.
+     */
+    static async _reconcileMissingRequiredItems() {
+        try {
+            // 1. Find all required items that are still just text
+            const res = await SupabaseClient.get('activity_required_items', '?not_availible_text=not.is.null');
+            if (!res.ok) return;
+            const missing = await res.json();
+            if (missing.length === 0) return;
+
+            // 2. Get all inventory to match against
+            const invRes = await SupabaseClient.get('inventory', '?select=id,name');
+            if (!invRes.ok) return;
+            const inventory = await invRes.json();
+
+            // 3. Match unique missing names against inventory
+            const uniqueNames = [...new Set(missing.map(m => m.not_availible_text))];
+            for (const name of uniqueNames) {
+                const match = inventory.find(i => i.name.toLowerCase() === name.toLowerCase());
+                if (match) {
+                    // Update all rows that used this placeholder string
+                    await SupabaseClient.patch(
+                        'activity_required_items',
+                        `?not_availible_text=eq.${encodeURIComponent(name)}`,
+                        {
+                            inventory_id: match.id,
+                            not_availible_text: null
+                        }
+                    );
+                }
+            }
+        } catch (e) {
+            console.warn('[DataService] Reconciliation failed:', e);
         }
     }
 
@@ -601,7 +664,7 @@ export class DataService {
         const ids = rows.map(r => r.id || (r.toJSON ? r.toJSON().id : null)).filter(Boolean);
         if (ids.length === 0) return;
 
-        let query = `?select=id,updated_at&id=in.(${ids.map(id => `"${id}"`).join(',')})`;
+        let query = `?select=id,updated_at&id=in.(${ids.join(',')})`;
         if (supaTable === 'activities' && category) {
             query += `&category=eq.${category}`;
         } else if (supaTable === 'sport_venues' && category) {

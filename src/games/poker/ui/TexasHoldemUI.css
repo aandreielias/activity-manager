@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+.holdem-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text-primary);
+    overflow: hidden;
+    animation: blackjackFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.holdem-content {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    padding: 20px 40px;
+    gap: 20px;
+    background: var(--bg);
+    position: relative;
+    overflow-y: auto;
+}
+
+.holdem-game-area {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    flex: 1;
+    min-width: 300px;
+}
+
+/* Base reuse from blackjack for buttons, we will just use same classes mostly */
+.community-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin: 5px auto;
+    min-height: 124px;
+    width: fit-content;
+    min-width: 440px;
+    padding: 6px 16px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+}
+
+.poker-header-title {
+    font-size: 18px;
+    font-weight: 700;
+}

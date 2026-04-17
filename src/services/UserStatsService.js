@@ -60,36 +60,35 @@ export class UserStatsService {
      * Note: 'blackjack_pushes' is omitted as it does not exist in the current DB schema.
      */
     static formatUserStats(row, categoryHits = {}) {
+        const chips = {
+            1: row.chip_1 || 0,
+            5: row.chip_5 || 0,
+            10: row.chip_10 || 0,
+            20: row.chip_20 || 0,
+            25: row.chip_25 || 0,
+            100: row.chip_100 || 0,
+            500: row.chip_500 || 0,
+            1000: row.chip_1000 || 0
+        };
+
         const stats = {
             userId: row.user_id,
             lastLogin: row.last_login,
             entryCount: row.entry_count || 0,
             lastEntryDate: row.last_entry_date,
-            blackjackWins: row.blackjack_wins || 0,
-            blackjackLosses: row.blackjack_losses || 0,
-            blackjackBlackjacks: row.blackjack_blackjacks || 0,
-            blackjackCurrentStreak: row.blackjack_current_streak || 0,
-            blackjackHighestStreak: row.blackjack_highest_streak || 0,
             favoritesCount: row.favorites_count || 0,
-            categoryHits,
-            // Mapping for legacy/UI convenience
-            wins: row.blackjack_wins || 0,
-            losses: row.blackjack_losses || 0,
-            blackjacks: row.blackjack_blackjacks || 0
+            chips: chips,
+            categoryHits
         };
 
         // Derived Metrics
-        stats.winRate = this.calculateWinRate(stats);
         stats.topCategory = this.getTopCategory(categoryHits);
         stats.activityLevel = this.getActivityLevel(stats.lastLogin);
 
         return stats;
     }
 
-    static calculateWinRate(stats) {
-        const total = (stats.blackjackWins || 0) + (stats.blackjackLosses || 0);
-        return total > 0 ? Math.round(((stats.blackjackWins || 0) / total) * 100) : 0;
-    }
+
 
     static getTopCategory(hits) {
         if (!hits || Object.keys(hits).length === 0) return 'N/A';
@@ -161,46 +160,68 @@ export class UserStatsService {
         }
     }
 
-    static async recordBlackjackResult(userId, result) {
-        const stats = await this._ensureStats(userId);
-        if (!stats) return;
-
-        const update = {};
-        if (result === 'WIN' || result === 'BLACKJACK') {
-            update.blackjack_wins = (stats.blackjack_wins || 0) + 1;
-            update.blackjack_current_streak = (stats.blackjack_current_streak || 0) + 1;
-            update.blackjack_highest_streak = Math.max(stats.blackjack_highest_streak || 0, update.blackjack_current_streak);
-            if (result === 'BLACKJACK') update.blackjack_blackjacks = (stats.blackjack_blackjacks || 0) + 1;
-        } else if (result === 'LOSS' || result === 'BUST') {
-            update.blackjack_losses = (stats.blackjack_losses || 0) + 1;
-            update.blackjack_current_streak = 0;
-        }
-        // Result === 'PUSH' is not recorded as the column 'blackjack_pushes' is missing in DB.
-
-        await this._updateStats(userId, update);
-    }
-
     static async recordFavoriteChange(userId, count) {
         await this._updateStats(userId, { favorites_count: count });
     }
 
+    static CHIP_VALUES = [1000, 500, 100, 25, 20, 10, 5, 1];
+
+    static valueToChips(value) {
+        let remaining = Math.max(0, Math.floor(value));
+        const chipsObj = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 0, 500: 0, 1000: 0 };
+        for (const val of this.CHIP_VALUES) {
+            const count = Math.floor(remaining / val);
+            if (count > 0) {
+                chipsObj[val] = count;
+                remaining -= count * val;
+            }
+        }
+        // If there's fraction, we ignore it or round down.
+        return chipsObj;
+    }
+
+    static calculateTotalChipsValue(chipsObj) {
+        if (!chipsObj) return 0;
+        let total = 0;
+        for (const [valStr, count] of Object.entries(chipsObj)) {
+            total += parseInt(valStr, 10) * count;
+        }
+        return total;
+    }
+
+    static async updateChips(userId, chipsDiff) {
+        const stats = await this._ensureStats(userId);
+        if (!stats) return;
+        
+        const updates = {};
+        for (const [val, diff] of Object.entries(chipsDiff)) {
+            const col = `chip_${val}`;
+            const current = stats[col] || 0;
+            updates[col] = Math.max(0, current + diff); // prevent negative
+        }
+        
+        await this._updateStats(userId, updates);
+    }
+
     /**
      * Resets ALL stats (Game and Activity) for the given user.
-     * Note: 'blackjack_pushes' is excluded to avoid 400 errors as it doesn't exist in the DB.
      */
     static async resetAllStats(userId) {
         if (!userId) return;
 
         // 1. Reset user_stats fields
         await this._updateStats(userId, {
-            blackjack_wins: 0,
-            blackjack_losses: 0,
-            blackjack_blackjacks: 0,
-            blackjack_current_streak: 0,
-            blackjack_highest_streak: 0,
             entry_count: 0,
             favorites_count: 0,
-            last_entry_date: null
+            last_entry_date: null,
+            chip_1: 0,
+            chip_5: 0,
+            chip_10: 0,
+            chip_20: 0,
+            chip_25: 0,
+            chip_100: 0,
+            chip_500: 0,
+            chip_1000: 0
         });
 
         // 2. Clear category hits

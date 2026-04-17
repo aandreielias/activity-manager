@@ -159,6 +159,7 @@ export class UserInfoPage {
                 </div>
             </div>
         `;
+        this._attachStatsEvents(container, person, userStat);
 
         const tabs = container.querySelectorAll('.user-tab-btn');
         const tabContent = container.querySelector('.user-tab-content');
@@ -169,6 +170,7 @@ export class UserInfoPage {
                 tab.classList.add('active');
                 if (tab.dataset.tab === 'stats') {
                     tabContent.innerHTML = this._getStatsTabHTML(person, userStat);
+                    this._attachStatsEvents(container, person, userStat);
                 } else {
                     this._renderPermissionsTab(tabContent, person);
                 }
@@ -196,7 +198,26 @@ export class UserInfoPage {
 
     static _getStatsTabHTML(person, userStat) {
         const lastLoginStr = userStat.lastLogin ? new Date(userStat.lastLogin).toLocaleDateString('de-DE') : 'N/A';
+        const chipsObj = userStat.chips || {1:0, 5:0, 10:0, 20:0, 25:0, 100:0, 500:0, 1000:0};
+        const totalValue = UserStatsService.calculateTotalChipsValue(chipsObj);
+        
         return `
+            <style>
+            .admin-chip-disp {
+                width: 44px; height: 44px; border-radius: 50%; border: 3px dashed rgba(0,0,0,0.2);
+                color: #fff; font-family: 'DM Mono', monospace; font-weight: bold; font-size: 14px;
+                display: flex; align-items: center; justify-content: center;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            .admin-chip-disp[data-val="1"] { background: #ffffff; color: #111; border-color: rgba(0,0,0,0.1); }
+            .admin-chip-disp[data-val="5"] { background: #d92525; }
+            .admin-chip-disp[data-val="10"] { background: #e88610; }
+            .admin-chip-disp[data-val="20"] { background: #e8c810; color: #111; }
+            .admin-chip-disp[data-val="25"] { background: #228b3f; }
+            .admin-chip-disp[data-val="100"] { background: #222222; }
+            .admin-chip-disp[data-val="500"] { background: #6f2b8f; }
+            .admin-chip-disp[data-val="1000"] { background: #5c1818; }
+            </style>
             <div class="profile-section anim-fade-in" style="margin-top:0;">
                 <div class="section-header"><h4>Benutzer-Leistungsmetriken</h4></div>
                 <div class="stats-grid-modern">
@@ -212,16 +233,84 @@ export class UserInfoPage {
                         <span class="stat-label">Letzter System-Zugriff</span>
                         <span class="stat-value">${lastLoginStr}</span>
                     </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Gesamtwert Chips</span>
+                        <span class="stat-value highlight" id="user-totalchips-display">${totalValue}</span>
+                    </div>
+                </div>
+
+                <div class="chip-management" style="margin-top: 24px; padding: 20px; background: rgba(0,0,0,0.2); border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h5 style="margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.6);">Individuelle Casino Chips</h5>
+                    <div class="chip-manage-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px;">
+                        ${[1, 5, 10, 20, 25, 100, 500, 1000].map(val => `
+                            <div class="chip-manage-item" style="display: flex; flex-direction: column; gap: 12px; background: var(--bg-tertiary, rgba(255,255,255,0.03)); padding: 16px; border-radius: 12px; border: 1px solid var(--border, rgba(255,255,255,0.05));">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div class="admin-chip-disp" data-val="${val}">${val}</div>
+                                    <span class="chip-count-disp" data-chip="${val}" style="font-size: 16px; font-family: 'DM Mono', monospace; color: rgba(255,255,255,0.7);">${chipsObj[val] || 0}x</span>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="mod-chip-btn" data-chip="${val}" data-diff="-1" style="flex: 1; padding: 6px; font-size: 14px; cursor: pointer; background: rgba(255,60,60,0.2); color: #ff5252; border: 1px solid rgba(255,60,60,0.3); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,60,60,0.4)'" onmouseout="this.style.background='rgba(255,60,60,0.2)'">-1</button>
+                                    <button class="mod-chip-btn" data-chip="${val}" data-diff="1" style="flex: 1; padding: 6px; font-size: 14px; cursor: pointer; background: rgba(0,230,118,0.2); color: #00e676; border: 1px solid rgba(0,230,118,0.3); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(0,230,118,0.4)'" onmouseout="this.style.background='rgba(0,230,118,0.2)'">+1</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             </div>
         `;
+    }
+
+    static _attachStatsEvents(container, person, userStat) {
+        const modBtns = container.querySelectorAll('.mod-chip-btn');
+        const totalDisp = container.querySelector('#user-totalchips-display');
+
+        modBtns.forEach(btn => {
+            btn.onclick = async () => {
+                const val = parseInt(btn.dataset.chip, 10);
+                const diff = parseInt(btn.dataset.diff, 10);
+                
+                if (!userStat.chips) userStat.chips = {};
+                const currentCount = userStat.chips[val] || 0;
+                
+                // Don't let go below 0 visually
+                if (diff < 0 && currentCount === 0) return;
+
+                btn.disabled = true;
+                
+                try {
+                    await UserStatsService.updateChips(person.id, { [val]: diff });
+                    
+                    // Update local state
+                    userStat.chips[val] = currentCount + diff;
+                    
+                    // Update UI text (local count)
+                    const disp = container.querySelector(`.chip-count-disp[data-chip="${val}"]`);
+                    if (disp) disp.textContent = userStat.chips[val] + 'x';
+                    
+                    // Update total value text
+                    if (totalDisp) totalDisp.textContent = UserStatsService.calculateTotalChipsValue(userStat.chips);
+                    
+                } catch (e) {
+                    alert('Fehler beim Aktualisieren der Chips.');
+                } finally {
+                    btn.disabled = false;
+                }
+            };
+        });
     }
 
     static async _renderPermissionsTab(container, person) {
         container.innerHTML = '<div class="empty-state-small">Lade Berechtigungen...</div>';
         
         const targetUsername = `${person.vorname || ''} ${person.nachname || ''}`.trim().toLowerCase();
-        const user = await AuthService.getUserByUsername(targetUsername);
+        // 1. Try fetching by person.id (UUID) - most robust
+        let user = await AuthService.getUserByPersonId(person.id);
+        
+        // 2. Fallback to username for legacy or unlinked accounts
+        if (!user) {
+            user = await AuthService.getUserByUsername(targetUsername);
+        }
+
         const perms = (user && user.permissions) ? user.permissions : { overwrites: {} };
         const overwrites = perms.overwrites || {};
 

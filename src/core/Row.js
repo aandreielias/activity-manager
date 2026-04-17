@@ -56,6 +56,7 @@ export class Row {
                     this.callbacks.onEditChange?.();
                 },
                 onEditStart: () => {
+                    Tooltip.hide();
                     this.callbacks.onEditStart?.();
                 },
                 onTab: (fieldId) => {
@@ -178,9 +179,12 @@ export class Row {
                 const isFull = data.image_url.includes('://') || data.image_url.startsWith('data:');
                 const imgUrl = isFull ? data.image_url : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/inventory_picture_bucket/${data.image_url}`;
                 
-                // Framed photo tooltip matching standard themed box (no newlines to avoid pre-wrap space)
+                // Framed photo tooltip matching standard themed box
                 const html = `<div style="display: block; width: 220px; height: 220px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);"><img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;"></div>`;
-                Tooltip.attach(this.element, html, 400);
+                
+                // Only show tooltip if NOT editing any cell in this row
+                const condition = () => !Object.values(this.fields).some(f => f.td?.classList.contains('editing'));
+                Tooltip.attach(this.element, html, 400, condition);
             }
         }
     }
@@ -226,6 +230,8 @@ export class Row {
         // Ensure internal fields are preserved even if not in schema
         if (this.data.image_url !== undefined) result.image_url = this.data.image_url;
         if (this.data.updated_at !== undefined) result.updated_at = this.data.updated_at;
+        if (this.data.category !== undefined) result.category = this.data.category;
+        if (this.data.sport_type !== undefined) result.sport_type = this.data.sport_type;
 
         if (this.createdBy) result.createdBy = this.createdBy;
         if (this.createdAt) result.createdAt = this.createdAt;

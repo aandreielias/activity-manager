@@ -1,14 +1,17 @@
-import './BlackjackUI.css';
+import '../../blackjack/ui/BlackjackUI.css';
+import './TexasHoldemUI.css';
 import { GlobalStateManager } from '../../../core/GlobalStateManager.js';
 import { BettingUI } from '../../shared/BettingUI.js';
 import { ChipManager } from '../../shared/ChipManager.js';
 
-export class BlackjackUI {
+export class TexasHoldemUI {
     #game;
     #container;
     #onClose;
     #chipManager;
     #bettingUI;
+    #lastDealerPot = 0;
+    #chipsCollected = false;
 
     constructor(game, onClose) {
         this.#game = game;
@@ -18,7 +21,7 @@ export class BlackjackUI {
 
     render() {
         this.#container = document.createElement('div');
-        this.#container.className = 'blackjack-overlay';
+        this.#container.className = 'blackjack-overlay holdem-overlay';
 
         const userId = GlobalStateManager.getInstance().getCurrentUserId();
         this.#chipManager = new ChipManager(userId);
@@ -27,26 +30,39 @@ export class BlackjackUI {
             () => this.#game.getState().phase === 'IDLE',
             () => this.update()
         );
+        this.#bettingUI.setAlwaysAllowChips(true);
 
         this.#container.innerHTML = `
             <header class="app-header" style="position: relative; z-index: 10; flex-shrink: 0;">
                 <div class="header-left">
-                    <span class="header-logo">♤</span>
+                    <span class="header-logo">♣</span>
                     <div class="logo-stack">
-                        <span class="header-title" style="font-size: 18px;">Blackjack</span>
+                        <span class="header-title poker-header-title">Texas Hold'em</span>
                     </div>
                 </div>
                 <div class="header-right">
                     <button class="nav-btn blackjack-close" title="Close Game" style="font-weight: bold; color: #ff5252; font-size: 20px;">×</button>
                 </div>
             </header>
-            <div class="blackjack-content">
-                <div class="game-area">
+            <div class="blackjack-content holdem-content">
+                <div class="game-area holdem-game-area">
                     <div class="hand-section dealer-section">
                         <div class="cards-container dealer-cards" style="min-height: 120px;"></div>
-                        <div class="hand-score-display dealer-score-val" style="font-family: 'DM Mono', monospace; font-size: 16px; font-weight: bold; color: #fff; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 8px; margin-top: 4px;">?</div>
+                        <div class="hand-score-display dealer-score-val" style="font-family: 'DM Mono', monospace; font-size: 14px; font-weight: bold; color: #fff; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 8px; margin-top: 4px; display: flex; gap: 10px; align-items: center;">
+                            Dealer
+                            <span class="dealer-pot-display" style="color: #ff5252; font-size: 12px; opacity: 0; transition: opacity 0.3s;">(Bet: <span class="dealer-pot-val">0</span>)</span>
+                        </div>
                     </div>
+
+                    <div class="community-section">
+                        <div class="cards-container community-cards" style="min-height: 120px;"></div>
+                    </div>
+
                     <div class="hand-section player-section-container">
+                        <div class="hand-section player-section active" style="display: flex">
+                            <div class="cards-container player-cards" style="min-height: 120px;"></div>
+                            <div class="hand-score-display player-score-val" style="font-family: 'DM Mono', monospace; font-size: 14px; font-weight: bold; color: #fff; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 8px; margin-top: 4px;">Player</div>
+                        </div>
                     </div>
                     <div class="deck-stack">
                         <div class="deck-stack-card"></div>
@@ -67,15 +83,15 @@ export class BlackjackUI {
 
         const actionsContainer = this.#bettingUI.getActionsContainer();
         actionsContainer.className = 'blackjack-actions';
+        actionsContainer.style.flexWrap = 'wrap';
         actionsContainer.innerHTML = `
             <button class="game-btn primary deal-btn">Deal</button>
-            <button class="game-btn secondary hit-btn" disabled>Hit</button>
-            <button class="game-btn secondary stand-btn" disabled>Stand</button>
-            <button class="game-btn secondary double-btn" style="display: none;">Double</button>
-            <button class="game-btn secondary split-btn" style="display: none;">Split</button>
-            <button class="game-btn secondary insurance-btn" style="display: none;">Insurance</button>
+            <button class="game-btn secondary call-btn" style="display: none;">Call/Bet</button>
+            <button class="game-btn secondary check-btn" style="display: none;">Check</button>
+            <button class="game-btn primary bet-btn" style="display: none;">Raise</button>
+            <button class="game-btn secondary fold-btn" style="display: none;">Fold</button>
             <button class="game-btn primary continue-btn" style="display: none;">Continue</button>
-            <div class="shoe-counter" style="margin-top:auto; font-size:12px; color:rgba(255,255,255,0.4);">Shoe: <span class="shoe-val">0</span> cards left</div>
+            <div class="shoe-counter" style="margin-top:auto; font-size:12px; color:rgba(255,255,255,0.4); width: 100%;">Shoe: <span class="shoe-val">0</span> cards left</div>
         `;
 
         this.#attachEventListeners();
@@ -102,118 +118,108 @@ export class BlackjackUI {
         const shoeDisp = this.#container.querySelector('.shoe-display');
         if (shoeDisp) shoeDisp.textContent = state.shoeSize;
 
-        // Dealer Hand
-        this.#syncHand(this.#container.querySelector('.dealer-cards'), state.dealerHand);
-        const dScoreEl = this.#container.querySelector('.dealer-score-val');
-        if (dScoreEl) {
-            dScoreEl.textContent = state.dealerScore || '?';
-            dScoreEl.classList.toggle('bust', state.dealerFullScore > 21 && !state.dealerHidden);
+        // Dealer pot display & chip spawning
+        const dealerPotVal = this.#container.querySelector('.dealer-pot-val');
+        const dealerPotDisp = this.#container.querySelector('.dealer-pot-display');
+        if (state.dealerPot > 0) {
+            if (state.dealerPot > this.#lastDealerPot) {
+                this.#bettingUI.spawnDealerChip(state.dealerPot - this.#lastDealerPot);
+                this.#lastDealerPot = state.dealerPot;
+            }
+            dealerPotVal.textContent = state.dealerPot;
+            dealerPotDisp.style.opacity = '1';
+        } else {
+            dealerPotDisp.style.opacity = '0';
+            this.#lastDealerPot = 0;
         }
 
-        // Player Hands
-        const pContainer = this.#container.querySelector('.player-section-container');
-        const currentHandCount = pContainer.querySelectorAll('.player-section').length;
-
-        if (currentHandCount !== state.playerHands.length || state.phase === 'IDLE') {
-            pContainer.innerHTML = '';
-        }
-
-        state.playerHands.forEach((hand, idx) => {
-            let handEl = pContainer.querySelector(`.player-section[data-hand-idx="${idx}"]`);
-            if (!handEl) {
-                handEl = document.createElement('div');
-                handEl.className = 'hand-section player-section';
-                handEl.dataset.handIdx = idx;
-                handEl.innerHTML = `
-                    <div class="cards-container player-cards"></div>
-                    <div class="hand-score-display player-score-val" style="font-family: 'DM Mono', monospace; font-size: 16px; font-weight: bold; color: #fff; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 8px; margin-top: 4px;">0</div>
-                `;
-                pContainer.appendChild(handEl);
-            }
-
-            handEl.style.display = 'flex';
-            handEl.classList.toggle('active', state.activeHandIndex === idx);
-            this.#syncHand(handEl.querySelector('.cards-container'), hand);
-
-            const scoreEl = handEl.querySelector('.player-score-val');
-            if (scoreEl) {
-                const score = state.playerScores ? state.playerScores[idx] : 0;
-                scoreEl.textContent = score || '0';
-                scoreEl.classList.toggle('bust', score > 21);
-            }
-        });
+        // Sync card displays
+        this.#syncHand(this.#container.querySelector('.dealer-cards'), state.dealerHand, 'dealer');
+        this.#syncHand(this.#container.querySelector('.player-cards'), state.playerHand, 'player');
+        this.#syncHand(this.#container.querySelector('.community-cards'), state.communityCards, 'community');
 
         // Action button visibility
         const dealBtn = this.#container.querySelector('.deal-btn');
-        const hitBtn = this.#container.querySelector('.hit-btn');
-        const standBtn = this.#container.querySelector('.stand-btn');
-        const doubleBtn = this.#container.querySelector('.double-btn');
-        const splitBtn = this.#container.querySelector('.split-btn');
-        const insuranceBtn = this.#container.querySelector('.insurance-btn');
+        const foldBtn = this.#container.querySelector('.fold-btn');
+        const callBtn = this.#container.querySelector('.call-btn');
+        const checkBtn = this.#container.querySelector('.check-btn');
+        const betBtn = this.#container.querySelector('.bet-btn');
         const cntBtn = this.#container.querySelector('.continue-btn');
         const resOverlay = this.#container.querySelector('.result-overlay');
         const resText = this.#container.querySelector('.result-text');
 
-        const isPlayerTurn = state.phase === 'PLAYER_TURN';
-        const isResultState = state.phase === 'RESULT';
-
-        dealBtn.style.display = (state.phase === 'IDLE') ? 'block' : 'none';
-        hitBtn.style.display = (isPlayerTurn || (state.phase === 'IDLE' && state.playerHands[0].length === 0)) ? 'block' : 'none';
-        hitBtn.disabled = !state.canHit;
-        standBtn.style.display = (isPlayerTurn || (state.phase === 'IDLE' && state.playerHands[0].length === 0)) ? 'block' : 'none';
-        standBtn.disabled = !isPlayerTurn;
-        doubleBtn.style.display = (isPlayerTurn && state.canDouble) ? 'block' : 'none';
-        doubleBtn.disabled = !state.canDouble;
-        splitBtn.style.display = (isPlayerTurn && state.canSplit) ? 'block' : 'none';
-        splitBtn.disabled = !state.canSplit;
-        insuranceBtn.style.display = (isPlayerTurn && state.canInsurance) ? 'block' : 'none';
-        insuranceBtn.disabled = !state.canInsurance;
-        cntBtn.style.display = isResultState ? 'block' : 'none';
+        dealBtn.style.display = isIdle ? 'block' : 'none';
+        foldBtn.style.display = state.canFold ? 'block' : 'none';
+        callBtn.style.display = state.canCall ? 'block' : 'none';
+        checkBtn.style.display = state.canCheck ? 'block' : 'none';
+        betBtn.style.display = state.canBet ? 'block' : 'none';
+        cntBtn.style.display = (state.phase === 'RESULT') ? 'block' : 'none';
 
         // Result overlay
-        if (isResultState && state.lastResults && state.lastResults.length > 0) {
+        if (state.phase === 'RESULT' && state.lastResult) {
             if (resOverlay.style.display === 'none' || !resOverlay.style.display) {
                 setTimeout(() => {
                     if (this.#game.getState().phase === 'RESULT') {
                         resOverlay.style.display = 'flex';
-                        resText.innerHTML = state.lastResults.join('<br>');
+                        resText.innerHTML = state.lastResult;
                         resText.className = 'result-text result-summary';
                     }
                 }, 1200);
             } else {
-                resText.innerHTML = state.lastResults.join('<br>');
+                resText.innerHTML = state.lastResult;
             }
         } else {
             resOverlay.style.display = 'none';
+        }
+
+        // Chip collection animation on RESULT
+        if (state.phase === 'RESULT' && !this.#chipsCollected) {
+            const isWin = state.lastResult.includes('WIN') || state.lastResult.includes('DEALER FOLD') || state.lastResult === 'PUSH';
+            this.#bettingUI.collectChips(isWin);
+            this.#chipsCollected = true;
+        } else if (state.phase === 'IDLE') {
+            this.#chipsCollected = false;
         }
     }
 
     // ── Card Rendering ──────────────────────────────────────
 
-    #syncHand(container, cards) {
+    #syncHand(container, cards, type) {
         if (!container) return;
         if (cards.length < container.children.length) container.innerHTML = '';
 
         cards.forEach((card, idx) => {
             let cardEl = container.children[idx];
             if (!cardEl) {
-                cardEl = this.#createCardElement(card);
+                cardEl = this.#createCardElement(card, type, idx);
                 container.appendChild(cardEl);
+                if (!card.isHidden && type === 'community') {
+                    cardEl.classList.add('hidden');
+                    setTimeout(() => {
+                        cardEl.classList.remove('hidden');
+                        cardEl.classList.add('reveal');
+                    }, idx * 250);
+                }
             } else {
                 if (card.isHidden) {
                     cardEl.className = 'card-item hidden';
-                    cardEl.innerHTML = '<div class="card-back"></div>';
                 } else if (cardEl.classList.contains('hidden')) {
-                    const newEl = this.#createCardElement(card);
-                    container.replaceChild(newEl, cardEl);
+                    setTimeout(() => {
+                        cardEl.className = 'card-item reveal';
+                        cardEl.innerHTML = this.#createCardElement(card, type, idx).innerHTML;
+                    }, idx * 200);
                 }
             }
         });
     }
 
-    #createCardElement(card) {
+    #createCardElement(card, type, idx) {
         const el = document.createElement('div');
         el.className = `card-item ${card.isRed ? 'red' : ''} ${card.isHidden ? 'hidden' : ''}`;
+
+        if (type === 'player') el.style.animationDelay = `${0.2 + idx * 0.4}s`;
+        if (type === 'dealer') el.style.animationDelay = `${0.4 + idx * 0.4}s`;
+        if (type === 'community') el.style.animationDelay = `${idx * 0.2}s`;
 
         if (card.isHidden) {
             el.innerHTML = '<div class="card-back"></div>';
@@ -256,72 +262,65 @@ export class BlackjackUI {
             }
             this.#chipManager.startRound();
             this.#chipManager.placeBet(currentBet);
+            this.#chipManager.dealerMatch(currentBet); // Dealer antes
             this.#game.action('deal', { bet: currentBet });
             this.update();
         });
 
-        this.#container.querySelector('.hit-btn').addEventListener('click', () => {
-            this.#game.action('hit');
+        // Call/Bet (pre-flop)
+        this.#container.querySelector('.call-btn').addEventListener('click', () => {
+            const betAmount = this.#bettingUI.getCurrentBet();
+            this.#chipManager.placeBet(betAmount);
+            this.#game.action('call', { amount: betAmount });
             this.update();
         });
 
-        this.#container.querySelector('.stand-btn').addEventListener('click', () => {
-            this.#game.action('stand');
+        // Check
+        this.#container.querySelector('.check-btn').addEventListener('click', () => {
+            this.#game.action('check');
             this.update();
         });
 
-        this.#container.querySelector('.double-btn').addEventListener('click', () => {
-            // Double doubles the bet
-            this.#chipManager.placeBet(this.#chipManager.getPlayerPot());
-            this.#game.action('double');
+        // Raise/Bet (post-flop)
+        this.#container.querySelector('.bet-btn').addEventListener('click', () => {
+            const betAmount = this.#bettingUI.getCurrentBet();
+            this.#chipManager.placeBet(betAmount);
+            this.#game.action('bet', { amount: betAmount });
             this.update();
         });
 
-        this.#container.querySelector('.split-btn').addEventListener('click', () => {
-            this.#game.action('split');
+        // Fold
+        this.#container.querySelector('.fold-btn').addEventListener('click', () => {
+            this.#game.action('fold');
             this.update();
         });
 
-        this.#container.querySelector('.insurance-btn').addEventListener('click', () => {
-            this.#game.action('insurance');
-            this.update();
-        });
-
+        // Continue (new round)
         this.#container.querySelector('.continue-btn').addEventListener('click', () => {
             this.#game.action('continue');
             this.#bettingUI.clearBetTable();
             this.update();
         });
 
+        // Close
         this.#container.querySelector('.blackjack-close').addEventListener('click', () => {
             this.#onClose();
         });
 
         // Round settlement callback
-        this.#game.onRoundUpdate = async (resultSummary, statsAndNet) => {
-            const netChips = statsAndNet.netChips || 0;
+        this.#game.onRoundUpdate = async (outcome, data) => {
+            // Sync dealer pot to ChipManager
+            this.#chipManager.dealerMatch(Math.max(0, data.dealerPot - this.#chipManager.getDealerPot()));
 
-            // Map Blackjack results to ChipManager outcomes
-            // netChips > 0 → WIN, netChips < 0 → LOSS, netChips === 0 → PUSH
-            if (netChips > 0) {
-                // For Blackjack, the multiplier is already baked into netChips by the game engine.
-                // We just need to tell ChipManager the raw settlement.
-                // WIN: player gets bet back + winnings (net = winnings)
-                this.#chipManager.settle('WIN', { multiplier: netChips / this.#chipManager.getPlayerPot() });
-            } else if (netChips < 0) {
-                this.#chipManager.settle('LOSS');
-            } else {
-                this.#chipManager.settle('PUSH');
-            }
-
+            // Settle via ChipManager
+            this.#chipManager.settle(outcome);
             await this.#chipManager.save();
 
-            // Reload chips after animation delay
+            // Reload chips from DB after a delay (let animations play)
             setTimeout(async () => {
-                this.#bettingUI.clearBetTable();
                 await this.#loadChips();
                 this.update();
-            }, 3000);
+            }, 2500);
 
             this.update();
         };

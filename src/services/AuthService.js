@@ -55,6 +55,12 @@ export class AuthService {
         }
 
         const teams = await this._fetchUserTeams(user.person_id);
+        
+        // Ensure permissions are parsed if stored as string
+        let permissions = user.permissions;
+        if (typeof permissions === 'string' && permissions.trim() !== '') {
+            try { permissions = JSON.parse(permissions); } catch (e) { console.error('Failed to parse permissions:', e); }
+        }
 
         await UserStatsService.recordLogin(user.id);
         return { 
@@ -62,7 +68,7 @@ export class AuthService {
             username, 
             userId: user.id, 
             role: user.role || 'User',
-            permissions: user.permissions || null,
+            permissions: permissions || null,
             personId: user.person_id,
             teams
         };
@@ -86,7 +92,30 @@ export class AuthService {
         const res = await SupabaseClient.get('users', `?username=eq.${encodeURIComponent(username)}&select=*`);
         if (!res.ok) return null;
         const rows = await res.json();
-        return rows[0] || null;
+        if (rows.length === 0) return null;
+        
+        const user = rows[0];
+        if (typeof user.permissions === 'string' && user.permissions.trim() !== '') {
+            try { user.permissions = JSON.parse(user.permissions); } catch (e) {}
+        }
+        return user;
+    }
+
+    /**
+     * Get user record by person_id.
+     */
+    static async getUserByPersonId(personId) {
+        if (!personId) return null;
+        const res = await SupabaseClient.get('users', `?person_id=eq.${personId}&select=*`);
+        if (!res.ok) return null;
+        const rows = await res.json();
+        if (rows.length === 0) return null;
+
+        const user = rows[0];
+        if (typeof user.permissions === 'string' && user.permissions.trim() !== '') {
+            try { user.permissions = JSON.parse(user.permissions); } catch (e) {}
+        }
+        return user;
     }
 
     /**

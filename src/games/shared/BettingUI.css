@@ -1,0 +1,120 @@
+.betting-sidebar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.betting-table {
+    background: #173826;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+    overflow: hidden;
+}
+
+.betting-table-label {
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.2);
+    margin-bottom: 20px;
+}
+
+.betting-table-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%;
+    height: 60%;
+}
+
+.chip-inventory {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    background: rgba(0,0,0,0.2);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    transition: opacity 0.3s;
+}
+
+.chip-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+}
+
+.chip-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.bet-chip {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 3px dashed rgba(0,0,0,0.2);
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 10;
+}
+
+/* Casino Chip Colors */
+.bet-chip[data-val="1"] { background: #ffffff; color: #111; border-color: rgba(0,0,0,0.1); }
+.bet-chip[data-val="5"] { background: #d92525; }
+.bet-chip[data-val="10"] { background: #e88610; }
+.bet-chip[data-val="20"] { background: #e8c810; color: #111; }
+.bet-chip[data-val="25"] { background: #228b3f; }
+.bet-chip[data-val="100"] { background: #222222; }
+.bet-chip[data-val="500"] { background: #6f2b8f; }
+.bet-chip[data-val="1000"] { background: #5c1818; }
+.bet-chip:disabled {
+    filter: grayscale(100%);
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+.bet-chip:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.4);
+}
+.bet-chip:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.2);
+}
+
+.bet-chip.dealer-chip {
+    filter: brightness(0.6) saturate(1.2);
+    border: 3px solid rgba(255,255,255,0.1);
+    pointer-events: none;
+    z-index: 5;
+}

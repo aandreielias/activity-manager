@@ -56,7 +56,10 @@ export class PermissionHub {
         const category = this._getCategoryForId(objectId);
         if (category) {
             const categoryLevel = perms?.overwrites?.[`cat_${category}`];
-            if (categoryLevel !== undefined) return categoryLevel;
+            // Only use category level if it's an explicit setting (NOT -2/Manuell and NOT -1/Standard)
+            if (categoryLevel !== undefined && categoryLevel !== -1 && categoryLevel !== -2) {
+                return categoryLevel;
+            }
         }
 
         // --- STAGE 3: ROLE-BASED CONTEXT (LEAST PRIVILEGE) ---

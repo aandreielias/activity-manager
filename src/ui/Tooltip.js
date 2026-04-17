@@ -66,22 +66,26 @@ export class Tooltip {
         document.head.appendChild(style);
     }
 
-    static attach(element, content, delay = 500) {
+    static attach(element, content, delay = 500, condition = null) {
         this.init();
+        
+        let localTimer = null;
 
         element.addEventListener('mouseenter', (e) => {
-            this.#timer = setTimeout(() => {
+            if (condition && !condition()) return;
+            localTimer = setTimeout(() => {
                 this.show(e.clientX, e.clientY, content);
             }, delay);
         });
 
         element.addEventListener('mousemove', (e) => {
-            if (this.#instance.style.display === 'block') {
+            if (this.#instance && this.#instance.style.display === 'block') {
                 this._positionTooltip(e.clientX, e.clientY);
             }
         });
 
         element.addEventListener('mouseleave', () => {
+            clearTimeout(localTimer);
             this.hide();
         });
     }

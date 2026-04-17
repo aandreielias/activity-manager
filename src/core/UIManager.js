@@ -66,6 +66,7 @@ export class UIManager {
         this.header.onCalendarToggle = () => this._handleCalendarToggle();
         this.header.onCalendarFull = () => this._handleCalendarFullView();
         this.header.onLogoDoubleClick = () => this.app._launchBlackjack();
+        this.header.onLogoRightClick = () => this.app._launchTexasHoldem();
 
         appElement.appendChild(this.header.render());
 

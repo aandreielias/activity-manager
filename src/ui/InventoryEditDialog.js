@@ -272,9 +272,18 @@ export class InventoryEditDialog extends BaseDialog {
                             const fileName = `${data.id}_${Date.now()}.jpg`;
                             const uploadRes = await SupabaseClient.upload('inventory_picture_bucket', fileName, compressedBlob);
                             if (!uploadRes.ok) throw new Error('Upload fehlgeschlagen');
+                            
+                            // Delete old image if it exists
+                            if (data.photo) {
+                                await SupabaseClient.deleteStorageFile('inventory_picture_bucket', data.photo);
+                            }
+                            
                             updatedData.photo = fileName;
                         } else {
-                            // If base64 was selected but not uploaded (should not happen with current logic)
+                            // Check if image was removed
+                            if (!currentImageUrl && data.photo) {
+                                await SupabaseClient.deleteStorageFile('inventory_picture_bucket', data.photo);
+                            }
                             updatedData.photo = currentImageUrl === data.photo ? data.photo : currentImageUrl;
                         }
 

@@ -33,7 +33,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.9.0';
+        return '2.9.1';
     }
 
     render() {
@@ -101,9 +101,10 @@ export class Header {
                     </button>
                     <div class="dropdown-menu user-dropdown-menu">
                         <button class="dropdown-item favorites-toggle-btn">Favoriten</button>
+                        <button class="dropdown-item logout-btn">Abmelden</button>
+                        <div class="dropdown-divider"></div>
                         <button class="dropdown-item change-avatar-btn">Personendaten ändern</button>
                         <button class="dropdown-item change-password-btn">Passwort ändern</button>
-                        <button class="dropdown-item logout-btn">Abmelden</button>
                     </div>
                 </div>
                 <button class="theme-toggle" aria-label="Design umschalten" title="Dunkelmodus umschalten">
@@ -633,7 +634,6 @@ export class Header {
         const banner = this.element.querySelector('.unsaved-banner');
         if (banner) {
             banner.style.display = 'flex';
-            this.setLoading(false);
         }
     }
 
@@ -642,6 +642,17 @@ export class Header {
         if (banner) {
             banner.style.display = 'none';
             this.setLoading(false);
+        }
+    }
+
+    refreshUserArea() {
+        if (!this.element) return;
+        const userBtn = this.element.querySelector('.header-user');
+        if (userBtn) {
+            userBtn.innerHTML = `
+                ${this._renderUserAvatar()}
+                ${GlobalStateManager.getInstance().getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
+            `;
         }
     }
 

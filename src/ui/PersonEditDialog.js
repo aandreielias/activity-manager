@@ -277,9 +277,18 @@ export class PersonEditDialog extends BaseDialog {
                             const fileName = `${data.id}_${Date.now()}.jpg`;
                             const uploadRes = await SupabaseClient.upload('user_picture_bucket', fileName, compressedBlob);
                             if (!uploadRes.ok) throw new Error('Upload fehlgeschlagen');
+                            
+                            // Delete old image if it exists
+                            if (data.image_url) {
+                                await SupabaseClient.deleteStorageFile('user_picture_bucket', data.image_url);
+                            }
+                            
                             updatedData.image_url = fileName;
                         } else {
-                            // If base64 was selected but not uploaded (should not happen with current logic)
+                            // Check if image was removed
+                            if (!currentImageUrl && data.image_url) {
+                                await SupabaseClient.deleteStorageFile('user_picture_bucket', data.image_url);
+                            }
                             updatedData.image_url = currentImageUrl === data.image_url ? data.image_url : currentImageUrl;
                         }
 

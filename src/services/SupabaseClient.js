@@ -205,6 +205,25 @@ export class SupabaseClient {
     }
 
     /**
+     * Delete a file from a Supabase bucket.
+     * @param {string} bucket - Bucket name.
+     * @param {string} path - Remote path (filename).
+     * @returns {Promise<Response>}
+     */
+    static deleteStorageFile(bucket, path) {
+        const url = `${SUPABASE_CONFIG.URL}/storage/v1/object/${bucket}/${path}`;
+        const headers = {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+        };
+        
+        return fetch(url, {
+            method: 'DELETE',
+            headers: headers
+        });
+    }
+
+    /**
      * Clear all caches (useful for manual refresh).
      */
     static clearCache() {

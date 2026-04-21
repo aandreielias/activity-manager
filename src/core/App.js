@@ -245,10 +245,19 @@ export class App {
             return;
         }
 
+        const baseSchema = this.globalState.getTableConfig('tbl_people')?.schema || [];
+        const enrichedSchema = [...baseSchema];
+        if (!enrichedSchema.find(c => c.id === 'email')) {
+            enrichedSchema.push({ id: 'email', type: 'text', label: 'E-Mail', hidden: false });
+        }
+        if (!enrichedSchema.find(c => c.id === 'image_url')) {
+            enrichedSchema.push({ id: 'image_url', type: 'text', label: 'Image URL', hidden: true });
+        }
+
         const personRow = {
             id: currentPersonId,
             data: this.peopleData.find(p => p.id === currentPersonId),
-            schema: this.globalState.getTableConfig('tbl_people')?.schema || [],
+            schema: enrichedSchema,
             tableId: 'tbl_people',
             render: () => {
                 // Refresh header after change
@@ -260,7 +269,7 @@ export class App {
                     this.globalState.getCurrentTeams(),
                     updatedPerson.image_url
                 );
-                this.uiManager.header.render(); // Re-render header to show new image
+                this.uiManager.header.refreshUserArea(); // Refresh only the user area
             }
         };
 
@@ -304,9 +313,14 @@ export class App {
                     await DataService.saveTable('tbl_people', 'people.json', dirtyRows, deletedIds);
                     this.globalState.clearDirtyRowIds('tbl_people');
                     this.globalState.clearDeletedRowIds('tbl_people');
+                    
+                    // Mark both possible IDs as saved
+                    this.globalState.markTableAsSaved('tbl_people');
+                    this.globalState.markTableAsSaved('people_table');
                 }
                 this.globalState.markTableAsSaved(id);
             }
+            this.globalState.clearAllUnsaved(); // Nuclear option to ensure banner goes away
             this.uiManager.header.hideUnsavedBanner();
             
             // Full refresh to ensure all derived data/views are in sync

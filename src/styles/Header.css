@@ -208,6 +208,10 @@
     to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
+.unsaved-banner.loading .save-loading-bar {
+    display: block;
+}
+
 .save-loading-bar {
     display: none;
     position: absolute;
@@ -427,6 +431,13 @@
     box-shadow: var(--shadow-md);
     z-index: 1000;
     border-top: 2px solid var(--accent);
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 4px 8px;
+    opacity: 0.5;
 }
 
 .dropdown-container.show .dropdown-menu {

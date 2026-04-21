@@ -33,7 +33,7 @@ export class BaseFilterBar {
     _populate(container) {
         if (this.schema.length === 0) return;
         const g1 = document.createElement('div'); g1.className = 'filter-group'; g1.innerHTML = '<span class="filter-label">Gruppieren:</span>';
-        const gO = this.schema.filter(f => ['enum', 'number', 'tag'].includes(f.type));
+        const gO = this.schema.filter(f => ['enum', 'number', 'tag', 'tags'].includes(f.type));
         const curG = this.schema.find(s => s.id === this.state.groupBy);
         g1.appendChild(this._createFilterDropdown(gO, curG ? curG.label : 'Attribut...', (o) => { this.state.groupBy = o.id; this.refresh(); this.onUpdate(this.state); }));
         if (this.state.groupBy) {
@@ -56,14 +56,22 @@ export class BaseFilterBar {
                 let modes = [{ id: 'contains', label: 'enthält' }, { id: 'not_contains', label: 'enthält nicht' }, { id: 'equals', label: 'exakt' }];
                 if (cur.type === 'number') modes = [{ id: 'equals', label: 'gleich' }, { id: 'greater', label: 'größer' }, { id: 'less', label: 'kleiner' }];
                 else if (cur.type === 'date' || cur.id === 'date') modes = [{ id: 'equals', label: 'am' }, { id: 'after', label: 'nach' }, { id: 'before', label: 'vor' }];
-                else if (['enum', 'tag', 'inventory'].includes(cur.type) || isInv || cur.options || cur.availableTags) modes = [{ id: 'is', label: 'ist' }, { id: 'is_not', label: 'ist nicht' }];
+                else if (['enum', 'tag', 'tags', 'inventory'].includes(cur.type) || isInv || cur.options || cur.availableTags) modes = [{ id: 'is', label: 'ist' }, { id: 'is_not', label: 'ist nicht' }];
                 if (!f.mode) f.mode = modes[0].id;
                 row.appendChild(this._createFilterDropdown(modes, modes.find(m => m.id === f.mode)?.label || modes[0].label, (o) => { f.mode = o.id; this.refresh(); this.onUpdate(this.state); }));
 
-                if (['enum', 'tag', 'inventory'].includes(cur.type) || isInv || cur.options || cur.availableTags) {
+                if (['enum', 'tag', 'tags', 'inventory'].includes(cur.type) || isInv || cur.options || cur.availableTags) {
                     let full = cur.options || cur.availableTags || [];
                     if (isInv) full = GlobalStateManager.getInstance().getInventory().map(i => i.data?.name || i.name);
-                    if (full.length === 0) full = GlobalStateManager.getInstance().getEnumOptionsForColumn(cur.id, this.tableId) || [];
+                    
+                    if (full.length === 0) {
+                        // Harvest unique tags from rows if no predefined options
+                        const harvested = [...new Set(this.rows.flatMap(r => {
+                            const val = r.data[cur.id] || '';
+                            return typeof val === 'string' ? val.split(',').map(t => t.trim()) : [];
+                        }))].filter(Boolean);
+                        full = harvested.length > 0 ? harvested : (GlobalStateManager.getInstance().getEnumOptionsForColumn(cur.id, this.tableId) || []);
+                    }
                     const normFull = full.map(o => { const id = typeof o === 'string' ? o : (o.id ?? o.value); return { id, label: typeof o === 'string' ? o : (o.label ?? o.header ?? id) }; });
                     
                     let finalOptions = normFull;

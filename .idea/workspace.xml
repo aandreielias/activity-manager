@@ -5,31 +5,24 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.env.local.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.local.example" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/copilotDiffState.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/App.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/App.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/GlobalStateManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/GlobalStateManager.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/TableRenderer.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableRenderer.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/UIManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/UIManager.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/fields/EnumField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/EnumField.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/fields/Field.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/Field.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/fields/LocationField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/LocationField.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/AccessGuard.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/AuthService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/AuthService.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/services/builders/QueryBuilder.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/services/cache/CacheManager.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/services/interceptors/RequestInterceptor.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/services/mappers/ResultMapper.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/services/repositories/BaseRepository.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/services/repositories/RepositoryFactory.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/GlobalStateManager-CkVu5UmY.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/GlobalStateManager-DycBFrws.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/InventoryEditDialog-Cq-NIJDi.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/html2canvas-suW7PDr_.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index-M0k6iX2K.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index-pmw4jFf4.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index.es-pNiIkobK.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/dist/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/TableDataManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableDataManager.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/TableLoader.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableLoader.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/services/DataService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/DataService.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/PermissionService.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/ValidationService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/ValidationService.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/CalendarView.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/CalendarView.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/Dialog.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/Dialog.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/FilterBar.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/FilterBar.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/Header.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/Header.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/LoginDialog.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/LoginDialog.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/Table.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/Table.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/styles/UserInfoPage.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/UserInfoPage.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/Dialog.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Dialog.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/Header.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Header.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ui/UserInfoPage.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/UserInfoPage.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/SupabaseClient.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/SupabaseClient.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -84,28 +77,28 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "git-widget-placeholder": "master",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "/home/andrei/IdeaProjects/activity-manager/public",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "prettierjs.PrettierConfiguration.Package": "/home/andrei/IdeaProjects/activity-manager/node_modules/prettier",
-    "settings.editor.selected.configurable": "preferences.general",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/andrei/IdeaProjects/activity-manager/public&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;prettierjs.PrettierConfiguration.Package&quot;: &quot;/home/andrei/IdeaProjects/activity-manager/node_modules/prettier&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.general&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/public" />
@@ -151,6 +144,7 @@
       <workItem from="1775650753329" duration="5181000" />
       <workItem from="1775820711342" duration="4461000" />
       <workItem from="1776084419352" duration="690000" />
+      <workItem from="1776755866230" duration="1001000" />
     </task>
     <servers />
   </component>

@@ -80,7 +80,16 @@ export class FilterEngine {
             if (Array.isArray(filterValue)) {
                 if (filterValue.length === 0) return true;
                 const rowValStr = this._normalizeValue(rawValue);
-                const isAnyMatch = filterValue.some(v => this._compareStrings(rowValStr, v));
+                
+                // Handle multi-value strings (tags)
+                const rowTags = rowValStr.split(',').map(t => t.trim()).filter(Boolean);
+                const isAnyMatch = filterValue.some(v => {
+                    if (rowTags.length > 0) {
+                        return rowTags.some(rt => this._compareStrings(rt, v));
+                    }
+                    return this._compareStrings(rowValStr, v);
+                });
+                
                 return f.mode === 'is' ? isAnyMatch : !isAnyMatch;
             }
 
@@ -147,14 +156,23 @@ export class FilterEngine {
 
         const groups = {};
         rows.forEach(row => {
-            if (!row || !row.data) return; // Skip invalid rows 
+            if (!row || !row.data) return;
 
             let rawValue = row.data[groupByAttrId];
-            // Case-insensitive key lookup fallback
             if (rawValue === undefined) {
                 const lowerId = groupByAttrId.toLowerCase();
                 const actualKey = Object.keys(row.data).find(k => k.toLowerCase() === lowerId);
                 if (actualKey) rawValue = row.data[actualKey];
+            }
+
+            // Handle multi-value strings (tags) for 1:N grouping
+            if (typeof rawValue === 'string' && rawValue.includes(',')) {
+                const tags = rawValue.split(',').map(t => t.trim()).filter(Boolean);
+                tags.forEach(tag => {
+                    if (!groups[tag]) groups[tag] = [];
+                    groups[tag].push(row);
+                });
+                return;
             }
 
             let groupName;

@@ -1,5 +1,6 @@
 import { Field } from './Field.js';
 import { GlobalStateManager } from '../GlobalStateManager.js';
+import { ColourFactory } from '../../utils/ColourFactory.js';
 
 export class TagField extends Field {
     updateDisplay() {
@@ -14,21 +15,27 @@ export class TagField extends Field {
 
         const tags = rawValue.split(',').map(t => t.trim()).filter(t => t);
         const gs = GlobalStateManager.getInstance();
-        const teamColors = this.colDef.id === 'Team' ? gs.getAvailableTeams() : [];
+        const isTeam = this.colDef.id === 'Team';
+        const teamColors = isTeam ? gs.getAvailableTeams() : [];
 
         tags.forEach(text => {
             const tag = document.createElement('span');
             tag.className = 'inventory-tag available';
             tag.textContent = text;
             
-            if (this.colDef.id === 'Team') {
+            if (isTeam) {
                 const match = teamColors.find(tc => tc.name === text);
                 if (match) {
                     tag.style.backgroundColor = match.color;
-                    tag.style.color = '#fff';
-                    tag.style.borderColor = 'transparent';
+                } else {
+                    tag.style.backgroundColor = ColourFactory.getColorForString(text);
                 }
+            } else {
+                tag.style.backgroundColor = ColourFactory.getColorForString(text);
             }
+            
+            tag.style.color = '#fff';
+            tag.style.borderColor = 'transparent';
             
             this.contentWrap.appendChild(tag);
         });
@@ -115,10 +122,14 @@ export class TagField extends Field {
                         const match = availableTags.find(tc => tc.name === text);
                         if (match) {
                             tagContainer.style.backgroundColor = match.color;
-                            tagContainer.style.color = '#fff';
-                            tagContainer.style.borderColor = 'transparent';
+                        } else {
+                            tagContainer.style.backgroundColor = ColourFactory.getColorForString(text);
                         }
+                    } else {
+                        tagContainer.style.backgroundColor = ColourFactory.getColorForString(text);
                     }
+                    tagContainer.style.color = '#fff';
+                    tagContainer.style.borderColor = 'transparent';
 
                     const span = document.createElement('span');
                     span.textContent = text;
@@ -176,9 +187,11 @@ export class TagField extends Field {
                     
                     if (color) {
                         tag.style.backgroundColor = color;
-                        tag.style.color = '#fff';
-                        tag.style.borderColor = 'transparent';
+                    } else {
+                        tag.style.backgroundColor = ColourFactory.getColorForString(text);
                     }
+                    tag.style.color = '#fff';
+                    tag.style.borderColor = 'transparent';
 
                     tag.onclick = () => {
                         if (!internalSelected.includes(text)) {

@@ -142,7 +142,12 @@ export class TableRenderer {
         menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
         menu.style.position = 'fixed'; menu.style.zIndex = '100000';
 
-        const isSingleTableView = ['tbl_people', 'people_table', 'tbl_inventory'].includes(this.table.id);
+        // Determine if we should show global options (for the entire category/view)
+        const gs = GlobalStateManager.getInstance();
+        const currentViewId = gs.getCurrentViewId();
+        const isSplit = this.element.closest('.split-container-inner') !== null;
+        const isMultiTableView = currentViewId?.startsWith('all-') || currentViewId === 'tbl_people' || isSplit;
+        const isSingleTableView = !isMultiTableView;
 
         if (isSingleTableView) {
             const exportBtn = document.createElement('button');
@@ -353,6 +358,7 @@ export class TableRenderer {
 
         if (filteredRows.length === 0) {
             const tr = document.createElement('tr');
+            tr.className = 'empty-row';
             tr.innerHTML = `<td colspan="${this.table.schema.length + 2}" style="text-align:center; padding: 40px; color: var(--text-muted);">Keine Einträge gefunden</td>`;
             tbody.appendChild(tr);
             this._renderAddRowButton(tbody);

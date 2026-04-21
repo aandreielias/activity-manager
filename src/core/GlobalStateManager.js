@@ -29,6 +29,7 @@ export class GlobalStateManager {
 
     #tableConfigs = [];
     #availableTeams = []; // Global list of all available teams in the system
+    #currentViewId = null; // Currently active main view/category ID
     #globalFilters = {
         main: {}, // tableId -> { active, groupBy, filters }
         split: {} // tableId -> { active, groupBy, filters }
@@ -58,6 +59,9 @@ export class GlobalStateManager {
         }
         return GlobalStateManager.#instance;
     }
+
+    setCurrentViewId(id) { this.#currentViewId = id; }
+    getCurrentViewId() { return this.#currentViewId; }
 
     // ── Authentication & Permissions ───────────────────────────
 
@@ -172,7 +176,10 @@ export class GlobalStateManager {
         }
         if (id === 'role' || id === 'rolle') return this.getEnumOptions('rolle_enum');
         if (id === 'location' || id === 'ort') return this.getEnumOptions('location_enum');
-        if (id === 'category' || id === 'kategorie') return this.getEnumOptions('activity_category_enum');
+        if (id === 'category' || id === 'kategorie') {
+            if (tableId && tableId.includes('activities')) return this.getEnumOptions('activity_category_enum');
+            return null;
+        }
         if (id === 'condition' || id === 'zustand') return this.getEnumOptions('condition_enum');
         if (id === 'type' || id === 'typ') return this.getEnumOptions('venue_type_enum') || this.getEnumOptions('sport_type_enum');
         if (id === 'indoor_outdoor') return this.getEnumOptions('indoor_outdoor_enum');
@@ -261,7 +268,7 @@ export class GlobalStateManager {
 
     getGlobalFilterState(side, tableId) {
         if (!this.#globalFilters[side][tableId]) {
-            this.#globalFilters[side][tableId] = { active: false, groupBy: null, filters: [{ attrId: null, mode: null, value: [], quantityMode: 'any', quantityValue: '', availability: [] }] };
+            this.#globalFilters[side][tableId] = { active: true, groupBy: null, filters: [{ attrId: null, mode: null, value: [], quantityMode: 'any', quantityValue: '', availability: [] }] };
         }
         return this.#globalFilters[side][tableId];
     }

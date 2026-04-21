@@ -3,7 +3,8 @@ import { DataService } from '../services/DataService.js';
 
 /**
  * TableLoader — Loads table configurations and row data from
- * the relational Supabase schema. No local JSON fallback.
+ * the relational Supabase schema. Provides better error handling
+ * and recovery options.
  */
 export class TableLoader {
     static async loadAllTables(peopleData = null, tablesConfig = []) {
@@ -14,6 +15,7 @@ export class TableLoader {
 
         const tables = {};
         const allGames = [];
+        const loadErrors = [];
 
         for (const config of tablesConfig) {
             try {
@@ -31,15 +33,34 @@ export class TableLoader {
                     element: null,
                 };
             } catch (error) {
-                console.error(`[TableLoader] Failed to load table ${config.id}:`, error);
-                // Create empty table on error so the UI doesn't break
+                // Log error with context instead of silently failing
+                const errorMsg = `Failed to load table ${config.id}: ${error.message}`;
+                console.error(`[TableLoader] ${errorMsg}`, error);
+                loadErrors.push({
+                    tableId: config.id,
+                    error: error.message,
+                    context: error.context || {}
+                });
+
+                // Create empty table as fallback, but mark it as having errors
                 const table = this._createTableInstance(config, [], peopleData);
-                tables[config.id] = { config, instance: table, element: null };
+                table._loadError = error;
+                tables[config.id] = { 
+                    config, 
+                    instance: table, 
+                    element: null,
+                    error: errorMsg
+                };
             }
         }
 
+        // Log summary if there were errors
+        if (loadErrors.length > 0) {
+            console.warn(`[TableLoader] ${loadErrors.length} table(s) failed to load:`, loadErrors);
+        }
+
         // Post-processing to link games to events
-        if (tables['tbl_events']) {
+        if (tables['tbl_events'] && tables['tbl_events'].instance) {
             const gamesCol = tables['tbl_events'].instance.schema.find(c => ['reihenfolge', 'games', 'spiele'].includes(c.id) || c.header === 'Spiele');
             if (gamesCol) {
                 gamesCol.header = 'Reihenfolge';

@@ -796,6 +796,7 @@ export class UIManager {
 
     _handleTableSwitch(tableId, rowId, colId) {
         this.currentTableId = tableId;
+        GlobalStateManager.getInstance().setCurrentViewId(tableId);
         this.tablesContainer.style.display = 'flex';
 
         this._populateFilterBar('main');

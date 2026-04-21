@@ -57,6 +57,7 @@ export class FieldFactory {
         case 'required_items':
             return new InventoryField(params);
         case 'Team':
+        case 'kategorie':
             return new TagField(params);
         case 'time':
             return new TimeField(params);
@@ -69,6 +70,7 @@ export class FieldFactory {
         case 'enum':
             return new EnumField(params);
         case 'tag':
+        case 'tags':
             return new TagField(params);
         case 'date':
             return new DateField(params);

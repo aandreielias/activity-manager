@@ -58,10 +58,10 @@ export class LoginDialog {
                             </div>
                         </div>
                     </div>
-                    <div class="login-input-group">
+                    <div class="login-input-group login-row">
                         <input type="password" id="login-password-input" placeholder="Passwort" class="login-password input-field">
+                        <button id="login-submit-btn" class="login-btn header-btn no-icon">Anmelden</button>
                     </div>
-                    <button id="login-submit-btn" class="login-btn header-btn no-icon">Anmelden</button>
                     <div id="login-error-msg" class="login-error"></div>
                 `;
 

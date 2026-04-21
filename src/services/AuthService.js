@@ -13,7 +13,7 @@ export class AuthService {
      * - If the user exists, validate the password.
      */
     static async authenticate(username, password) {
-        const res = await SupabaseClient.get('users', `?username=eq.${encodeURIComponent(username)}&select=*`);
+        const res = await SupabaseClient.get('users', `?username=eq.${encodeURIComponent(username)}&select=*,user_permissions(*)`);
         if (!res.ok) throw new Error('Verbindung zu Supabase fehlgeschlagen');
 
         const rows = await res.json();
@@ -23,8 +23,7 @@ export class AuthService {
             const insertRes = await SupabaseClient.post('users', {
                 username,
                 password_hash: password,
-                role: 'User',
-                permissions: null
+                role: 'User'
             }, { 'Prefer': 'return=representation' });
 
             if (!insertRes.ok) {
@@ -34,7 +33,7 @@ export class AuthService {
 
             const newUser = (await insertRes.json())[0];
             await UserStatsService.recordLogin(newUser.id);
-            return { success: true, username, userId: newUser.id, role: 'User', permissions: null, personId: newUser.person_id, teams: [] };
+            return { success: true, username, userId: newUser.id, role: 'User', permissions: { overwrites: {} }, personId: newUser.person_id, teams: [] };
         }
 
         const user = rows[0];
@@ -56,11 +55,11 @@ export class AuthService {
 
         const teams = await this._fetchUserTeams(user.person_id);
         
-        // Ensure permissions are parsed if stored as string
-        let permissions = user.permissions;
-        if (typeof permissions === 'string' && permissions.trim() !== '') {
-            try { permissions = JSON.parse(permissions); } catch (e) { console.error('Failed to parse permissions:', e); }
-        }
+        // Map normalized permissions to nested object for app compatibility
+        const permissions = { overwrites: {} };
+        (user.user_permissions || []).forEach(p => {
+            permissions.overwrites[p.permission_key] = parseInt(p.access_level, 10) || 0;
+        });
 
         await UserStatsService.recordLogin(user.id);
         return { 
@@ -89,15 +88,17 @@ export class AuthService {
      * Get user record by username.
      */
     static async getUserByUsername(username) {
-        const res = await SupabaseClient.get('users', `?username=eq.${encodeURIComponent(username)}&select=*`);
+        const res = await SupabaseClient.get('users', `?username=eq.${encodeURIComponent(username)}&select=*,user_permissions(*)`);
         if (!res.ok) return null;
         const rows = await res.json();
         if (rows.length === 0) return null;
         
         const user = rows[0];
-        if (typeof user.permissions === 'string' && user.permissions.trim() !== '') {
-            try { user.permissions = JSON.parse(user.permissions); } catch (e) {}
-        }
+        const permissions = { overwrites: {} };
+        (user.user_permissions || []).forEach(p => {
+            permissions.overwrites[p.permission_key] = parseInt(p.access_level, 10) || 0;
+        });
+        user.permissions = permissions;
         return user;
     }
 
@@ -106,15 +107,17 @@ export class AuthService {
      */
     static async getUserByPersonId(personId) {
         if (!personId) return null;
-        const res = await SupabaseClient.get('users', `?person_id=eq.${personId}&select=*`);
+        const res = await SupabaseClient.get('users', `?person_id=eq.${personId}&select=*,user_permissions(*)`);
         if (!res.ok) return null;
         const rows = await res.json();
         if (rows.length === 0) return null;
 
         const user = rows[0];
-        if (typeof user.permissions === 'string' && user.permissions.trim() !== '') {
-            try { user.permissions = JSON.parse(user.permissions); } catch (e) {}
-        }
+        const permissions = { overwrites: {} };
+        (user.user_permissions || []).forEach(p => {
+            permissions.overwrites[p.permission_key] = parseInt(p.access_level, 10) || 0;
+        });
+        user.permissions = permissions;
         return user;
     }
 
@@ -149,29 +152,43 @@ export class AuthService {
         }
 
         const users = userRes.ok ? await userRes.json() : [];
+        let userId;
 
         if (users.length > 0) {
-            const userId = users[0].id;
-            const res = await SupabaseClient.patch(
-                'users',
-                `?id=eq.${userId}`,
-                { permissions: permissions }
-            );
-            if (!res.ok) throw new Error('Fehler beim Speichern der Berechtigungen');
+            userId = users[0].id;
         } else {
             // Create new record
             const res = await SupabaseClient.post('users', {
                 username: targetUsername,
                 password_hash: '__UNSET__',
                 role: 'User',
-                permissions: permissions,
                 person_id: personId
-            });
+            }, { 'Prefer': 'return=representation' });
             if (!res.ok) {
                 const txt = await res.text();
                 throw new Error(`Konnte Nutzer-Datensatz nicht anlegen: ${txt}`);
             }
+            userId = (await res.json())[0].id;
         }
+
+        // 3. Sync permissions
+        await SupabaseClient.delete('user_permissions', `?user_id=eq.${userId}`);
+        
+        if (permissions && permissions.overwrites) {
+            const permissionRows = Object.entries(permissions.overwrites)
+                .filter(([_, level]) => level !== undefined && level !== -1 && level !== 'none')
+                .map(([key, level]) => ({
+                    user_id: userId,
+                    permission_key: key,
+                    access_level: String(level)
+                }));
+            
+            if (permissionRows.length > 0) {
+                const res = await SupabaseClient.post('user_permissions', permissionRows);
+                if (!res.ok) console.error('[AuthService] Failed to sync permissions:', await res.text());
+            }
+        }
+
         return { success: true };
     }
 }

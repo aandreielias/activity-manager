@@ -175,15 +175,15 @@ export class GlobalStateManager {
         const id = colId.toLowerCase();
         if (id === 'status') {
             if (tableId && tableId.includes('people')) return this.getEnumOptions('status_enum');
-            return this.getEnumOptions('task_status_enum');
+            return this.getEnumOptions('activity_status') || this.getEnumOptions('task_status_enum');
         }
-        if (id === 'role' || id === 'rolle') return this.getEnumOptions('rolle_enum');
+        if (id === 'role' || id === 'rolle') return this.getEnumOptions('app_role') || this.getEnumOptions('rolle_enum');
         if (id === 'location' || id === 'ort') return this.getEnumOptions('location_enum');
         if (id === 'category' || id === 'kategorie') {
             if (tableId && tableId.includes('activities')) return this.getEnumOptions('activity_category_enum');
             return null;
         }
-        if (id === 'condition' || id === 'zustand') return this.getEnumOptions('condition_enum');
+        if (id === 'condition' || id === 'zustand') return this.getEnumOptions('inventory_condition') || this.getEnumOptions('condition_enum');
         if (id === 'type' || id === 'typ') return this.getEnumOptions('venue_type_enum') || this.getEnumOptions('sport_type_enum');
         if (id === 'indoor_outdoor') return this.getEnumOptions('indoor_outdoor_enum');
         return null;

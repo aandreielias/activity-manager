@@ -13,7 +13,7 @@ export class PermissionHub {
      * Define default permissions for each role.
      */
     static ROLE_DEFAULTS = {
-        'Superadmin': { '*': 2 },
+        'SuperAdmin': { '*': 2 },
         'Admin': {
             '*': 2,
             'btn_audit_logs': 1,
@@ -41,7 +41,14 @@ export class PermissionHub {
      * @param {string} teamContext - Optional team context
      */
     static getEffectiveLevel(context, objectId, teamContext = null) {
-        const { role, teams = [], perms } = context;
+        const { teams = [], perms } = context;
+        let role = context.role || 'User';
+
+        // Normalize role casing to match ROLE_DEFAULTS keys
+        if (role.toLowerCase() === 'superadmin') role = 'SuperAdmin';
+        else if (role.toLowerCase() === 'admin') role = 'Admin';
+        else if (role.toLowerCase() === 'supervisor') role = 'Supervisor';
+        else if (role.toLowerCase() === 'user') role = 'User';
 
         // --- STAGE 1: GLOBAL HARD-BLOCKS ---
         if ((objectId.includes('.role') || objectId.includes('.rolle')) && !this._isAdmin(role)) {
@@ -90,7 +97,9 @@ export class PermissionHub {
     }
 
     static _isAdmin(role) {
-        return ['SuperAdmin', 'Admin', 'Superadmin'].includes(role);
+        if (!role) return false;
+        const r = role.toLowerCase();
+        return r === 'superadmin' || r === 'admin';
     }
 
     static canRead(context, objectId, teamContext = null) {

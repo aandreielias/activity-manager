@@ -52,15 +52,16 @@ export class PeopleRepository extends BaseRepository {
     }
 
     fromDb(row) {
+        const responsibilities = (row.person_responsibilities || []).map(pr => pr.responsibility);
         return {
             id: row.id,
             vorname: row.vorname || '',
             nachname: row.nachname || '',
             'Tel.': row.telefon || '',
             Status: row.status ? this._capitalizeFirst(row.status) : 'Aktiv',
-            role: row.rolle || 'User',
-            responsibility_1: row.responsibility_1 ? this._capitalizeFirst(row.responsibility_1) : '',
-            responsibility_2: row.responsibility_2 ? this._capitalizeFirst(row.responsibility_2) : '',
+            role: row.role || 'User',
+            responsibility_1: responsibilities[0] || '',
+            responsibility_2: responsibilities[1] || '',
             'Spez. Zuständigkeit': row.spez_zustaendigkeit || '',
             email: row.email || '',
             Team: (row.person_teams || []).map(pt => pt.teams?.name).filter(Boolean).join(', '),
@@ -78,9 +79,7 @@ export class PeopleRepository extends BaseRepository {
             nachname: appRow.nachname || '',
             telefon: appRow['Tel.'] || appRow.telefon || '',
             status: (appRow.Status || appRow.status || 'Aktiv').toLowerCase(),
-            rolle: this._capitalizeFirst(appRow.role || appRow.rolle || 'User'),
-            responsibility_1: appRow.responsibility_1 ? appRow.responsibility_1.toLowerCase() : null,
-            responsibility_2: appRow.responsibility_2 ? appRow.responsibility_2.toLowerCase() : null,
+            role: (appRow.role || appRow.rolle || 'User'), // Use 'role' instead of 'rolle'
             spez_zustaendigkeit: appRow['Spez. Zuständigkeit'] || appRow.spez_zustaendigkeit || '',
             email: appRow.email || '',
             image_url: appRow.image_url || null,
@@ -121,7 +120,7 @@ export class ActivitiesRepository extends BaseRepository {
             category: row.category || '',
             required_items: (row.activity_required_items || [])
                 .map(ari => {
-                    const name = ari.inventory?.name || ari.not_availible_text;
+                    const name = ari.inventory?.name || ari.placeholder_text || ari.not_availible_text;
                     if (!name) return null;
                     return ari.quantity_needed ? `${name} (${ari.quantity_needed})` : name;
                 })
@@ -131,7 +130,7 @@ export class ActivitiesRepository extends BaseRepository {
             rules: row.rules || '',
             duration_minutes: row.duration_minutes ?? '',
             preparation_minutes: row.preparation_minutes ?? '',
-            location: row.location || '',
+            location: row.location_id ? (row.location || row.location_id) : (row.location || ''),
             location_notes: row.location_notes || '',
             min_players: row.min_players ?? '',
             max_players: row.max_players ?? '',
@@ -147,6 +146,8 @@ export class ActivitiesRepository extends BaseRepository {
     }
 
     toDb(appRow, category = null) {
+        const isUuid = (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+        
         return {
             id: appRow.id,
             name: appRow.name || '',
@@ -155,7 +156,8 @@ export class ActivitiesRepository extends BaseRepository {
             rules: appRow.rules || '',
             duration_minutes: this._parseIntOrNull(appRow.duration_minutes),
             preparation_minutes: this._parseIntOrNull(appRow.preparation_minutes),
-            location: appRow.location || null,
+            location_id: appRow.location?.id || (isUuid(appRow.location) ? appRow.location : null),
+            location: isUuid(appRow.location) ? null : (appRow.location || null), // Keep legacy text only if not UUID
             location_notes: appRow.location_notes || '',
             min_players: this._parseIntOrNull(appRow.min_players),
             max_players: this._parseIntOrNull(appRow.max_players),
@@ -197,7 +199,7 @@ export class InventoryRepository extends BaseRepository {
             id: row.id,
             name: row.name || '',
             category: row.category || '',
-            kategorie: row.kategorie || '',
+            kategorie: row.item_category || row.kategorie || '',
             quantity: row.quantity ?? '',
             storage_location: row.storage_location || '',
             condition: row.condition ? this._capitalizeFirst(row.condition) : 'Gut',
@@ -219,7 +221,7 @@ export class InventoryRepository extends BaseRepository {
             id: appRow.id,
             name: appRow.name || '',
             category: appRow.category || category,
-            kategorie: appRow.kategorie || null,
+            item_category: appRow.kategorie || appRow.item_category || null,
             quantity: appRow.quantity ? parseInt(appRow.quantity, 10) || 0 : 0,
             storage_location: appRow.storage_location || '',
             condition: condition || 'Gut',

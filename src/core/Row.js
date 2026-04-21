@@ -155,13 +155,16 @@ export class Row {
             contextMenu.show(e.clientX, e.clientY, {
                 onDelete: onDelete,
                 onEdit: onEdit,
-                onEditRow: (canEditTable && (this.tableId === 'tbl_inventory' || this.tableId === 'tbl_people')) ? async () => {
+                onEditRow: canEditTable ? async () => {
                     if (this.tableId === 'tbl_inventory') {
                         const { InventoryEditDialog } = await import('../ui/InventoryEditDialog.js');
                         await InventoryEditDialog.show(this);
-                    } else if (this.tableId === 'tbl_people') {
+                    } else if (this.tableId === 'tbl_people' || this.tableId === 'people_table') {
                         const { PersonEditDialog } = await import('../ui/PersonEditDialog.js');
                         await PersonEditDialog.show(this);
+                    } else {
+                        const { RowEditDialog } = await import('../ui/RowEditDialog.js');
+                        await RowEditDialog.show(this);
                     }
                 } : null,
                 onToggleFavorite: () => this.toggleFavorite(),
@@ -184,14 +187,69 @@ export class Row {
             if (imgPath) {
                 const isFull = imgPath.includes('://') || imgPath.startsWith('data:');
                 const imgUrl = isFull ? imgPath : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/inventory_picture_bucket/${imgPath}`;
-                
-                // Framed photo tooltip matching standard themed box
-                const html = `<div style="display: block; width: 220px; height: 220px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);"><img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;"></div>`;
-                
-                // Only show tooltip if NOT editing any cell in this row
+                const html = `<div style="display: flex; align-items: center; justify-content: center; width: 220px; height: 220px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-secondary); position: relative;"><div class="tooltip-loader" style="position: absolute; z-index: 1;"></div><img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 0.2s ease; z-index: 2;" onload="this.style.opacity='1'; this.previousElementSibling.style.display='none';" onerror="this.previousElementSibling.style.display='none';"></div>`;
                 const condition = () => !Object.values(this.fields).some(f => f.td?.classList.contains('editing'));
                 Tooltip.attach(this.element, html, 400, condition);
             }
+        }
+
+        // Tooltip for People Table
+        if (this.tableId === 'tbl_people') {
+            const data = this.data;
+            const imgPath = data.image_url || data.photo;
+            const bucket = 'user_picture_bucket';
+            const isFull = imgPath?.includes('://') || imgPath?.startsWith('data:');
+            const imgUrl = imgPath ? (isFull ? imgPath : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/${bucket}/${imgPath}`) : null;
+
+            const name = `${data.vorname || ''} ${data.nachname || ''}`.trim() || 'Unbekannt';
+            const team = data.Team || data.Teams || '-';
+            const role = data.role || data.Rolle || 'User';
+            const status = data.Status || 'Aktiv';
+            const email = data.email || data.Email || '-';
+            const phone = data['Tel.'] || data.Telefon || '-';
+            const isActive = String(status).toLowerCase() === 'aktiv';
+
+            // Ultra-compact rewrite
+            const html = `
+                <div style="width: 220px; display: flex; flex-direction: column; gap: 6px; color: var(--text-primary); font-family: inherit;">
+                    <!-- Identity Header -->
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <!-- Avatar -->
+                        <div style="width: 48px; height: 48px; border-radius: 50%; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-tertiary); flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative;">
+                            ${imgUrl ? `
+                                <div class="tooltip-loader" style="position: absolute; width: 14px; height: 14px; border-width: 1px; z-index: 1;"></div>
+                                <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.2s ease; z-index: 2;" onload="this.style.opacity='1'; this.previousElementSibling.style.display='none';" onerror="this.previousElementSibling.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 18px; opacity: 0.3;\\'>👤</span>';">
+                            ` : '<span style="font-size: 18px; opacity: 0.3;">👤</span>'}
+                        </div>
+                        
+                        <!-- Name & Role -->
+                        <div style="min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-weight: 700; color: var(--accent); font-size: 14px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${name}
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">
+                                ${role}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="height: 1px; background: var(--border-light); opacity: 0.4;"></div>
+
+                    <!-- Compact Grid -->
+                    <div style="display: grid; grid-template-columns: 55px 1fr; gap: 2px 8px; font-size: 10px; line-height: 1.2;">
+                        <div style="color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 8px;">Team</div>
+                        <div style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${team}</div>
+                        
+                        <div style="color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 8px;">E-Mail</div>
+                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8;">${email}</div>
+                        
+                        <div style="color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 8px;">Telefon</div>
+                        <div style="opacity: 0.8;">${phone}</div>
+                    </div>
+                </div>`.trim();
+
+            const condition = () => !Object.values(this.fields).some(f => f.td?.classList.contains('editing'));
+            Tooltip.attach(this.element, html, 400, condition);
         }
     }
 

@@ -32,6 +32,10 @@ export class ContextMenu {
                 }
             );
             this.element.appendChild(favItem);
+
+            const separator = document.createElement('div');
+            separator.className = 'context-menu-separator';
+            this.element.appendChild(separator);
         }
 
         if (options.onEdit) {
@@ -40,18 +44,14 @@ export class ContextMenu {
                 options.onEdit();
             });
             this.element.appendChild(editItem);
+        }
 
-            if (options.onEditRow) {
-                const editRowItem = this._createMenuItem('Eintrag bearbeiten', () => {
-                    this.close();
-                    options.onEditRow();
-                });
-                this.element.appendChild(editRowItem);
-            }
-
-            const separator = document.createElement('div');
-            separator.className = 'context-menu-separator';
-            this.element.appendChild(separator);
+        if (options.onEditRow) {
+            const editRowItem = this._createMenuItem('Eintrag bearbeiten', () => {
+                this.close();
+                options.onEditRow();
+            });
+            this.element.appendChild(editRowItem);
         }
 
         if (options.onShowInfo) {
@@ -68,17 +68,17 @@ export class ContextMenu {
                 options.onExportToCalendar();
             });
             this.element.appendChild(calItem);
-
-            const separator = document.createElement('div');
-            separator.className = 'context-menu-separator';
-            this.element.appendChild(separator);
         }
 
         if (options.onDelete) {
-            const deleteItem = this._createMenuItem('Zeile löschen', async () => {
+            const separator = document.createElement('div');
+            separator.className = 'context-menu-separator';
+            this.element.appendChild(separator);
+
+            const deleteItem = this._createMenuItem('Eintrag löschen', async () => {
                 this.close();
                 const confirmed = await Dialog.confirm({
-                    message: 'Diese Zeile wirklich unwiderruflich löschen?',
+                    message: 'Diesen Eintrag wirklich unwiderruflich löschen?',
                     confirmText: 'Löschen',
                     confirmStyle: 'warning'
                 });

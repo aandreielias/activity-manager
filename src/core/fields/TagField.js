@@ -77,14 +77,26 @@ export class TagField extends Field {
             dialog.appendChild(header);
 
             const displayLabel = this.colDef.label;
-            let displayLabelPlural = displayLabel.endsWith('e') ? displayLabel : displayLabel + 's';
-            let displayLabelSingular = displayLabel.endsWith('e') ? displayLabel.slice(0, -1) : displayLabel;
+            let displayLabelPlural = displayLabel;
+            let displayLabelSingular = displayLabel;
             let addPrefix = 'Neues';
 
             if (displayLabel === 'Spiele') {
                 displayLabelPlural = 'Spiele';
                 displayLabelSingular = 'Spiel';
                 addPrefix = 'Neues';
+            } else if (displayLabel === 'Kategorie' || displayLabel === 'Kategorien') {
+                displayLabelPlural = 'Kategorien';
+                displayLabelSingular = 'Kategorie';
+                addPrefix = 'Neue';
+            } else if (displayLabel === 'Tags') {
+                displayLabelPlural = 'Tags';
+                displayLabelSingular = 'Tag';
+                addPrefix = 'Neuen';
+            } else if (displayLabel === 'Personen') {
+                displayLabelPlural = 'Personen';
+                displayLabelSingular = 'Person';
+                addPrefix = 'Neue';
             }
 
             const content = document.createElement('div');

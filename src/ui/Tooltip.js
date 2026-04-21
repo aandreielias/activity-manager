@@ -20,10 +20,8 @@ export class Tooltip {
             .custom-tooltip {
                 position: fixed;
                 z-index: 99999;
-                padding: 10px 14px;
-                background: var(--bg-primary);
-                backdrop-filter: blur(12px);
-                -webkit-backdrop-filter: blur(12px);
+                padding: 12px;
+                background: var(--bg);
                 border: 1px solid var(--border-color);
                 border-radius: 10px;
                 color: var(--text-primary);
@@ -62,6 +60,17 @@ export class Tooltip {
                 font-size: 12px;
                 opacity: 0.9;
             }
+            .tooltip-loader {
+                width: 24px;
+                height: 24px;
+                border: 2px solid rgba(var(--accent-rgb), 0.1);
+                border-top-color: var(--accent);
+                border-radius: 50%;
+                animation: tooltip-spinner 0.6s linear infinite;
+            }
+            @keyframes tooltip-spinner {
+                to { transform: rotate(360deg); }
+            }
         `;
         document.head.appendChild(style);
     }
@@ -93,7 +102,7 @@ export class Tooltip {
     static show(x, y, content) {
         if (!this.#instance) this.init();
 
-        this.#instance.innerHTML = content;
+        this.#instance.innerHTML = content.trim();
         this.#instance.style.display = 'block';
         
         // Use timeout to ensure transform animation works

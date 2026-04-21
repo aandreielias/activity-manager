@@ -65,12 +65,28 @@ export class DataService {
      * Replaces the old app_config JSON approach.
      */
     static async loadTableDefinitions() {
-        const res = await SupabaseClient.get('table_definitions', '?order=order_index.asc');
+        const res = await SupabaseClient.get('table_definitions', '?select=*,table_columns(*)&order=order_index.asc');
         if (!res.ok) {
             console.warn('[DataService] Structured table_definitions not found or inaccessible.');
             return null;
         }
-        return await res.json();
+        const data = await res.json();
+        
+        // Reconstruct the 'schema' array for each table from its table_columns
+        return data.map(table => ({
+            ...table,
+            schema: (table.table_columns || [])
+                .sort((a, b) => a.order_index - b.order_index)
+                .map(col => ({
+                    id: col.field_name,
+                    label: col.label,
+                    type: col.data_type,
+                    ui_component: col.ui_component,
+                    hidden: !col.is_visible,
+                    editable: col.is_editable,
+                    ...(col.config || {})
+                }))
+        }));
     }
 
     /**
@@ -88,7 +104,7 @@ export class DataService {
 
         let query = '?select=*';
         if (supaTable === 'people') {
-            query = '?select=*,person_teams(teams(name))';
+            query = '?select=*,person_teams(teams(name)),person_responsibilities(responsibility)';
             
             // Filter by team if user is restricted
             const teams = gs.getCurrentTeams();
@@ -184,8 +200,11 @@ export class DataService {
                 const rowId = dbRows[i].id;
                 if (!rowId) continue;
 
-                if (supaTable === 'people' && plain.Team !== undefined) {
-                    await this._syncPersonTeams(rowId, plain.Team);
+                if (supaTable === 'people') {
+                    if (plain.Team !== undefined) await this._syncPersonTeams(rowId, plain.Team);
+                    if (plain.responsibility_1 !== undefined || plain.responsibility_2 !== undefined) {
+                        await this._syncPersonResponsibilities(rowId, [plain.responsibility_1, plain.responsibility_2].filter(Boolean));
+                    }
                 } else if (supaTable === 'activities' && plain.required_items !== undefined) {
                     await this._syncActivityInventory(rowId, plain.required_items, category);
                 }
@@ -362,6 +381,20 @@ export class DataService {
         }
     }
 
+    static async _syncPersonResponsibilities(personId, responsibilities) {
+        await SupabaseClient.delete('person_responsibilities', `?person_id=eq.${personId}`);
+
+        if (!responsibilities || responsibilities.length === 0) return;
+
+        const rows = responsibilities.map(r => ({
+            person_id: personId,
+            responsibility: r
+        }));
+
+        const res = await SupabaseClient.post('person_responsibilities', rows);
+        if (!res.ok) console.error('[DataService] Sync Responsibilities failed:', await res.text());
+    }
+
     static async _syncActivityInventory(activityId, inventoryString, category = null) {
         await SupabaseClient.delete('activity_required_items', `?activity_id=eq.${activityId}`);
 
@@ -397,7 +430,7 @@ export class DataService {
                     activity_id: activityId,
                     inventory_id: null,
                     quantity_needed: item.quantity ? parseInt(item.quantity, 10) || 0 : 0,
-                    not_availible_text: item.name
+                    placeholder_text: item.name
                 });
             }
         }
@@ -409,13 +442,13 @@ export class DataService {
     }
 
     /**
-     * Automatically links activity requirement placeholders (not_availible_text)
+     * Automatically links activity requirement placeholders (placeholder_text)
      * to real inventory items once they are created.
      */
     static async _reconcileMissingRequiredItems() {
         try {
             // 1. Find all required items that are still just text
-            const res = await SupabaseClient.get('activity_required_items', '?not_availible_text=not.is.null');
+            const res = await SupabaseClient.get('activity_required_items', '?placeholder_text=not.is.null');
             if (!res.ok) return;
             const missing = await res.json();
             if (missing.length === 0) return;
@@ -426,17 +459,17 @@ export class DataService {
             const inventory = await invRes.json();
 
             // 3. Match unique missing names against inventory
-            const uniqueNames = [...new Set(missing.map(m => m.not_availible_text))];
+            const uniqueNames = [...new Set(missing.map(m => m.placeholder_text))];
             for (const name of uniqueNames) {
                 const match = inventory.find(i => i.name.toLowerCase() === name.toLowerCase());
                 if (match) {
                     // Update all rows that used this placeholder string
                     await SupabaseClient.patch(
                         'activity_required_items',
-                        `?not_availible_text=eq.${encodeURIComponent(name)}`,
+                        `?placeholder_text=eq.${encodeURIComponent(name)}`,
                         {
                             inventory_id: match.id,
-                            not_availible_text: null
+                            placeholder_text: null
                         }
                     );
                 }

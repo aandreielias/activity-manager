@@ -155,9 +155,14 @@ export class Row {
             contextMenu.show(e.clientX, e.clientY, {
                 onDelete: onDelete,
                 onEdit: onEdit,
-                onEditRow: this.tableId === 'tbl_inventory' ? async () => {
-                    const { InventoryEditDialog } = await import('../ui/InventoryEditDialog.js');
-                    await InventoryEditDialog.show(this);
+                onEditRow: (canEditTable && (this.tableId === 'tbl_inventory' || this.tableId === 'tbl_people')) ? async () => {
+                    if (this.tableId === 'tbl_inventory') {
+                        const { InventoryEditDialog } = await import('../ui/InventoryEditDialog.js');
+                        await InventoryEditDialog.show(this);
+                    } else if (this.tableId === 'tbl_people') {
+                        const { PersonEditDialog } = await import('../ui/PersonEditDialog.js');
+                        await PersonEditDialog.show(this);
+                    }
                 } : null,
                 onToggleFavorite: () => this.toggleFavorite(),
                 isFavorite: GlobalStateManager.getInstance().isFavorite(this.id),
@@ -175,9 +180,10 @@ export class Row {
         // Tooltip for Inventory Table
         if (this.tableId === 'tbl_inventory') {
             const data = this.data;
-            if (data.image_url) {
-                const isFull = data.image_url.includes('://') || data.image_url.startsWith('data:');
-                const imgUrl = isFull ? data.image_url : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/inventory_picture_bucket/${data.image_url}`;
+            const imgPath = data.photo || data.image_url;
+            if (imgPath) {
+                const isFull = imgPath.includes('://') || imgPath.startsWith('data:');
+                const imgUrl = isFull ? imgPath : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/inventory_picture_bucket/${imgPath}`;
                 
                 // Framed photo tooltip matching standard themed box
                 const html = `<div style="display: block; width: 220px; height: 220px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);"><img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;"></div>`;
@@ -228,6 +234,7 @@ export class Row {
         });
 
         // Ensure internal fields are preserved even if not in schema
+        if (this.data.photo !== undefined) result.photo = this.data.photo;
         if (this.data.image_url !== undefined) result.image_url = this.data.image_url;
         if (this.data.updated_at !== undefined) result.updated_at = this.data.updated_at;
         if (this.data.category !== undefined) result.category = this.data.category;

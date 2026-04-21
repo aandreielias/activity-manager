@@ -7,17 +7,17 @@ import { SUPABASE_CONFIG } from '../config.js';
  * InventoryEditDialog - Specialized dialog for structured editing of inventory entries.
  * Styled to match the system dashboard and audit logs.
  */
-export class InventoryEditDialog extends BaseDialog {
-    static async show(row) {
+export class PersonEditDialog extends BaseDialog {
+    static async show(row, isSelfEdit = false) {
         const gs = GlobalStateManager.getInstance();
         const data = { ...row.data };
         const schema = row.schema;
         const tableId = row.tableId;
         const inputsMap = {};
-        let currentImageUrl = data.photo || data.image_url;
+        let currentImageUrl = data.image_url;
         let selectedFile = null;
 
-        console.log('[InventoryEditDialog] Opening for row:', row.id);
+        console.log('[PersonEditDialog] Opening for row:', row.id);
         console.log('[InventoryEditDialog] Row Data:', data);
         console.log('[InventoryEditDialog] Table Schema:', schema);
 
@@ -37,8 +37,8 @@ export class InventoryEditDialog extends BaseDialog {
                 header.className = 'user-info-header';
                 header.innerHTML = `
                     <div class="user-info-title-area">
-                        <h2>Eintrag bearbeiten</h2>
-                        <p>${data.name || 'Gegenstand bearbeiten'}</p>
+                        <h2>${isSelfEdit ? 'Profil bearbeiten' : 'Eintrag bearbeiten'}</h2>
+                        <p>${data.vorname} ${data.nachname || ''}</p>
                     </div>
                     <div class="user-info-header-actions">
                         <button class="close-info-btn" aria-label="Schließen">✕</button>
@@ -61,7 +61,7 @@ export class InventoryEditDialog extends BaseDialog {
                 leftCol.style.gap = '16px';
 
                 const imagePreview = document.createElement('div');
-                imagePreview.className = 'inventory-image-preview hero-card';
+                imagePreview.className = 'user-profile-image-preview hero-card';
                 imagePreview.style.width = '100%';
                 imagePreview.style.aspectRatio = '1';
                 imagePreview.style.borderRadius = 'var(--radius)';
@@ -92,7 +92,7 @@ export class InventoryEditDialog extends BaseDialog {
                     if (currentImageUrl) {
                         const img = document.createElement('img');
                         const isFullOrBase64 = currentImageUrl.includes('://') || currentImageUrl.startsWith('data:');
-                        img.src = isFullOrBase64 ? currentImageUrl : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/inventory_picture_bucket/${currentImageUrl}`;
+                        img.src = isFullOrBase64 ? currentImageUrl : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/user_picture_bucket/${currentImageUrl}`;
                         img.style.width = '100%';
                         img.style.height = '100%';
                         img.style.objectFit = 'cover';
@@ -166,6 +166,11 @@ export class InventoryEditDialog extends BaseDialog {
 
                 schema.forEach(col => {
                     if (['id', 'createdBy', 'createdAt', 'image_url', 'photo'].includes(col.id)) return;
+                    
+                    if (isSelfEdit) {
+                        const allowed = ['Tel.', 'email'];
+                        if (!allowed.includes(col.id)) return;
+                    }
 
                     const group = document.createElement('div');
                     group.className = 'field-group';
@@ -270,12 +275,12 @@ export class InventoryEditDialog extends BaseDialog {
                         if (selectedFile) {
                             const compressedBlob = await this._compressImage(selectedFile);
                             const fileName = `${data.id}_${Date.now()}.jpg`;
-                            const uploadRes = await SupabaseClient.upload('inventory_picture_bucket', fileName, compressedBlob);
+                            const uploadRes = await SupabaseClient.upload('user_picture_bucket', fileName, compressedBlob);
                             if (!uploadRes.ok) throw new Error('Upload fehlgeschlagen');
-                            updatedData.photo = fileName;
+                            updatedData.image_url = fileName;
                         } else {
                             // If base64 was selected but not uploaded (should not happen with current logic)
-                            updatedData.photo = currentImageUrl === data.photo ? data.photo : currentImageUrl;
+                            updatedData.image_url = currentImageUrl === data.image_url ? data.image_url : currentImageUrl;
                         }
 
                         // Apply

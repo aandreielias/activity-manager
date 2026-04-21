@@ -12,6 +12,7 @@ export class GlobalStateManager {
     #currentUser = null;
     #currentRole = null;
     #currentUserId = null;
+    #currentUserImageUrl = null;
     #currentTeams = []; // Array of team names the current user belongs to
     #permissions = null;
     #favorites = [];
@@ -65,11 +66,12 @@ export class GlobalStateManager {
 
     // ── Authentication & Permissions ───────────────────────────
 
-    setCurrentUser(username, role, permissions = null, teams = []) {
+    setCurrentUser(username, role, permissions = null, teams = [], imageUrl = null) {
         this.#currentUser = username;
         this.#currentRole = role || 'User';
         this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []);
         this.#permissions = permissions || { overwrites: {} };
+        this.#currentUserImageUrl = imageUrl;
     }
 
     setCurrentRole(role) { this.#currentRole = role; }
@@ -83,6 +85,7 @@ export class GlobalStateManager {
     getCurrentUser() { return this.#currentUser; }
     getCurrentRole() { return this.#currentRole; }
     getCurrentTeams() { return this.#currentTeams; }
+    getCurrentUserImageUrl() { return this.#currentUserImageUrl; }
     getPermissions() { return this.#permissions; }
 
     getRoleForTeam(teamName) {

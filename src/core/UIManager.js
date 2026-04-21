@@ -58,6 +58,7 @@ export class UIManager {
         this.header.onUserInfo = () => this._handleUserInfo();
         this.header.onLogout = () => this.app._handleLogout();
         this.header.onChangePassword = () => this.app._handleChangePassword();
+        this.header.onChangeAvatar = () => this.app._handleChangeAvatar();
         this.header.onSaveAll = () => this.app._handleSaveAll();
         this.header.onDiscardAll = () => this.app._handleDiscardAll();
         this.header.onFavoritesToggle = (active) => this._handleFavoritesToggle(active);
@@ -1023,11 +1024,11 @@ export class UIManager {
                 });
 
                 // Ensure image_url is included for inventory
-                if (isInventory && !exportSchema.find(c => c.id === 'image_url')) {
-                    exportSchema.unshift({ id: 'image_url', label: 'Bild' });
+                if (isInventory && !exportSchema.find(c => c.id === 'photo')) {
+                    exportSchema.unshift({ id: 'photo', label: 'Bild' });
                 }
 
-                const head = [exportSchema.map(col => col.id === 'image_url' ? 'Bild' : col.label)];
+                const head = [exportSchema.map(col => col.id === 'photo' ? 'Bild' : col.label)];
 
                 // Filter rows for this specific table instance
                 let rowsToExport = tableInstance.rows;
@@ -1040,7 +1041,7 @@ export class UIManager {
                 const imageCache = {};
                 if (isInventory) {
                     const imagePromises = rowsToExport.map(async (row) => {
-                        const url = row.data.image_url;
+                        const url = row.data.photo;
                         if (url) {
                             const base64 = await getBase64Image(url);
                             if (base64) imageCache[row.id] = base64;
@@ -1050,14 +1051,14 @@ export class UIManager {
                 }
 
                 const body = rowsToExport.map(row => exportSchema.map(col => {
-                    if (col.id === 'image_url') return ''; // Handled by didDrawCell
+                    if (col.id === 'photo') return ''; // Handled by didDrawCell
                     let val = row.data[col.id];
                     if (val === null || val === undefined) return '';
                     let strVal = typeof val === 'object' ? (Array.isArray(val) ? val.map(v => typeof v === 'object' ? v.name || v.id : v).join(', ') : (val.title || val.name || JSON.stringify(val))) : String(val);
                     return strVal.length > 250 ? strVal.substring(0, 247) + '...' : strVal;
                 }));
 
-            const imgColIdx = exportSchema.findIndex(c => c.id === 'image_url');
+            const imgColIdx = exportSchema.findIndex(c => c.id === 'photo');
 
             autoTable(doc, { 
                 head, 

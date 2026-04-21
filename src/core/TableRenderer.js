@@ -569,12 +569,11 @@ export class TableRenderer {
             const ignore = ['Erstellt von', 'Erstellt am', 'createdAt', 'createdBy', 'Link/Video/Lied'];
             const schema = this.table.schema.filter(c => !ignore.includes(c.label) && !ignore.includes(c.id));
             
-            // Inject image column if missing for inventory
-            if (isInventory && !schema.find(c => c.id === 'image_url')) {
-                schema.unshift({ id: 'image_url', label: 'Bild' });
+            if (isInventory && !schema.find(c => c.id === 'photo')) {
+                schema.unshift({ id: 'photo', label: 'Bild' });
             }
 
-            const head = [schema.map(c => c.id === 'image_url' ? 'Bild' : c.label)];
+            const head = [schema.map(c => c.id === 'photo' ? 'Bild' : c.label)];
 
             // Filter Rows logic
             let filteredRows = this.table.rows;
@@ -586,7 +585,7 @@ export class TableRenderer {
             const imageCache = {};
             if (isInventory) {
                 const imagePromises = filteredRows.map(async (row) => {
-                    const url = row.data.image_url;
+                    const url = row.data.photo;
                     if (url) {
                         const base64 = await getBase64Image(url);
                         if (base64) imageCache[row.id] = base64;
@@ -596,13 +595,13 @@ export class TableRenderer {
             }
 
             const body = filteredRows.map(row => schema.map(c => {
-                if (c.id === 'image_url') return ''; 
+                if (c.id === 'photo') return ''; 
                 let v = row.data[c.id]; if (v === null || v === undefined) return '';
                 let s = typeof v === 'object' ? (Array.isArray(v) ? v.map(i => typeof i === 'object' ? i.name || i.id : i).join(', ') : (v.title || v.name || JSON.stringify(v))) : String(v);
                 return s.length > 250 ? s.substring(0, 247) + '...' : s;
             }));
 
-            const imgColIdx = schema.findIndex(c => c.id === 'image_url');
+            const imgColIdx = schema.findIndex(c => c.id === 'photo');
 
             autoTable(doc, { 
                 head, 

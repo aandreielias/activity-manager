@@ -208,7 +208,7 @@ export class App {
             teams = rawTeams.split(',').map(t => t.trim()).filter(Boolean);
         }
 
-        this.globalState.setCurrentUser(authUser, authRole || 'User', perms, teams);
+        this.globalState.setCurrentUser(authUser, authRole || 'User', perms, teams, person?.image_url || null);
 
         await this.globalState.loadFavorites();
         await this.globalState.loadGlobalEnums();
@@ -231,6 +231,41 @@ export class App {
             localStorage.setItem('auth_pass', newPass);
             this._handleLogout();
         } catch (e) { alert(e.message); }
+    }
+
+    async _handleChangeAvatar() {
+        const personId = this.globalState.getPermissionContext().perms?.personId || this.globalState.getPermissionContext().teams?.personId;
+        // Wait, personId is stored directly in GlobalStateManager too if I added it.
+        // Let's check GlobalStateManager.
+        
+        const currentPersonId = this.peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === this.globalState.getCurrentUser())?.id;
+        
+        if (!currentPersonId) {
+            alert('Personen-Eintrag nicht gefunden.');
+            return;
+        }
+
+        const personRow = {
+            id: currentPersonId,
+            data: this.peopleData.find(p => p.id === currentPersonId),
+            schema: this.globalState.getTableConfig('tbl_people')?.schema || [],
+            tableId: 'tbl_people',
+            render: () => {
+                // Refresh header after change
+                const updatedPerson = this.peopleData.find(p => p.id === currentPersonId);
+                this.globalState.setCurrentUser(
+                    this.globalState.getCurrentUser(),
+                    this.globalState.getCurrentRole(),
+                    this.globalState.getPermissions(),
+                    this.globalState.getCurrentTeams(),
+                    updatedPerson.image_url
+                );
+                this.uiManager.header.render(); // Re-render header to show new image
+            }
+        };
+
+        const { PersonEditDialog } = await import('../ui/PersonEditDialog.js');
+        await PersonEditDialog.show(personRow, true);
     }
 
     async _handleSaveAll() {

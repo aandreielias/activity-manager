@@ -62,7 +62,9 @@ export class PeopleRepository extends BaseRepository {
             responsibility_1: row.responsibility_1 ? this._capitalizeFirst(row.responsibility_1) : '',
             responsibility_2: row.responsibility_2 ? this._capitalizeFirst(row.responsibility_2) : '',
             'Spez. Zuständigkeit': row.spez_zustaendigkeit || '',
+            email: row.email || '',
             Team: (row.person_teams || []).map(pt => pt.teams?.name).filter(Boolean).join(', '),
+            image_url: row.image_url || null,
             createdBy: row.created_by || 'Unbekannt',
             createdAt: row.created_at || null,
             last_updated: row.updated_at || null,
@@ -80,6 +82,8 @@ export class PeopleRepository extends BaseRepository {
             responsibility_1: appRow.responsibility_1 ? appRow.responsibility_1.toLowerCase() : null,
             responsibility_2: appRow.responsibility_2 ? appRow.responsibility_2.toLowerCase() : null,
             spez_zustaendigkeit: appRow['Spez. Zuständigkeit'] || appRow.spez_zustaendigkeit || '',
+            email: appRow.email || '',
+            image_url: appRow.image_url || null,
             created_by: appRow.id ? undefined : (appRow.createdBy || null),
             created_at: appRow.id ? undefined : (appRow.createdAt || new Date().toISOString())
         };
@@ -199,7 +203,7 @@ export class InventoryRepository extends BaseRepository {
             condition: row.condition ? this._capitalizeFirst(row.condition) : 'Gut',
             last_checked: row.last_checked || '',
             notes: row.notes || '',
-            image_url: row.image_url || null,
+            photo: row.photo || row.image_url || null,
             createdBy: row.created_by || 'Unbekannt',
             createdAt: row.created_at || null,
             last_updated: row.updated_at || null,
@@ -221,7 +225,7 @@ export class InventoryRepository extends BaseRepository {
             condition: condition || 'Gut',
             last_checked: appRow.last_checked || null,
             notes: appRow.notes || '',
-            image_url: appRow.image_url || null,
+            photo: appRow.photo || appRow.image_url || null,
             created_by: appRow.createdBy || null,
             created_at: appRow.createdAt || new Date().toISOString()
         };

@@ -83,6 +83,30 @@ export class TableLoader {
             options: col.options || [],
         }));
 
+        if (config.id === 'tbl_inventory' || config.id === 'tbl_people') {
+            schema.forEach(col => {
+                if (col.id === 'photo' || col.id === 'image_url') {
+                    col.hidden = true;
+                }
+            });
+
+            // Ensure email and image_url are in schema for people
+            if (config.id === 'tbl_people') {
+                if (!schema.find(c => c.id === 'email')) {
+                    schema.push({ id: 'email', type: 'text', label: 'E-Mail', hidden: false });
+                }
+                if (!schema.find(c => c.id === 'image_url')) {
+                    schema.push({ id: 'image_url', type: 'text', label: 'Image URL', hidden: true });
+                }
+            }
+            // Ensure image_url/photo is in schema for inventory
+            if (config.id === 'tbl_inventory') {
+                if (!schema.find(c => c.id === 'image_url')) {
+                    schema.push({ id: 'image_url', type: 'text', label: 'Image URL', hidden: true });
+                }
+            }
+        }
+
         if ((config.category === 'spiele' || config.id === 'tbl_events') && peopleData?.length > 0) {
             const respCol = schema.find(c => c.id === 'responsible');
             if (respCol) {

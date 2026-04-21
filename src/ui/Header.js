@@ -1,6 +1,7 @@
 import '../styles/Header.css';
 import { GlobalStateManager } from '../core/GlobalStateManager.js';
 import { AuditLogsDialog } from './AuditLogsDialog.js';
+import { SUPABASE_CONFIG } from '../config.js';
 
 /**
  * Header - Main application header with navigation and theme toggle (Cleaned).
@@ -22,6 +23,7 @@ export class Header {
         this.onFavoritesToggle = null;
         this.onLogoDoubleClick = null;
         this.onCalendarFull = null;
+        this.onChangeAvatar = null;
         this.favoritesActive = false;
         this.currentResults = [];
         this.selectedIndex = -1;
@@ -31,7 +33,7 @@ export class Header {
     }
 
     _getVersion() {
-        return '2.8.1';
+        return '2.9.0';
     }
 
     render() {
@@ -94,10 +96,12 @@ export class Header {
                 ${this._renderCalendarButton()}
                 <div class="dropdown-container user-dropdown-container">
                     <button class="header-user user-menu-btn">
+                        ${this._renderUserAvatar()}
                         ${GlobalStateManager.getInstance().getCurrentUser()} <span class="dropdown-arrow" style="margin-left: 6px;">▼</span>
                     </button>
                     <div class="dropdown-menu user-dropdown-menu">
                         <button class="dropdown-item favorites-toggle-btn">Favoriten</button>
+                        <button class="dropdown-item change-avatar-btn">Personendaten ändern</button>
                         <button class="dropdown-item change-password-btn">Passwort ändern</button>
                         <button class="dropdown-item logout-btn">Abmelden</button>
                     </div>
@@ -215,6 +219,17 @@ export class Header {
         }).join('');
     }
 
+    _renderUserAvatar() {
+        const gs = GlobalStateManager.getInstance();
+        const imageUrl = gs.getCurrentUserImageUrl();
+        if (!imageUrl) return '';
+
+        const isFull = imageUrl.includes('://') || imageUrl.startsWith('data:');
+        const src = isFull ? imageUrl : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/user_picture_bucket/${imageUrl}`;
+
+        return `<img src="${src}" class="user-avatar-mini" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; margin-right: 8px; border: 1px solid var(--border);">`;
+    }
+
     _attachEventListeners() {
         if (!this.element) return;
 
@@ -285,6 +300,10 @@ export class Header {
 
             if (e.target.closest('.change-password-btn')) {
                 this.onChangePassword?.();
+            }
+
+            if (e.target.closest('.change-avatar-btn')) {
+                this.onChangeAvatar?.();
             }
 
             if (e.target.closest('.favorites-toggle-btn')) {

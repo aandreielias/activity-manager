@@ -149,15 +149,37 @@ export class UIManager {
         // Resolve schema for the current table
         let schema = [];
         let targetTableId = tableId;
-        // Virtual IDs like 'all-spiele'
+
         if (tableId.startsWith('all-')) {
             const category = tableId.replace('all-', '');
-            const found = Object.values(this.tables).find(t => t.config.category === category);
-            if (found) targetTableId = found.config.id;
+            // Only include tables in this category, and specifically exclude people from the Organisation all-view
+            const configs = this.app.tableConfigs.filter(c => 
+                c.category === category && !(category === 'organisation' && c.supa_table === 'people')
+            );
+            
+            const schemaMap = new Map();
+            configs.forEach(config => {
+                const tw = this.tables[config.id];
+                const s = tw?.instance?.schema || config.schema || [];
+                s.forEach(col => {
+                    if (!schemaMap.has(col.id)) {
+                        schemaMap.set(col.id, { ...col });
+                    } else {
+                        // Merge options if both have them to ensure all unique filter options are available
+                        const existing = schemaMap.get(col.id);
+                        if (col.options && col.options.length > 0) {
+                            const existingOptions = existing.options || [];
+                            const newOptions = col.options.filter(o => !existingOptions.find(eo => eo.value === o.value));
+                            existing.options = [...existingOptions, ...newOptions];
+                        }
+                    }
+                });
+            });
+            schema = Array.from(schemaMap.values());
+        } else {
+            const tableWrap = this.tables[tableId];
+            schema = tableWrap?.instance?.schema || tableWrap?.config?.schema || [];
         }
-
-        const tableWrap = this.tables[targetTableId];
-        schema = tableWrap?.instance?.schema || tableWrap?.config?.schema || [];
 
         // Hardcoded localized types for specific columns if not in schema
         schema = schema.map(c => {
@@ -874,10 +896,18 @@ export class UIManager {
                 exportFileName = 'Inventar';
                 const inv = this.tables['tbl_inventory'];
                 if (inv && inv.instance) tablesToExport.push(inv.instance);
-            } else {
-                const categoryName = categoryId === 'all-spiele' ? 'Spiele' : 'Sportarten';
-                exportFileName = categoryName;
-                const configs = this.app.tableConfigs.filter(c => c.category === (categoryId === 'all-spiele' ? 'spiele' : 'sportarten'));
+            } else if (categoryId.startsWith('all-')) {
+                const category = categoryId.replace('all-', '');
+                // Better label resolution
+                const categoryLabel = category === 'spiele' ? 'Spiele' : 
+                                     (category === 'sportarten' ? 'Sportarten' : 
+                                     (category === 'organisation' ? 'Organisation' : 
+                                      category.charAt(0).toUpperCase() + category.slice(1)));
+                
+                exportFileName = categoryLabel;
+                const configs = this.app.tableConfigs.filter(c => 
+                    c.category === category && !(category === 'organisation' && c.supa_table === 'people')
+                );
                 configs.forEach(config => {
                     const tableWrap = this.tables[config.id];
                     if (tableWrap && tableWrap.instance) tablesToExport.push(tableWrap.instance);

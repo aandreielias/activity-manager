@@ -3,14 +3,13 @@ export class PokerEvaluator {
         if (!cards || cards.length === 0) return { score: 0, text: 'High Card' };
         
         let values = [];
-        let suits = { '♠':0, '♥':0, '♦':0, '♣':0, '♤':0, '♡':0, '♢':0, '♧':0 }; // handle different possible suit symbols
+        let suits = {}; 
         cards.forEach(c => {
             let v = c.getRank().defaultValue;
             if (v === 1) v = 14; // Ace is 14
             values.push(v);
             let s = c.getSuit().symbol;
-            if (!suits[s]) suits[s] = 0;
-            suits[s]++;
+            suits[s] = (suits[s] || 0) + 1;
         });
         
         values.sort((a,b) => b - a); // descending

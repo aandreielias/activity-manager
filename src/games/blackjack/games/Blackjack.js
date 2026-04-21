@@ -52,7 +52,6 @@ export class Blackjack extends AGame {
                 suitSymbol: c.getSuit().symbol,
                 isRed: c.getSuit().isRed,
                 fullName: c.toFullString(),
-                toString: c.toString()
             }))),
             activeHandIndex: this.#activeHandIndex,
             dealerHand: this.#dealerHand.map((c, i) => ({
@@ -61,7 +60,6 @@ export class Blackjack extends AGame {
                 isRed: (this.#dealerHidden && i === 1) ? false : c.getSuit().isRed,
                 fullName: (this.#dealerHidden && i === 1) ? 'Hidden Card' : c.toFullString(),
                 isHidden: (this.#dealerHidden && i === 1),
-                toString: (this.#dealerHidden && i === 1) ? '[ ?? ]' : c.toString()
             })),
             playerScores: this.#playerHands.map(h => this.#calculateScore(h)),
             dealerScore: this.#calculateScore(this.#dealerHidden && this.#dealerHand.length > 0 ? [this.#dealerHand[0]] : this.#dealerHand),
@@ -261,31 +259,26 @@ export class Blackjack extends AGame {
         const validHand = hand.filter(c => !!c);
         if (validHand.length === 0) return false;
 
-        let score = 0;
-        let aces = 0;
+        // A hand is "soft" if it contains an Ace counted as 11.
+        // If the score with all Aces as 11 minus the hard total leaves room, it's soft.
+        const hasAce = validHand.some(c => c.getRank() === Rank.ACE);
+        if (!hasAce) return false;
 
+        // Calculate hard total (all Aces as 1)
+        let hardTotal = 0;
         for (const card of validHand) {
             const rank = card.getRank();
             if (rank === Rank.ACE) {
-                aces++;
-                score += 11;
+                hardTotal += 1;
             } else if (rank.defaultValue >= 10) {
-                score += 10;
+                hardTotal += 10;
             } else {
-                score += rank.defaultValue;
+                hardTotal += rank.defaultValue;
             }
         }
 
-        let soft = false;
-        while (score > 21 && aces > 0) {
-            score -= 10;
-            aces--;
-        }
-
-        // If we still have an ace that counts as 11, it's soft
-        if (aces > 0) soft = true;
-
-        return soft;
+        // If promoting one Ace to 11 (adding 10) still keeps us at ≤21, the hand is soft
+        return (hardTotal + 10) <= 21;
     }
 
     #isBlackJack(hand) {

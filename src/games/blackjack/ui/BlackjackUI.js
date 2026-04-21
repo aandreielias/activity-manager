@@ -10,34 +10,36 @@ export class BlackjackUI {
     #chipManager;
     #bettingUI;
 
-    constructor(game, onClose) {
+    constructor(game, onClose = null) {
         this.#game = game;
         this.#onClose = onClose;
         this.#container = null;
     }
 
+    setOnClose(fn) {
+        this.#onClose = fn;
+    }
+
     render() {
         this.#container = document.createElement('div');
-        this.#container.className = 'blackjack-overlay';
+        this.#container.className = 'game-window-content';
 
         const userId = GlobalStateManager.getInstance().getCurrentUserId();
         this.#chipManager = new ChipManager(userId);
 
         this.#bettingUI = new BettingUI(
             () => this.#game.getState().phase === 'IDLE',
-            () => this.update()
+            () => this.update(),
+            this.#chipManager
         );
 
         this.#container.innerHTML = `
-            <header class="app-header" style="position: relative; z-index: 10; flex-shrink: 0;">
-                <div class="header-left">
-                    <span class="header-logo">♤</span>
-                    <div class="logo-stack">
-                        <span class="header-title" style="font-size: 18px;">Blackjack</span>
-                    </div>
+            <header class="user-info-header">
+                <div class="user-info-title-area">
+                    <h2>Blackjack</h2>
                 </div>
-                <div class="header-right">
-                    <button class="nav-btn blackjack-close" title="Close Game" style="font-weight: bold; color: #ff5252; font-size: 20px;">×</button>
+                <div class="user-info-header-actions">
+                    <button class="close-info-btn blackjack-close" title="Spiel schließen">✕</button>
                 </div>
             </header>
             <div class="blackjack-content">
@@ -53,7 +55,7 @@ export class BlackjackUI {
                         <div class="deck-count-label"><span class="shoe-display">0</span> cards</div>
                     </div>
                 </div>
-                <div class="betting-sidebar-container" style="width: 320px; flex: 0 0 320px; display: flex; flex-direction: column; gap: 20px;">
+                <div class="betting-sidebar-container" style="width: 320px; flex: 0 0 320px; display: flex; flex-direction: column; gap: 20px; height: 100%;">
                     <!-- Betting UI mounts here -->
                 </div>
             </div>

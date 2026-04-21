@@ -6,6 +6,7 @@ import { BlackjackUI } from '../games/blackjack/ui/BlackjackUI.js';
 import { TexasHoldem } from '../games/poker/games/TexasHoldem.js';
 import { TexasHoldemUI } from '../games/poker/ui/TexasHoldemUI.js';
 import { Dialog } from '../ui/Dialog.js';
+import { GameDialog } from '../ui/GameDialog.js';
 import { UserStatsService } from '../services/UserStatsService.js';
 import { DataService } from '../services/DataService.js';
 import { AuthService } from '../services/AuthService.js';
@@ -374,15 +375,14 @@ export class App {
         const game = new Blackjack();
         const userId = this.globalState.getCurrentUserId();
         game.onRoundUpdate = (res) => UserStatsService.recordBlackjackResult(userId, res);
-        const ui = new BlackjackUI(game, () => overlay.remove());
-        const overlay = ui.render();
-        document.body.appendChild(overlay);
+        
+        const ui = new BlackjackUI(game);
+        await GameDialog.show(ui);
     }
 
     async _launchTexasHoldem() {
         const game = new TexasHoldem();
-        const ui = new TexasHoldemUI(game, () => overlay.remove());
-        const overlay = ui.render();
-        document.body.appendChild(overlay);
+        const ui = new TexasHoldemUI(game);
+        await GameDialog.show(ui);
     }
 }

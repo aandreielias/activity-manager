@@ -204,6 +204,14 @@ export class UserStatsService {
     }
 
     /**
+     * Update chips by setting absolute values (overwrites existing).
+     */
+    static async updateChipsAbsolute(userId, chipsMap) {
+        if (!userId) return;
+        await this._updateStats(userId, chipsMap);
+    }
+
+    /**
      * Resets ALL stats (Game and Activity) for the given user.
      */
     static async resetAllStats(userId) {

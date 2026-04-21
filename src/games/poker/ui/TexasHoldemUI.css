@@ -1,20 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap');
-
-.holdem-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bg);
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    font-family: 'DM Sans', sans-serif;
-    color: var(--text-primary);
-    overflow: hidden;
-    animation: blackjackFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
+/* Texas Hold'em — extends BlackjackUI.css base styles */
 
 .holdem-content {
     flex: 1;
@@ -38,7 +22,6 @@
     min-width: 300px;
 }
 
-/* Base reuse from blackjack for buttons, we will just use same classes mostly */
 .community-section {
     display: flex;
     justify-content: center;

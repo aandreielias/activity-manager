@@ -56,13 +56,35 @@ export class ChipManager {
     }
 
     async save() {
-        if (!this.#userId || this.#lastNetChips === 0) return;
-        const diffObj = UserStatsService.valueToChips(Math.abs(this.#lastNetChips));
+        if (!this.#userId) return;
+        
+        // We persist the entire state of chips to ensure consistency
         const dbUpdates = {};
-        for (const [v, c] of Object.entries(diffObj)) {
-            dbUpdates['chip_' + v] = this.#lastNetChips < 0 ? -(c) : c;
+        for (const [val, count] of Object.entries(this.#chips)) {
+            dbUpdates['chip_' + val] = count;
         }
-        await UserStatsService.updateChips(this.#userId, dbUpdates);
+        
+        await UserStatsService.updateChipsAbsolute(this.#userId, dbUpdates);
+    }
+
+    setChips(chips) {
+        this.#chips = { ...chips };
+        this.#notify();
+    }
+
+    setChipsFromData(data) {
+        if (!data) return;
+        this.#chips = {
+            1: data.chip_1 || 0,
+            5: data.chip_5 || 0,
+            10: data.chip_10 || 0,
+            20: data.chip_20 || 0,
+            25: data.chip_25 || 0,
+            100: data.chip_100 || 0,
+            500: data.chip_500 || 0,
+            1000: data.chip_1000 || 0
+        };
+        this.#notify();
     }
 
     // ── Getters ─────────────────────────────────────────────
@@ -139,25 +161,36 @@ export class ChipManager {
         switch (outcome) {
             case 'WIN':
             case 'DEALER_FOLD':
-                // Profit = dealer's contribution (poker) or bet amount (BJ)
-                this.#lastNetChips = options.multiplier !== undefined
-                    ? Math.floor(this.#playerPot * options.multiplier)
-                    : this.#dealerPot;
+            case 'BLACKJACK':
+                const profit = outcome === 'BLACKJACK' 
+                    ? Math.floor(this.#playerPot * (options.multiplier || 1.5))
+                    : (options.multiplier !== undefined 
+                        ? Math.floor(this.#playerPot * options.multiplier)
+                        : this.#dealerPot);
+                
+                this.#lastNetChips = profit;
+                // Add the original bet + profit back to chips
+                const totalPayout = this.#playerPot + profit;
+                const wonChips = UserStatsService.valueToChips(totalPayout);
+                for (const [val, count] of Object.entries(wonChips)) {
+                    this.#chips[val] += count;
+                }
                 break;
 
-            case 'BLACKJACK':
-                this.#lastNetChips = Math.floor(this.#playerPot * (options.multiplier || 1.5));
+            case 'PUSH':
+                this.#lastNetChips = 0;
+                // Add original bet back
+                const pushChips = UserStatsService.valueToChips(this.#playerPot);
+                for (const [val, count] of Object.entries(pushChips)) {
+                    this.#chips[val] += count;
+                }
                 break;
 
             case 'LOSS':
             case 'BUST':
             case 'FOLD':
                 this.#lastNetChips = -this.#playerPot;
-                break;
-
-            case 'PUSH':
-            default:
-                this.#lastNetChips = 0;
+                // Bet is already gone from #chips because BettingUI calls setChips
                 break;
         }
         this.#notify();

@@ -9,12 +9,14 @@ export class BettingUI {
     #currentBet;
     #alwaysAllowChips = false;
     
-    constructor(isIdleFn, onBetChanged) {
+    #chipManager;
+    
+    constructor(isIdleFn, onBetChanged, chipManager = null) {
         this.#isIdleFn = isIdleFn;
         this.#onBetChanged = onBetChanged;
+        this.#chipManager = chipManager;
         
         this.#currentBet = 0;
-        this.#userChips = {1:0, 5:0, 10:0, 20:0, 25:0, 100:0, 500:0, 1000:0};
         this.#container = null;
     }
 
@@ -48,19 +50,14 @@ export class BettingUI {
     }
     
     setInitialChips(chipData) {
-        if (chipData && chipData.chip_1 !== undefined) {
-            this.#userChips = {
-                1: chipData.chip_1 || 0,
-                5: chipData.chip_5 || 0,
-                10: chipData.chip_10 || 0,
-                20: chipData.chip_20 || 0,
-                25: chipData.chip_25 || 0,
-                100: chipData.chip_100 || 0,
-                500: chipData.chip_500 || 0,
-                1000: chipData.chip_1000 || 0
-            };
+        if (this.#chipManager) {
+            this.#chipManager.setChipsFromData(chipData);
+            this.renderInventory();
         }
-        this.renderInventory();
+    }
+
+    get userChips() {
+        return this.#chipManager ? this.#chipManager.getChips() : {1:0, 5:0, 10:0, 20:0, 25:0, 100:0, 500:0, 1000:0};
     }
     
     getActionsContainer() {
@@ -104,7 +101,7 @@ export class BettingUI {
         inv.innerHTML = '';
         
         [1, 5, 10, 20, 25, 100, 500, 1000].forEach(val => {
-            const count = this.#userChips[val] || 0;
+            const count = this.userChips[val] || 0;
             const item = document.createElement('div');
             item.className = 'chip-container';
             item.innerHTML = `
@@ -118,7 +115,11 @@ export class BettingUI {
                 const mouseX = e.clientX;
                 const mouseY = e.clientY;
                 
-                this.#userChips[val]--;
+                if (this.#chipManager) {
+                    const chips = this.#chipManager.getChips();
+                    chips[val]--;
+                    this.#chipManager.setChips(chips);
+                }
                 this.#currentBet += val;
                 this.updateDisplay();
                 this.renderInventory();
@@ -141,7 +142,11 @@ export class BettingUI {
                 tChip.onclick = () => {
                     if (!this.#isIdleFn()) return;
                     tChip.remove();
-                    this.#userChips[val]++;
+                    if (this.#chipManager) {
+                        const chips = this.#chipManager.getChips();
+                        chips[val]++;
+                        this.#chipManager.setChips(chips);
+                    }
                     this.#currentBet -= val;
                     this.updateDisplay();
                     this.renderInventory();

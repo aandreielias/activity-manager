@@ -153,13 +153,18 @@ export class UserInfoPage {
                     <button class="user-tab-btn active" data-tab="stats">Statistiken</button>
                     ${canManage ? `<button class="user-tab-btn" data-tab="perms">Berechtigungen</button>` : ''}
                 </div>
-
+ 
                 <div class="user-tab-content">
                     ${this._getStatsTabHTML(person, userStat)}
                 </div>
             </div>
         `;
-        this._attachStatsEvents(container, person, userStat);
+ 
+        // Resolve actual user_id for stats persistence
+        AuthService.getUserByPersonId(person.id).then(user => {
+            const userId = user ? user.id : null;
+            this._attachStatsEvents(container, person, userStat, userId);
+        });
 
         const tabs = container.querySelectorAll('.user-tab-btn');
         const tabContent = container.querySelector('.user-tab-content');
@@ -170,7 +175,9 @@ export class UserInfoPage {
                 tab.classList.add('active');
                 if (tab.dataset.tab === 'stats') {
                     tabContent.innerHTML = this._getStatsTabHTML(person, userStat);
-                    this._attachStatsEvents(container, person, userStat);
+                    AuthService.getUserByPersonId(person.id).then(user => {
+                        this._attachStatsEvents(container, person, userStat, user ? user.id : null);
+                    });
                 } else {
                     this._renderPermissionsTab(tabContent, person);
                 }
@@ -260,7 +267,9 @@ export class UserInfoPage {
         `;
     }
 
-    static _attachStatsEvents(container, person, userStat) {
+    static _attachStatsEvents(container, person, userStat, userId) {
+        if (!userId) return; // Cannot save if no linked user account
+        
         const modBtns = container.querySelectorAll('.mod-chip-btn');
         const totalDisp = container.querySelector('#user-totalchips-display');
 
@@ -278,7 +287,7 @@ export class UserInfoPage {
                 btn.disabled = true;
                 
                 try {
-                    await UserStatsService.updateChips(person.id, { [val]: diff });
+                    await UserStatsService.updateChips(userId, { [val]: diff });
                     
                     // Update local state
                     userStat.chips[val] = currentCount + diff;

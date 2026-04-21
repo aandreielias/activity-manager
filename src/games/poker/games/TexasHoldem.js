@@ -90,7 +90,7 @@ export class TexasHoldem extends AGame {
         if (hidden) {
             return {
                 symbol: '?', suitSymbol: '?', isRed: false,
-                fullName: 'Hidden Card', isHidden: true, toString: '[ ?? ]'
+                fullName: 'Hidden Card', isHidden: true,
             };
         }
         return {
@@ -99,7 +99,6 @@ export class TexasHoldem extends AGame {
             isRed: c.getSuit().isRed,
             fullName: c.toFullString(),
             isHidden: false,
-            toString: c.toString()
         };
     }
 

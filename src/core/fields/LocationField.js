@@ -3,6 +3,8 @@ import { GlobalStateManager } from '../GlobalStateManager.js';
 import { SupabaseClient } from '../../services/SupabaseClient.js';
 import { Dialog } from '../../ui/Dialog.js';
 import { BaseDialog } from '../../ui/BaseDialog.js';
+import { Tooltip } from '../../ui/Tooltip.js';
+import { TooltipGenerator } from '../../utils/TooltipGenerator.js';
 
 export class LocationField extends Field {
     constructor(params) {
@@ -36,6 +38,14 @@ export class LocationField extends Field {
             this.contentWrap.appendChild(a);
         } else {
             this.contentWrap.textContent = title;
+        }
+
+        // Attach tooltip if we have detailed data (object format) and are not in the master location table
+        if (val && typeof val === 'object' && val.title && this.tableId !== 'tbl_ort' && this.tableId !== 'ort') {
+            const html = TooltipGenerator.generateLocationTooltip(val);
+            const condition = () => !this.td?.classList.contains('editing');
+            Tooltip.attach(this.contentWrap, html, 400, condition);
+            this.contentWrap.style.cursor = 'pointer';
         }
     }
 

@@ -33,7 +33,7 @@ export class Header {
     }
 
     _getVersion() {
-        return 'v2.11.1';
+        return 'v2.12.0';
     }
 
     render() {

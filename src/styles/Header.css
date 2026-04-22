@@ -203,6 +203,12 @@
     animation: banner-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.unsaved-banner.removing {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+    transition: all 0.3s ease-in;
+}
+
 @keyframes banner-pop {
     from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
     to { transform: translateX(-50%) translateY(0); opacity: 1; }

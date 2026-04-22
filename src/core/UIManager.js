@@ -314,6 +314,25 @@ export class UIManager {
             if (tableId === 'tbl_sportarten') {
                 // Force grouping by sport type for the master sports table
                 instance.localFilters.groupBy = 'sport_type';
+                
+                // Patch schema to remove 'Alle' and add 'Sonstige'
+                const sportTypeCol = instance.schema.find(c => c.id === 'sport_type');
+                if (sportTypeCol) {
+                    let options = (sportTypeCol.options || []).filter(opt => {
+                        const val = typeof opt === 'object' ? (opt.value !== undefined ? opt.value : opt.label) : opt;
+                        return val !== 'Alle' && val !== 'alle';
+                    });
+                    
+                    const hasSonstige = options.some(opt => {
+                        const val = typeof opt === 'object' ? (opt.value !== undefined ? opt.value : opt.label) : opt;
+                        return val === 'Sonstige';
+                    });
+                    
+                    if (!hasSonstige) {
+                        options.push('Sonstige');
+                    }
+                    sportTypeCol.options = options;
+                }
             }
 
             if (tableId === 'tbl_people') {
@@ -375,12 +394,6 @@ export class UIManager {
                     
                     const tableEl = table.render();
                     tableEl.dataset.team = teamName;
-                    
-                    if (rows.length === 0) {
-                        tableEl.classList.add('collapsed');
-                        const icon = tableEl.querySelector('.collapse-icon');
-                        if (icon) icon.textContent = '▸';
-                    }
                     
                     container.appendChild(tableEl);
                 });
@@ -708,12 +721,6 @@ export class UIManager {
                 const tableEl = table.render();
                 tableEl.dataset.team = teamName;
                 
-                if (rows.length === 0) {
-                    tableEl.classList.add('collapsed');
-                    const icon = tableEl.querySelector('.collapse-icon');
-                    if (icon) icon.textContent = '▸';
-                }
-                
                 container.appendChild(tableEl);
             });
             
@@ -837,57 +844,80 @@ export class UIManager {
             this._updateSplitVisibility();
         }
 
-        // 1. Update Visibility & Count
+        // 1. Update Visibility
         this._updateVisibility(tableId, 'all');
-        const visibleTables = Array.from(this.mainContent.querySelectorAll('.table-wrapper'))
-            .filter(t => t.offsetParent !== null);
-        const isMultiTable = visibleTables.length > 1;
 
-        // 2. Toggle Global Filter Bar
-        if (this.filterBarMain && this.filterBarMain.element) {
-            this.filterBarMain.element.style.display = isMultiTable ? '' : 'none';
+        // 2. Main View Logic
+        const visibleMainTables = Array.from(this.mainContent.querySelectorAll('.table-wrapper'))
+            .filter(t => t.offsetParent !== null);
+        const isMultiTableMain = visibleMainTables.length > 1;
+
+        // Global Filter Bar (Main)
+        if (this.filterBarMain) {
+            this._populateFilterBar('main');
+            this.filterBarMain.state.active = isMultiTableMain;
+            this.filterBarMain.refresh();
         }
 
-        // 3. Update Local Bars
+        // Local Filter Bars (Main)
         Object.entries(this.app.tableElements).forEach(([id, el]) => {
             if (el.style.display !== 'block') return;
             
-            // Special handling for People sub-tables (Unified or Teams)
             if (id === 'tbl_people') {
-                const allSubTables = [this.personsUnifiedTable, ...Object.values(this.personsTeamTables || {})];
-                allSubTables.forEach(t => {
-                    if (t && t.renderer && t.renderer.filterBar) {
-                        const localBar = t.renderer.filterBar;
-                        // Check if the table element itself is visible
+                const subTables = [this.personsUnifiedTable, ...Object.values(this.personsTeamTables || {})];
+                subTables.forEach(t => {
+                    if (t?.renderer) {
                         const isVisible = t.element && t.element.style.display !== 'none';
                         if (isVisible) {
-                            if (!isMultiTable && !localBar.state.active) {
-                                localBar.state.active = true;
-                                localBar.refresh();
-                            } else if (isMultiTable && localBar.state.active) {
-                                localBar.state.active = false;
-                                localBar.refresh();
-                            }
+                            t.localFilters.active = !isMultiTableMain;
+                            t.renderer.update(); // Trigger re-render and auto-expand/collapse
                         }
                     }
                 });
-                return;
-            }
-
-            const tableWrap = this.tables[id];
-            if (tableWrap && tableWrap.instance && tableWrap.instance.renderer.filterBar) {
-                const localBar = tableWrap.instance.renderer.filterBar;
-                // Automatically show local bar if global bar is hidden
-                if (!isMultiTable && !localBar.state.active) {
-                    localBar.state.active = true;
-                    localBar.refresh();
-                } else if (isMultiTable && localBar.state.active) {
-                    // Hide local bar if global bar is active to avoid double headers
-                    localBar.state.active = false;
-                    localBar.refresh();
+            } else {
+                const tw = this.tables[id];
+                if (tw?.instance?.renderer) {
+                    tw.instance.localFilters.active = !isMultiTableMain;
+                    tw.instance.renderer.update(); // Trigger re-render and auto-expand/collapse
                 }
             }
         });
+
+        // 3. Split View Logic
+        const visibleSplitTables = Array.from(this.splitSideWrapper.querySelectorAll('.table-wrapper'))
+            .filter(t => t.offsetParent !== null);
+        const isMultiTableSplit = visibleSplitTables.length > 1;
+
+        if (this.filterBarSplit) {
+            this._populateFilterBar('split');
+            this.filterBarSplit.state.active = isMultiTableSplit;
+            this.filterBarSplit.refresh();
+        }
+
+        // Local Filter Bars (Split)
+        if (this.personsSplitUnifiedTable?.renderer?.filterBar) {
+            const isVisible = this.personsSplitUnifiedTable.element && this.personsSplitUnifiedTable.element.style.display !== 'none';
+            if (isVisible) {
+                this.personsSplitUnifiedTable.localFilters.active = !isMultiTableSplit;
+                this.personsSplitUnifiedTable.renderer.filterBar.refresh();
+            }
+        }
+        Object.values(this.personsSplitTeamTables || {}).forEach(t => {
+            if (t?.renderer?.filterBar) {
+                const isVisible = t.element && t.element.style.display !== 'none';
+                if (isVisible) {
+                    t.localFilters.active = !isMultiTableSplit;
+                    t.renderer.filterBar.refresh();
+                }
+            }
+        });
+        if (this.inventoryTable?.renderer?.filterBar) {
+            const isVisible = this.inventoryTable.element && this.inventoryTable.element.closest('.persons-split-container') !== null;
+            if (isVisible) {
+                this.inventoryTable.localFilters.active = !isMultiTableSplit;
+                this.inventoryTable.renderer.filterBar.refresh();
+            }
+        }
 
         const headerEl = this.header.element;
         headerEl.querySelector('.persons-toggle-btn')?.classList.toggle('active', tableId === 'tbl_people' || this.header.personsSplitOpen);

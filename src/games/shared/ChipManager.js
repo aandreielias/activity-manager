@@ -37,34 +37,63 @@ export class ChipManager {
     async load() {
         if (!this.#userId) return;
         const stats = await UserStatsService.getStatsByUserId(this.#userId);
-        if (stats && stats.chip_1 !== undefined) {
-            this.#chips = {
-                1: stats.chip_1 || 0,
-                5: stats.chip_5 || 0,
-                10: stats.chip_10 || 0,
-                20: stats.chip_20 || 0,
-                25: stats.chip_25 || 0,
-                100: stats.chip_100 || 0,
-                500: stats.chip_500 || 0,
-                1000: stats.chip_1000 || 0
-            };
+        
+        if (stats) {
+            let foundChips = false;
+            
+            // 1. Try new schema: user_inventory_items array
+            if (stats.user_inventory_items && Array.isArray(stats.user_inventory_items)) {
+                const chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 0, 500: 0, 1000: 0 };
+                let hasAnyChip = false;
+                
+                stats.user_inventory_items.forEach(item => {
+                    if (item.item_type && item.item_type.startsWith('chip_')) {
+                        const val = item.item_type.split('_').pop();
+                        if (chips[val] !== undefined) {
+                            chips[val] = item.quantity || 0;
+                            hasAnyChip = true;
+                        }
+                    }
+                });
+                
+                if (hasAnyChip) {
+                    this.#chips = chips;
+                    foundChips = true;
+                }
+            }
+            
+            // 2. Try old schema: direct properties (chip_1, chip_5, etc.)
+            if (!foundChips && stats.chip_100 !== undefined) {
+                this.#chips = {
+                    1: stats.chip_1 || 0,
+                    5: stats.chip_5 || 0,
+                    10: stats.chip_10 || 0,
+                    20: stats.chip_20 || 0,
+                    25: stats.chip_25 || 0,
+                    100: stats.chip_100 || 0,
+                    500: stats.chip_500 || 0,
+                    1000: stats.chip_1000 || 0
+                };
+                foundChips = true;
+            }
+
+            // 3. Fallback to defaults if no chips found in DB at all
+            if (!foundChips) {
+                this.#chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 10, 500: 0, 1000: 0 };
+            }
         } else {
-            // Default starting chips if no DB record
+            // Default starting chips if no DB record exists yet
             this.#chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 10, 500: 0, 1000: 0 };
         }
+        
         this.#notify();
     }
 
     async save() {
         if (!this.#userId) return;
-        
         // We persist the entire state of chips to ensure consistency
-        const dbUpdates = {};
-        for (const [val, count] of Object.entries(this.#chips)) {
-            dbUpdates['chip_' + val] = count;
-        }
-        
-        await UserStatsService.updateChipsAbsolute(this.#userId, dbUpdates);
+        // updateChipsAbsolute handles the 'chip_' prefix internally
+        await UserStatsService.updateChipsAbsolute(this.#userId, this.#chips);
     }
 
     setChips(chips) {

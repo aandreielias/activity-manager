@@ -44,8 +44,12 @@ export class TableRenderer {
 
         this.element.appendChild(this._renderTableScroll());
         
-        // Auto-collapse if empty
-        if (this.table.rows.length === 0) {
+        // Auto-collapse if empty and unfiltered
+        const gs = GlobalStateManager.getInstance();
+        const isFiltered = (this.table.localFilters && this.table.localFilters.active) || gs.isFavoritesFilterActive();
+        // Note: Global filters are harder to check here without DOM context, 
+        // but update() will run soon after and correct it if needed.
+        if (this.table.rows.length === 0 && !isFiltered) {
             this.element.classList.add('collapsed');
         }
 
@@ -62,17 +66,31 @@ export class TableRenderer {
             const newBody = this._renderTableBody();
             oldBody.replaceWith(newBody);
             
-            // Auto-collapse / expand based on row count
+            // Auto-collapse / expand logic
+            const gs = GlobalStateManager.getInstance();
+            const side = this.element.closest('.split-container-inner') ? 'split' : 'main';
+            const category = this.table.tableConfig?.category;
+            let globalFilterId = this.table.id;
+            if (category) {
+                const catId = `all-${category}`;
+                const catFilter = gs.getGlobalFilterState(side, catId);
+                if (catFilter && catFilter.active) globalFilterId = catId;
+            }
+            const globalFilter = gs.getGlobalFilterState(side, globalFilterId);
+            const isFiltered = (globalFilter && globalFilter.active) || (this.table.localFilters && this.table.localFilters.active) || gs.isFavoritesFilterActive();
+            
             const hasRows = this.table.rows.length > 0;
             const icon = this.element.querySelector('.collapse-icon');
             
-            if (!hasRows) {
+            if (!hasRows && !isFiltered) {
                 this.element.classList.add('collapsed');
                 if (icon) icon.textContent = '▸';
-            } else {
-                // Only auto-expand if it was previously auto-collapsed (optional)
-                // For now, let's just make it consistent
-                this.updateMeta();
+            } else if (hasRows || isFiltered) {
+                // Auto-expand if it was collapsed and now has content or is filtered
+                if (this.element.classList.contains('collapsed')) {
+                    this.element.classList.remove('collapsed');
+                    if (icon) icon.textContent = '▾';
+                }
             }
         }
     }

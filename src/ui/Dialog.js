@@ -325,5 +325,52 @@ export class Dialog {
             }
         });
     }
+
+    /**
+     * Shows a pill-shaped banner at the top of the screen for confirmations.
+     * Matches the "Unsaved Changes" style.
+     */
+    static async bannerConfirm({ message, confirmText = 'Bestätigen', confirmStyle = 'warning' }) {
+        return new Promise((resolve) => {
+            const banner = document.createElement('div');
+            banner.className = 'unsaved-banner';
+            banner.style.display = 'flex'; // Ensure visibility
+            banner.style.top = '24px';
+            banner.style.zIndex = '10001'; 
+
+            const msg = document.createElement('span');
+            msg.className = 'unsaved-msg';
+            msg.textContent = message;
+            banner.appendChild(msg);
+
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.gap = '8px';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'save-btn-header';
+            cancelBtn.textContent = 'Abbrechen';
+            
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'discard-btn-header';
+            confirmBtn.textContent = confirmText;
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(confirmBtn);
+            banner.appendChild(actions);
+
+            document.body.appendChild(banner);
+
+            const cleanup = () => {
+                banner.classList.add('removing');
+                setTimeout(() => {
+                    if (banner.parentNode) banner.parentNode.removeChild(banner);
+                }, 300);
+            };
+
+            cancelBtn.onclick = () => { cleanup(); resolve(false); };
+            confirmBtn.onclick = () => { cleanup(); resolve(true); };
+        });
+    }
 }
 

@@ -218,6 +218,7 @@ export class Row {
                 Tooltip.attach(this.element, html, 400, condition);
             }
         }
+
     }
 
     toggleFavorite() {

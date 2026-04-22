@@ -4,6 +4,8 @@ import { DataService } from '../../services/DataService.js';
 import { SupabaseClient } from '../../services/SupabaseClient.js';
 import { Dialog } from '../../ui/Dialog.js';
 import { BaseDialog } from '../../ui/BaseDialog.js';
+import { Tooltip } from '../../ui/Tooltip.js';
+import { TooltipGenerator } from '../../utils/TooltipGenerator.js';
 
 /**
  * EventGamesField - Specialized field for defining a sequence (Reihenfolge)
@@ -39,7 +41,8 @@ export class EventGamesField extends Field {
             const team = item.team || 'Aktivitäten';
             const isAktivitäten = team === 'Aktivitäten';
             
-            const status = isAktivitäten ? this._getGameStatus(item.name) : 'To Do';
+            const gameInfo = isAktivitäten ? this._getGameData(item.name) : null;
+            const status = gameInfo ? gameInfo.data.status : (isAktivitäten ? this._getGameStatus(item.name) : 'To Do');
             let statusClass = isAktivitäten && status ? 'status-' + status.toLowerCase().replace(/\s+/g, '-') : '';
             let isDeleted = false;
 
@@ -51,6 +54,7 @@ export class EventGamesField extends Field {
             const tag = document.createElement('span');
             tag.className = `event-game-tag ${statusClass}`;
             tag.style.fontSize = '12px';
+            tag.style.cursor = 'pointer';
 
             const teamSpan = document.createElement('span');
             teamSpan.className = 'game-team';
@@ -86,10 +90,28 @@ export class EventGamesField extends Field {
                 }
             }
 
+            // Attach tooltip
+            if (gameInfo) {
+                const html = TooltipGenerator.generateGameTooltip(gameInfo.data, gameInfo.categoryTitle);
+                const condition = () => !this.td?.classList.contains('editing');
+                Tooltip.attach(tag, html, 400, condition);
+            }
+
             tagsContainer.appendChild(tag);
         });
 
         this.contentWrap.appendChild(tagsContainer);
+    }
+
+    _getGameData(gameName) {
+        const tables = GlobalStateManager.getInstance().getTables();
+        if (!tables) return null;
+        for (const [id, tableInfo] of Object.entries(tables)) {
+            if (tableInfo.config.category !== 'spiele' && tableInfo.config.category !== 'sportarten') continue;
+            const row = tableInfo.instance.rows.find(r => r.data.name === gameName);
+            if (row) return { data: row.data, categoryTitle: tableInfo.config.title };
+        }
+        return null;
     }
 
     startEditing() {

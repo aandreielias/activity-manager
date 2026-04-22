@@ -78,9 +78,11 @@ export class UserStatsService {
         const chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 0, 500: 0, 1000: 0 };
         
         inventoryItems.forEach(item => {
-            if (item.item_type.startsWith('chip_')) {
-                const val = item.item_type.split('_')[1];
-                chips[val] = item.quantity;
+            if (item.item_type && item.item_type.startsWith('chip_')) {
+                const val = item.item_type.split('_').pop();
+                if (chips[val] !== undefined) {
+                    chips[val] = item.quantity;
+                }
             }
         });
 

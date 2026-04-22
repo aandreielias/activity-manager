@@ -59,7 +59,7 @@ export class PeopleRepository extends BaseRepository {
             nachname: row.nachname || '',
             'Tel.': row.telefon || '',
             Status: row.status ? this._capitalizeFirst(row.status) : 'Aktiv',
-            role: row.role || 'User',
+            role: row.rolle || row.role || 'User',
             responsibility_1: responsibilities[0] || '',
             responsibility_2: responsibilities[1] || '',
             'Spez. Zuständigkeit': row.spez_zustaendigkeit || '',
@@ -79,7 +79,7 @@ export class PeopleRepository extends BaseRepository {
             nachname: appRow.nachname || '',
             telefon: appRow['Tel.'] || appRow.telefon || '',
             status: (appRow.Status || appRow.status || 'Aktiv').toLowerCase(),
-            role: (appRow.role || appRow.rolle || 'User'), // Use 'role' instead of 'rolle'
+            rolle: (appRow.role || appRow.rolle || 'User'),
             spez_zustaendigkeit: appRow['Spez. Zuständigkeit'] || appRow.spez_zustaendigkeit || '',
             email: appRow.email || '',
             image_url: appRow.image_url || null,
@@ -130,7 +130,8 @@ export class ActivitiesRepository extends BaseRepository {
             rules: row.rules || '',
             duration_minutes: row.duration_minutes ?? '',
             preparation_minutes: row.preparation_minutes ?? '',
-            location: row.location_id ? (row.location || row.location_id) : (row.location || ''),
+            // Use joined details if available, else fallback to text/ID
+            location: row.location_details || row.location || row.location_id || '',
             location_notes: row.location_notes || '',
             min_players: row.min_players ?? '',
             max_players: row.max_players ?? '',
@@ -146,8 +147,12 @@ export class ActivitiesRepository extends BaseRepository {
     }
 
     toDb(appRow, category = null) {
-        const isUuid = (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+        const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
         
+        const locVal = appRow.location;
+        const locId = (locVal && typeof locVal === 'object' && locVal.id) ? locVal.id : (isUuid(locVal) ? locVal : null);
+        const locText = (locVal && typeof locVal === 'object') ? (locVal.title || null) : (isUuid(locVal) ? null : locVal);
+
         return {
             id: appRow.id,
             name: appRow.name || '',
@@ -156,8 +161,8 @@ export class ActivitiesRepository extends BaseRepository {
             rules: appRow.rules || '',
             duration_minutes: this._parseIntOrNull(appRow.duration_minutes),
             preparation_minutes: this._parseIntOrNull(appRow.preparation_minutes),
-            location_id: appRow.location?.id || (isUuid(appRow.location) ? appRow.location : null),
-            location: isUuid(appRow.location) ? null : (appRow.location || null), // Keep legacy text only if not UUID
+            location_id: locId,
+            location: locText || null,
             location_notes: appRow.location_notes || '',
             min_players: this._parseIntOrNull(appRow.min_players),
             max_players: this._parseIntOrNull(appRow.max_players),

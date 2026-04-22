@@ -78,6 +78,40 @@ export class Field {
                 return;
             }
         }
+
+        // 3. Check for Location match
+        const tables = gs.getTables();
+        const ortTable = tables['tbl_ort'] || tables['ort'];
+        if (ortTable && ortTable.instance && this.tableId !== 'tbl_ort' && this.tableId !== 'ort') {
+            const loc = ortTable.instance.rows.find(r => 
+                r.id === val || 
+                (r.data?.title || '').toLowerCase() === String(val).toLowerCase()
+            );
+            if (loc) {
+                const html = TooltipGenerator.generateLocationTooltip(loc.data);
+                const condition = () => !this.td.classList.contains('editing');
+                Tooltip.attach(this.td, html, 400, condition);
+                this.td.style.cursor = 'pointer';
+                return;
+            }
+        }
+
+        // 4. Check for Game match
+        for (const [id, tableInfo] of Object.entries(tables)) {
+            if (tableInfo.config.category !== 'spiele' && tableInfo.config.category !== 'sportarten') continue;
+            if (this.tableId === id) continue; // Skip if this is the game's own table
+
+            const game = tableInfo.instance.rows.find(r => 
+                (r.data?.name || '').toLowerCase() === String(val).toLowerCase()
+            );
+            if (game) {
+                const html = TooltipGenerator.generateGameTooltip(game.data, tableInfo.config.title);
+                const condition = () => !this.td.classList.contains('editing');
+                Tooltip.attach(this.td, html, 400, condition);
+                this.td.style.cursor = 'pointer';
+                return;
+            }
+        }
     }
 
     getDisplayValue() {

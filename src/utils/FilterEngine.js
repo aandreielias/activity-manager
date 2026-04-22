@@ -152,7 +152,8 @@ export class FilterEngine {
      * Returns an object mapping group names to arrays of rows.
      */
     static groupRows(rows, groupByAttrId) {
-        if (!groupByAttrId || !rows || rows.length === 0) return { 'Alle': rows };
+        if (!groupByAttrId) return { 'Gesamt': rows || [] };
+        if (!rows || rows.length === 0) return {};
 
         const groups = {};
         rows.forEach(row => {

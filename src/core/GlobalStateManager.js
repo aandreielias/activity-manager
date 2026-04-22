@@ -271,7 +271,7 @@ export class GlobalStateManager {
 
     getGlobalFilterState(side, tableId) {
         if (!this.#globalFilters[side][tableId]) {
-            this.#globalFilters[side][tableId] = { active: true, groupBy: null, filters: [{ attrId: null, mode: null, value: [], quantityMode: 'any', quantityValue: '', availability: [] }] };
+            this.#globalFilters[side][tableId] = { active: false, groupBy: null, filters: [{ attrId: null, mode: null, value: [], quantityMode: 'any', quantityValue: '', availability: [] }] };
         }
         return this.#globalFilters[side][tableId];
     }

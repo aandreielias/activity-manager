@@ -115,7 +115,7 @@ export class DataService {
                 // query += `&person_teams.teams.name=in.(${teams.map(t => `"${t}"`).join(',')})`;
             }
         } else if (supaTable === 'activities') {
-            query = '?select=*,activity_required_items(*,inventory(name))';
+            query = '?select=*,activity_required_items(*,inventory(name)),location_details:ort(*)';
             if (category) query += `&category=eq.${category}`;
         } else if (supaTable === 'inventory' && category) {
             // Check if we should filter - only if migration has likely run

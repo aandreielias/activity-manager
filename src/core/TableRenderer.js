@@ -146,7 +146,8 @@ export class TableRenderer {
         const gs = GlobalStateManager.getInstance();
         const currentViewId = gs.getCurrentViewId();
         const isSplit = this.element.closest('.split-container-inner') !== null;
-        const isMultiTableView = currentViewId?.startsWith('all-') || currentViewId === 'tbl_people' || isSplit;
+        // Multi-table views are now primarily the legacy organization view
+        const isMultiTableView = currentViewId === 'all-organisation';
         const isSingleTableView = !isMultiTableView;
 
         if (isSingleTableView) {
@@ -356,7 +357,10 @@ export class TableRenderer {
             filteredRows = filteredRows.filter(row => FilterEngine.matchesFilters(row, localFilter.filters));
         }
 
-        if (filteredRows.length === 0) {
+        // 1. Basic Empty State (only if no grouping)
+        let groupBy = localFilter.groupBy || (globalFilter.active ? globalFilter.groupBy : null);
+        
+        if (filteredRows.length === 0 && !groupBy) {
             const tr = document.createElement('tr');
             tr.className = 'empty-row';
             tr.innerHTML = `<td colspan="${this.table.schema.length + 2}" style="text-align:center; padding: 40px; color: var(--text-muted);">Keine Einträge gefunden</td>`;
@@ -366,15 +370,20 @@ export class TableRenderer {
         }
 
         // 2. Group Rows
-        // Priority: local grouping (even if bar hidden), then global grouping if active
-        let groupBy = localFilter.groupBy || (globalFilter.active ? globalFilter.groupBy : null);
-
         if (groupBy) {
             const groups = FilterEngine.groupRows(filteredRows, groupBy);
             const groupAttr = this.table.schema.find(s => s.id === groupBy);
             const attrLabel = groupAttr ? groupAttr.label : groupBy;
 
-            Object.entries(groups).forEach(([groupName, rows]) => {
+            // Pre-fill groups from schema options to ensure empty groups are shown
+                if (groupAttr && groupAttr.options) {
+                    groupAttr.options.forEach(opt => {
+                        const val = typeof opt === 'object' ? (opt.value !== undefined ? opt.value : opt.label) : opt;
+                        if (groups[val] === undefined) groups[val] = [];
+                    });
+                }
+
+                Object.entries(groups).forEach(([groupName, rows]) => {
                 // Render Group Header
                 const gtr = document.createElement('tr');
                 gtr.className = 'group-header-row';
@@ -419,12 +428,29 @@ export class TableRenderer {
                 }
 
                 // Render Rows for this group
-                rows.forEach(row => {
-                    this._setupRowCallbacks(row);
-                    const rowEl = row.render();
-                    if (shouldCollapse) rowEl.style.display = 'none';
-                    tbody.appendChild(rowEl);
-                });
+                if (rows.length === 0) {
+                    const emptyTr = document.createElement('tr');
+                    emptyTr.className = 'empty-group-row';
+                    const emptyTd = document.createElement('td');
+                    emptyTd.colSpan = this.table.schema.length + 2;
+                    emptyTd.style.textAlign = 'center';
+                    emptyTd.style.color = 'var(--text-secondary)';
+                    emptyTd.style.opacity = '0.6';
+                    emptyTd.style.fontStyle = 'italic';
+                    emptyTd.style.padding = '12px';
+                    emptyTd.style.fontSize = '12px';
+                    emptyTd.textContent = 'Keine Einträge in dieser Gruppe vorhanden';
+                    emptyTr.appendChild(emptyTd);
+                    if (shouldCollapse) emptyTr.style.display = 'none';
+                    tbody.appendChild(emptyTr);
+                } else {
+                    rows.forEach(row => {
+                        this._setupRowCallbacks(row);
+                        const rowEl = row.render();
+                        if (shouldCollapse) rowEl.style.display = 'none';
+                        tbody.appendChild(rowEl);
+                    });
+                }
             });
         } else {
             // No grouping

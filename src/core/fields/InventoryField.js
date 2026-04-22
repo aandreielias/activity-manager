@@ -1,6 +1,8 @@
 import { Field } from './Field.js';
 import { GlobalStateManager } from '../GlobalStateManager.js';
 import { InventoryService } from '../../services/InventoryService.js';
+import { Tooltip } from '../../ui/Tooltip.js';
+import { TooltipGenerator } from '../../utils/TooltipGenerator.js';
 
 export class InventoryField extends Field {
     updateDisplay() {
@@ -13,12 +15,25 @@ export class InventoryField extends Field {
             return;
         }
 
+        const globalState = GlobalStateManager.getInstance();
+        const inventory = globalState.getInventory();
+
         const items = InventoryService.parseInventoryString(rawValue);
         items.forEach(item => {
             const validation = InventoryService.validateAvailability(item.name, item.quantity);
             const tag = document.createElement('span');
             tag.className = `inventory-tag ${validation.status}`;
             tag.textContent = item.quantity ? `${item.name} (${item.quantity})` : item.name;
+            tag.style.cursor = 'pointer';
+            
+            // Attach tooltip for this specific item
+            const invItem = inventory.find(r => (r.data?.name || '').toLowerCase() === item.name.toLowerCase());
+            if (invItem) {
+                const html = TooltipGenerator.generateInventoryTooltip(invItem.data);
+                const condition = () => !this.td?.classList.contains('editing');
+                Tooltip.attach(tag, html, 400, condition);
+            }
+            
             this.contentWrap.appendChild(tag);
         });
     }

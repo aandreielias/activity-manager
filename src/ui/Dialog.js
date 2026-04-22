@@ -278,5 +278,52 @@ export class Dialog {
             }
         });
     }
+
+    static async select({ message, options, confirmText = 'Bestätigen' }) {
+        return BaseDialog.show({
+            dialogClassName: 'custom-dialog prompt-dialog',
+            onEscapeValue: null,
+            render: (dialog, overlay, resolve, cleanup) => {
+                const msgSpan = document.createElement('div');
+                msgSpan.className = 'unsaved-msg';
+                msgSpan.textContent = message;
+                msgSpan.style.marginBottom = '12px';
+
+                const select = document.createElement('select');
+                select.className = 'dialog-input';
+                select.style.display = 'block';
+                select.style.width = '100%';
+                select.style.marginBottom = '16px';
+
+                options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = typeof opt === 'object' ? opt.value : opt;
+                    option.textContent = typeof opt === 'object' ? opt.label : opt;
+                    select.appendChild(option);
+                });
+
+                const confirmBtn = document.createElement('button');
+                confirmBtn.className = 'save-btn-header';
+                confirmBtn.textContent = confirmText;
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'discard-btn-header';
+                cancelBtn.textContent = 'Abbrechen';
+
+                confirmBtn.addEventListener('click', () => resolve(select.value));
+                cancelBtn.addEventListener('click', () => resolve(null));
+
+                dialog.appendChild(msgSpan);
+                dialog.appendChild(select);
+                dialog.appendChild(cancelBtn);
+                dialog.appendChild(confirmBtn);
+
+                setTimeout(() => select.focus(), 50);
+            },
+            onKeydown: (e, dialog, overlay, resolve) => {
+                if (e.key === 'Enter') resolve(dialog.querySelector('select').value);
+            }
+        });
+    }
 }
 

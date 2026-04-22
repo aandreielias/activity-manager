@@ -1,4 +1,6 @@
 import { GlobalStateManager } from '../GlobalStateManager.js';
+import { Tooltip } from '../../ui/Tooltip.js';
+import { TooltipGenerator } from '../../utils/TooltipGenerator.js';
 
 export class Field {
     constructor({ rowId, rowData, colDef, value, peopleData, tableId, onChange, onEditStart, onTab }) {
@@ -30,7 +32,52 @@ export class Field {
         this.td.appendChild(this.contentWrap);
         this.attachCellListeners();
 
+        // Automatic tooltips for fields referencing entities (People, Inventory)
+        this._attachAutomaticTooltips();
+
         return this.td;
+    }
+
+    _attachAutomaticTooltips() {
+        const val = this.getDisplayValue();
+        if (!val || val === '—') return;
+
+        // Skip if this is already an InventoryField or PersonField which handles its own
+        // We check the class name or type to avoid double attachments
+        if (this.constructor.name === 'InventoryField' || this.constructor.name === 'PersonField') {
+            return;
+        }
+
+        const gs = GlobalStateManager.getInstance();
+        
+        // 1. Check for Person match
+        if (this.peopleData) {
+            const person = this.peopleData.find(p => {
+                const fullName = `${p.vorname || ''} ${p.nachname || ''}`.trim();
+                return p.id === val || fullName === val || p.vorname === val;
+            });
+            
+            if (person) {
+                const html = TooltipGenerator.generatePersonTooltip(person);
+                const condition = () => !this.td.classList.contains('editing');
+                Tooltip.attach(this.td, html, 400, condition);
+                this.td.style.cursor = 'pointer';
+                return;
+            }
+        }
+
+        // 2. Check for Inventory match
+        const inventory = gs.getInventory();
+        if (inventory) {
+            const item = inventory.find(i => (i.data?.name || '').toLowerCase() === String(val).toLowerCase());
+            if (item) {
+                const html = TooltipGenerator.generateInventoryTooltip(item.data);
+                const condition = () => !this.td.classList.contains('editing');
+                Tooltip.attach(this.td, html, 400, condition);
+                this.td.style.cursor = 'pointer';
+                return;
+            }
+        }
     }
 
     getDisplayValue() {

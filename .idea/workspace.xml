@@ -5,24 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/services/builders/QueryBuilder.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/services/cache/CacheManager.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/services/interceptors/RequestInterceptor.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/services/mappers/ResultMapper.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/services/repositories/BaseRepository.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/services/repositories/RepositoryFactory.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/assets/GlobalStateManager-CkVu5UmY.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/assets/GlobalStateManager-DycBFrws.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/assets/InventoryEditDialog-Cq-NIJDi.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/assets/html2canvas-suW7PDr_.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/assets/index-M0k6iX2K.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/assets/index-pmw4jFf4.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/assets/index.es-pNiIkobK.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/dist/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/TableDataManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableDataManager.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/TableLoader.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableLoader.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/DataService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/DataService.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/SupabaseClient.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/SupabaseClient.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rls_implementation.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_rls.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/validate_rls_readiness.sql" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -145,6 +130,7 @@
       <workItem from="1775820711342" duration="4461000" />
       <workItem from="1776084419352" duration="690000" />
       <workItem from="1776755866230" duration="1001000" />
+      <workItem from="1776798769036" duration="633000" />
     </task>
     <servers />
   </component>

@@ -306,6 +306,16 @@ export class UIManager {
             wrapper.className = 'table-view-wrapper';
             wrapper.dataset.tableId = tableId;
 
+            if (tableId === 'tbl_spiele') {
+                // Force category grouping for the master games table
+                instance.localFilters.groupBy = 'category';
+            }
+
+            if (tableId === 'tbl_sportarten') {
+                // Force grouping by sport type for the master sports table
+                instance.localFilters.groupBy = 'sport_type';
+            }
+
             if (tableId === 'tbl_people') {
                 const gs = GlobalStateManager.getInstance();
                 const teams = gs.getAvailableTeams();
@@ -435,7 +445,7 @@ export class UIManager {
         }
 
         const teams = gs.getCurrentTeams() || [];
-        let targetView = 'all-spiele'; // Default fallback
+        let targetView = 'tbl_spiele'; // Default master view
 
         if (teams.length > 0) {
             const teamNamesParsed = teams.map(t => t.toLowerCase());
@@ -445,7 +455,7 @@ export class UIManager {
             } else if (teamNamesParsed.some(t => t.includes('sport'))) {
                 targetView = 'all-sportarten';
             } else if (teamNamesParsed.some(t => t.includes('aktivität') || t.includes('activity') || t.includes('spiele'))) {
-                targetView = 'all-spiele';
+                targetView = 'tbl_spiele';
             }
         }
 
@@ -560,17 +570,11 @@ export class UIManager {
 
     _handlePersonTeamMainSwitch(team) {
         // Switch main view to people
-        this.header.switchTo('tbl_people');
-        this._handleTableSwitch('tbl_people');
-
-        // Filter the main container
-        const container = this.mainContent.querySelector('.people-multi-table-container');
-        if (container) {
-            const tables = container.querySelectorAll('.table-wrapper');
-            tables.forEach(t => {
-                const isMatch = (team === 'all' && t.dataset.team === 'all') || (t.dataset.team === team);
-                t.style.display = isMatch ? 'block' : 'none';
-            });
+        this._updateVisibility('tbl_people', team);
+        
+        const isMultiTable = false; // Team switch is always a single table view
+        if (this.filterBarMain && this.filterBarMain.element) {
+            this.filterBarMain.element.style.display = 'none';
         }
         
         // Auto-close sidebar if it was showing the same thing
@@ -833,28 +837,55 @@ export class UIManager {
             this._updateSplitVisibility();
         }
 
+        // 1. Update Visibility & Count
+        this._updateVisibility(tableId, 'all');
+        const visibleTables = Array.from(this.mainContent.querySelectorAll('.table-wrapper'))
+            .filter(t => t.offsetParent !== null);
+        const isMultiTable = visibleTables.length > 1;
+
+        // 2. Toggle Global Filter Bar
+        if (this.filterBarMain && this.filterBarMain.element) {
+            this.filterBarMain.element.style.display = isMultiTable ? '' : 'none';
+        }
+
+        // 3. Update Local Bars
         Object.entries(this.app.tableElements).forEach(([id, el]) => {
-            if (tableId === 'all-spiele') {
-                el.style.display = this.app.tableConfigs.find(c => c.id === id)?.category === 'spiele' ? 'block' : 'none';
-            } else if (tableId === 'all-sportarten') {
-                el.style.display = this.app.tableConfigs.find(c => c.id === id)?.category === 'sportarten' ? 'block' : 'none';
-            } else if (tableId === 'all-organisation') {
-                const config = this.app.tableConfigs.find(c => c.id === id);
-                el.style.display = (config?.category === 'organisation' && config?.supa_table !== 'people') ? 'block' : 'none';
-            } else if (tableId === 'tbl_people') {
-                el.style.display = id === 'tbl_people' ? 'block' : 'none';
-                if (id === 'tbl_people') {
-                    // Default to showing only the unified table when manually switching
-                    const container = el.querySelector('.people-multi-table-container');
-                    if (container) {
-                        const tables = container.querySelectorAll('.table-wrapper');
-                        tables.forEach(t => {
-                            t.style.display = t.dataset.team === 'all' ? 'block' : 'none';
-                        });
+            if (el.style.display !== 'block') return;
+            
+            // Special handling for People sub-tables (Unified or Teams)
+            if (id === 'tbl_people') {
+                const allSubTables = [this.personsUnifiedTable, ...Object.values(this.personsTeamTables || {})];
+                allSubTables.forEach(t => {
+                    if (t && t.renderer && t.renderer.filterBar) {
+                        const localBar = t.renderer.filterBar;
+                        // Check if the table element itself is visible
+                        const isVisible = t.element && t.element.style.display !== 'none';
+                        if (isVisible) {
+                            if (!isMultiTable && !localBar.state.active) {
+                                localBar.state.active = true;
+                                localBar.refresh();
+                            } else if (isMultiTable && localBar.state.active) {
+                                localBar.state.active = false;
+                                localBar.refresh();
+                            }
+                        }
                     }
+                });
+                return;
+            }
+
+            const tableWrap = this.tables[id];
+            if (tableWrap && tableWrap.instance && tableWrap.instance.renderer.filterBar) {
+                const localBar = tableWrap.instance.renderer.filterBar;
+                // Automatically show local bar if global bar is hidden
+                if (!isMultiTable && !localBar.state.active) {
+                    localBar.state.active = true;
+                    localBar.refresh();
+                } else if (isMultiTable && localBar.state.active) {
+                    // Hide local bar if global bar is active to avoid double headers
+                    localBar.state.active = false;
+                    localBar.refresh();
                 }
-            } else {
-                el.style.display = id === tableId ? 'block' : 'none';
             }
         });
 
@@ -897,17 +928,41 @@ export class UIManager {
                 exportFileName = 'Inventar';
                 const inv = this.tables['tbl_inventory'];
                 if (inv && inv.instance) tablesToExport.push(inv.instance);
+            } else if (categoryId === 'tbl_spiele' || categoryId === 'all-spiele') {
+                exportFileName = 'Spiele';
+                const master = this.tables['tbl_spiele'];
+                if (master && master.instance) {
+                    tablesToExport.push(master.instance);
+                } else {
+                    // Fallback to individual tables if master is missing
+                    const configs = this.app.tableConfigs.filter(c => c.category === 'spiele' && c.id !== 'tbl_spiele');
+                    configs.forEach(config => {
+                        const tableWrap = this.tables[config.id];
+                        if (tableWrap && tableWrap.instance) tablesToExport.push(tableWrap.instance);
+                    });
+                }
+            } else if (categoryId === 'tbl_sportarten' || categoryId === 'all-sportarten') {
+                exportFileName = 'Sportarten';
+                const master = this.tables['tbl_sportarten'];
+                if (master && master.instance) {
+                    tablesToExport.push(master.instance);
+                } else {
+                    const configs = this.app.tableConfigs.filter(c => c.category === 'sportarten' && c.id !== 'tbl_sportarten');
+                    configs.forEach(config => {
+                        const tableWrap = this.tables[config.id];
+                        if (tableWrap && tableWrap.instance) tablesToExport.push(tableWrap.instance);
+                    });
+                }
             } else if (categoryId.startsWith('all-')) {
                 const category = categoryId.replace('all-', '');
                 // Better label resolution
-                const categoryLabel = category === 'spiele' ? 'Spiele' : 
-                                     (category === 'sportarten' ? 'Sportarten' : 
-                                     (category === 'organisation' ? 'Organisation' : 
-                                      category.charAt(0).toUpperCase() + category.slice(1)));
+                const categoryLabel = (category === 'sportarten' ? 'Sportarten' : 
+                                      (category === 'organisation' ? 'Organisation' : 
+                                       category.charAt(0).toUpperCase() + category.slice(1)));
                 
                 exportFileName = categoryLabel;
                 const configs = this.app.tableConfigs.filter(c => 
-                    c.category === category && !(category === 'organisation' && c.supa_table === 'people')
+                    c.category === category && c.id !== 'tbl_spiele' && !(category === 'organisation' && c.supa_table === 'people')
                 );
                 configs.forEach(config => {
                     const tableWrap = this.tables[config.id];
@@ -1134,6 +1189,32 @@ export class UIManager {
         doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('Aufgaben-Status', 14, y);
         y += 4;
         autoTable(doc, { head: [['Status', 'Gesamtzahl']], body: [['To-Do', String(globalTodo)], ['In Progress', String(globalInProgress)], ['Done', String(globalDone)]], startY: y, styles: { fontSize: 9 }, headStyles: { fillColor: ColourFactory.getBrandBlueRGB() }, theme: 'grid', margin: { left: 14, right: 14 } });
+    }
+
+    _updateVisibility(tableId, targetTeam = 'all') {
+        Object.entries(this.app.tableElements).forEach(([id, el]) => {
+            let isVisible = (id === tableId);
+            
+            // Category logic
+            if (tableId === 'all-spiele') {
+                isVisible = (this.app.tableConfigs.find(c => c.id === id)?.category === 'spiele' && id !== 'tbl_spiele');
+            } else if (tableId === 'all-sportarten') {
+                isVisible = (this.app.tableConfigs.find(c => c.id === id)?.category === 'sportarten' && id !== 'tbl_sportarten');
+            } else if (tableId === 'all-organisation') {
+                const config = this.app.tableConfigs.find(c => c.id === id);
+                isVisible = (config?.category === 'organisation' && config?.supa_table !== 'people');
+            }
+
+            el.style.display = isVisible ? 'block' : 'none';
+
+            // Special handling for People sub-tables
+            if (id === 'tbl_people' && isVisible) {
+                const subTables = el.querySelectorAll('.table-wrapper');
+                subTables.forEach(t => {
+                    t.style.display = (t.dataset.team === targetTeam) ? 'block' : 'none';
+                });
+            }
+        });
     }
 
     _highlightRow(rowId, colId) {

@@ -120,7 +120,7 @@ export class ActivitiesRepository extends BaseRepository {
             category: row.category || '',
             required_items: (row.activity_required_items || [])
                 .map(ari => {
-                    const name = ari.inventory?.name || ari.placeholder_text || ari.not_availible_text;
+                    const name = ari.inventory?.name || ari.placeholder_text;
                     if (!name) return null;
                     return ari.quantity_needed ? `${name} (${ari.quantity_needed})` : name;
                 })

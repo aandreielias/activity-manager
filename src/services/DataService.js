@@ -114,8 +114,9 @@ export class DataService {
                 // OR use a proper joined filter if supported.
                 // query += `&person_teams.teams.name=in.(${teams.map(t => `"${t}"`).join(',')})`;
             }
-        } else if (supaTable === 'activities' && category) {
-            query = `?select=*,activity_required_items(*,inventory(name))&category=eq.${category}`;
+        } else if (supaTable === 'activities') {
+            query = '?select=*,activity_required_items(*,inventory(name))';
+            if (category) query += `&category=eq.${category}`;
         } else if (supaTable === 'inventory' && category) {
             // Check if we should filter - only if migration has likely run
             query = `?select=*&category=eq.${category}`;
@@ -422,7 +423,7 @@ export class DataService {
                     activity_id: activityId,
                     inventory_id: match.id,
                     quantity_needed: item.quantity ? parseInt(item.quantity, 10) || 0 : 0,
-                    not_availible_text: null
+                    placeholder_text: null
                 });
             } else {
                 // Not in inventory - store as text in the new column

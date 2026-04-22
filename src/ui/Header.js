@@ -33,7 +33,7 @@ export class Header {
     }
 
     _getVersion() {
-        return 'v2.11.0';
+        return 'v2.11.1';
     }
 
     render() {
@@ -66,7 +66,7 @@ export class Header {
                 <span class="header-logo">⬡</span>
                 <div class="logo-stack">
                     <span class="header-title">${this.appName}</span>
-                    <span class="header-version">v${this.version}</span>
+                    <span class="header-version">${this.version}</span>
                 </div>
             </div>
             <nav class="header-nav">
@@ -160,19 +160,25 @@ export class Header {
         const categoryTables = this.tableConfigs.filter(t =>
             t.category === categoryName &&
             !exclusions.some(exc => t.id.includes(exc)) &&
-            gs.canView(t.id)
+            gs.canView(t.id) &&
+            !['tbl_spiele', 'tbl_sportarten'].includes(t.id) // Don't include master tables in dropdowns
         );
 
         if (categoryTables.length === 0) return '';
 
-        if (categoryTables.length === 1) {
+        // Master view resolution
+        let mainTableId = `all-${categoryName}`;
+        if (categoryName === 'spiele') mainTableId = 'tbl_spiele';
+        if (categoryName === 'sportarten') mainTableId = 'tbl_sportarten';
+
+        if (categoryTables.length === 1 && !['spiele', 'sportarten'].includes(categoryName)) {
             const table = categoryTables[0];
             return `<button class="nav-btn ${this.currentTable === table.id ? 'active' : ''}" data-table="${table.id}">${table.title}</button>`;
         }
 
         return `
             <div class="dropdown-container split-btn-group">
-                <button class="nav-btn split-main-btn" data-table="all-${categoryName}">
+                <button class="nav-btn split-main-btn" data-table="${mainTableId}">
                     ${label}
                 </button>
                 <div class="split-divider"></div>

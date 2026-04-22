@@ -1,6 +1,7 @@
 import { Row } from './Row.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
 import { RepositoryFactory } from '../services/repositories/RepositoryFactory.js';
+import { Dialog } from '../ui/Dialog.js';
 
 export class TableDataManager {
     constructor(table) {
@@ -47,8 +48,9 @@ export class TableDataManager {
         return validator.validate(rowData);
     }
 
-    addEmptyRow() {
+    async addEmptyRow() {
         const id = this._generateId();
+        const gs = GlobalStateManager.getInstance();
         const defaults = { ...(this.table.tableConfig?.defaultRowData || {}) };
         if (defaults.date === 'TODAY_PLACEHOLDER') {
             defaults.date = new Date().toISOString().split('T')[0];
@@ -56,10 +58,45 @@ export class TableDataManager {
 
         const data = {
             id,
-            createdBy: GlobalStateManager.getInstance().getCurrentUser(),
+            createdBy: gs.getCurrentUser(),
             createdAt: new Date().toISOString(),
             ...defaults
         };
+
+        // Requirement: Automatic Category Assignment (Spiele)
+        const resolved = this._resolveTable();
+        if (this.table.tableConfig?.supa_table === 'activities') {
+            if (resolved.category) {
+                data.category = resolved.category;
+            } else if (this.table.id === 'tbl_spiele') {
+                const options = gs.getEnumOptions('activity_category_enum') || [];
+                if (options.length > 0) {
+                    const selected = await Dialog.select({
+                        message: 'Bitte wählen Sie eine Kategorie für das neue Spiel:',
+                        options: options.map(o => ({ value: o, label: o }))
+                    });
+                    if (!selected) return; // User cancelled
+                    data.category = selected;
+                }
+            }
+        }
+
+        // Requirement: Automatic Sport Type Assignment (Sportarten)
+        if (this.table.tableConfig?.supa_table === 'sport_venues') {
+            if (resolved.category) {
+                data.sport_type = resolved.category;
+            } else if (this.table.id === 'tbl_sportarten') {
+                const options = gs.getEnumOptions('sport_type_enum') || [];
+                if (options.length > 0) {
+                    const selected = await Dialog.select({
+                        message: 'Bitte wählen Sie die Sportart für den neuen Eintrag:',
+                        options: options.map(o => ({ value: o, label: o }))
+                    });
+                    if (!selected) return; // User cancelled
+                    data.sport_type = selected;
+                }
+            }
+        }
 
         // Ensure critical fields for people table have at least empty strings or placeholders
         // to satisfy validators and ensure they appear in the correct groups.

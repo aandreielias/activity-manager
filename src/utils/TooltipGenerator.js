@@ -75,11 +75,11 @@ export class TooltipGenerator {
         const isFull = imgPath?.includes('://') || imgPath?.startsWith('data:');
         const imgUrl = imgPath ? (isFull ? imgPath : `${SUPABASE_CONFIG.URL}/storage/v1/object/public/${bucket}/${imgPath}`) : null;
 
-        const name = data.name || 'Unbekannt';
-        const category = data.kategorie || data.item_category || data.category || '-';
-        const quantity = data.quantity ?? '-';
-        const location = data.storage_location || data.lagerort || '-';
-        const condition = data.condition || data.zustand || '-';
+        const name = data.in_name || data.name || 'Unbekannt';
+        const category = data.in_kategorie || data.kategorie || data.item_category || data.category || '-';
+        const quantity = data.in_menge ?? data.quantity ?? '-';
+        const location = data.in_lagerort || data.storage_location || data.lagerort || '-';
+        const condition = data.in_zustand || data.condition || data.zustand || '-';
 
         return `
             <div style="width: 220px; display: flex; flex-direction: column; gap: 6px; color: var(--text-primary); font-family: inherit;">
@@ -149,13 +149,13 @@ export class TooltipGenerator {
     static generateLocationTooltip(data) {
         if (!data) return '';
 
-        const title = data.title || 'Unbekannter Ort';
-        const street = data.street || '';
-        const zip = data.zip_code || '';
-        const city = data.city || '';
-        const addressExtra = data.address_extra || '';
-        const notes = data.notes || data.notizen || '-';
-        const link = data.link || '-';
+        const title = data.st_titel || data.title || 'Unbekannter Ort';
+        const street = data.st_strasse || data.street || '';
+        const zip = data.st_plz || data.zip_code || '';
+        const city = data.st_stadt || data.city || '';
+        const addressExtra = data.st_adresszusatz || data.address_extra || '';
+        const notes = data.st_notizen || data.notes || data.notizen || '-';
+        const link = data.st_link || data.link || '-';
 
         const address = [street, addressExtra, `${zip} ${city}`.trim()].filter(x => x).join('<br>') || '-';
 

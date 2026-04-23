@@ -1,3 +1,5 @@
+import { ROLES, CATEGORIES, TABLE_NAMES, TABLE_PREFIXES } from './Constants.js';
+
 /**
  * PermissionHub - Centralized authority for checking user permissions.
  * Implements granular access control (Level 0, 1, 2).
@@ -13,23 +15,23 @@ export class PermissionHub {
      * Define default permissions for each role.
      */
     static ROLE_DEFAULTS = {
-        'SuperAdmin': { '*': 2 },
-        'Admin': {
+        [ROLES.SUPERADMIN]: { '*': 2 },
+        [ROLES.ADMIN]: {
             '*': 2,
-            'btn_audit_logs': 1,
-            'col_people.password': 0
+            [`${TABLE_PREFIXES.BUTTON}audit_logs`]: 1,
+            [`${TABLE_PREFIXES.COLUMN}${TABLE_NAMES.PEOPLE}.password`]: 0
         },
-        'Supervisor': {
-            'btn_calendar': 0,
-            'btn_stats': 0,
-            'btn_audit_logs': 0
+        [ROLES.SUPERVISOR]: {
+            [`${TABLE_PREFIXES.BUTTON}calendar`]: 0,
+            [`${TABLE_PREFIXES.BUTTON}stats`]: 0,
+            [`${TABLE_PREFIXES.BUTTON}audit_logs`]: 0
         },
-        'User': {
-            'btn_calendar': 0,
-            'btn_stats': 0,
-            'btn_audit_logs': 0
+        [ROLES.USER]: {
+            [`${TABLE_PREFIXES.BUTTON}calendar`]: 0,
+            [`${TABLE_PREFIXES.BUTTON}stats`]: 0,
+            [`${TABLE_PREFIXES.BUTTON}audit_logs`]: 0
         },
-        'Inaktiv': {
+        [ROLES.INAKTIV]: {
             '*': 0
         }
     };
@@ -42,13 +44,13 @@ export class PermissionHub {
      */
     static getEffectiveLevel(context, objectId, teamContext = null) {
         const { teams = [], perms } = context;
-        let role = context.role || 'User';
+        let role = context.role || ROLES.USER;
 
         // Normalize role casing to match ROLE_DEFAULTS keys
-        if (role.toLowerCase() === 'superadmin') role = 'SuperAdmin';
-        else if (role.toLowerCase() === 'admin') role = 'Admin';
-        else if (role.toLowerCase() === 'supervisor') role = 'Supervisor';
-        else if (role.toLowerCase() === 'user') role = 'User';
+        if (role.toLowerCase() === ROLES.SUPERADMIN.toLowerCase()) role = ROLES.SUPERADMIN;
+        else if (role.toLowerCase() === ROLES.ADMIN.toLowerCase()) role = ROLES.ADMIN;
+        else if (role.toLowerCase() === ROLES.SUPERVISOR.toLowerCase()) role = ROLES.SUPERVISOR;
+        else if (role.toLowerCase() === ROLES.USER.toLowerCase()) role = ROLES.USER;
 
         // --- STAGE 1: GLOBAL HARD-BLOCKS ---
         if ((objectId.includes('.role') || objectId.includes('.rolle')) && !this._isAdmin(role)) {
@@ -71,35 +73,38 @@ export class PermissionHub {
 
         // --- STAGE 3: ROLE-BASED CONTEXT (LEAST PRIVILEGE) ---
         // Block restricted admin tools for non-admins early
-        if (['btn_stats', 'btn_audit_logs'].includes(objectId)) return this.LEVELS.NONE;
+        if ([`${TABLE_PREFIXES.BUTTON}stats`, `${TABLE_PREFIXES.BUTTON}audit_logs`].includes(objectId)) return this.LEVELS.NONE;
 
         const isTeamScoped = this._isTeamScoped(objectId);
+        const isGlobalActivity = category === CATEGORIES.SPIELE || category === CATEGORIES.SPORTARTEN;
         
         // A) TEAM ISOLATION: If in a team, only that team's specific context is allowed
+        // BUT: Global activities are always allowed at least for reading
         if (teams.length > 0) {
             if (isTeamScoped) {
                 const targetTeam = teamContext || this._extractTeamFromId(objectId);
                 if (teams.includes(targetTeam)) {
-                    return role === 'Supervisor' ? this.LEVELS.WRITE : this.LEVELS.READ;
+                    return role === ROLES.SUPERVISOR ? this.LEVELS.WRITE : this.LEVELS.READ;
                 }
             }
+            if (isGlobalActivity) return this.LEVELS.READ;
             // All other tables/buttons (including Events) default to NONE unless in Role Defaults
         } 
         // B) UNASSIGNED FLEX: Only Activities are granted by default
-        else if (role === 'User' || role === 'Supervisor') {
-            const isActivity = category === 'spiele' || category === 'sportarten';
+        else if (role === ROLES.USER || role === ROLES.SUPERVISOR) {
+            const isActivity = category === CATEGORIES.SPIELE || category === CATEGORIES.SPORTARTEN;
             if (isActivity || isTeamScoped) return this.LEVELS.WRITE;
         }
 
         // --- STAGE 4: ROLE DEFAULTS (THE SAFETY NET) ---
-        const roleConfig = this.ROLE_DEFAULTS[role] || this.ROLE_DEFAULTS['User'];
+        const roleConfig = this.ROLE_DEFAULTS[role] || this.ROLE_DEFAULTS[ROLES.USER];
         return roleConfig[objectId] !== undefined ? roleConfig[objectId] : (roleConfig['*'] || this.LEVELS.NONE);
     }
 
     static _isAdmin(role) {
         if (!role) return false;
         const r = role.toLowerCase();
-        return r === 'superadmin' || r === 'admin';
+        return r === ROLES.SUPERADMIN.toLowerCase() || r === ROLES.ADMIN.toLowerCase();
     }
 
     static canRead(context, objectId, teamContext = null) {
@@ -112,18 +117,31 @@ export class PermissionHub {
 
     static _isTeamScoped(objectId) {
         if (!objectId) return false;
-        let id = objectId.startsWith('col_') ? objectId.replace('col_', '').split('.')[0] : objectId;
+        let id = objectId.startsWith(TABLE_PREFIXES.COLUMN) ? objectId.replace(TABLE_PREFIXES.COLUMN, '').split('.')[0] : objectId;
         
-        if (!id.startsWith('tbl_')) return false;
-        const parts = id.split('_');
-        return parts.length >= 3;
+        if (!id.startsWith(TABLE_PREFIXES.TABLE)) return false;
+        
+        // A team-scoped ID looks like: tbl_[supa_table]_[team]
+        // Example: tbl_ak_aktivitaeten_deko
+        for (const tableName of Object.values(TABLE_NAMES)) {
+            if (id.startsWith(`${TABLE_PREFIXES.TABLE}${tableName}_`)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static _extractTeamFromId(objectId) {
         if (!this._isTeamScoped(objectId)) return null;
-        let id = objectId.startsWith('col_') ? objectId.replace('col_', '').split('.')[0] : objectId;
-        const parts = id.split('_');
-        return parts.slice(2).join('_');
+        let id = objectId.startsWith(TABLE_PREFIXES.COLUMN) ? objectId.replace(TABLE_PREFIXES.COLUMN, '').split('.')[0] : objectId;
+        
+        for (const tableName of Object.values(TABLE_NAMES)) {
+            const prefix = `${TABLE_PREFIXES.TABLE}${tableName}_`;
+            if (id.startsWith(prefix)) {
+                return id.replace(prefix, '');
+            }
+        }
+        return null;
     }
 
     static _getCategoryForId(objectId) {
@@ -131,27 +149,28 @@ export class PermissionHub {
         let id = objectId.toLowerCase();
         
         // Handle column-to-table mapping
-        if (id.startsWith('col_')) {
-            id = id.replace('col_', '').split('.')[0];
+        if (id.startsWith(TABLE_PREFIXES.COLUMN)) {
+            id = id.replace(TABLE_PREFIXES.COLUMN, '').split('.')[0];
         }
 
-        if (!id.startsWith('tbl_')) {
-            if (id.startsWith('btn_')) return 'system';
+        if (!id.startsWith(TABLE_PREFIXES.TABLE)) {
+            if (id.startsWith(TABLE_PREFIXES.BUTTON)) return CATEGORIES.SYSTEM;
             return null;
         }
 
-        const parts = id.split('_');
-        if (parts.length < 2) return null;
-        
-        const type = parts[1];
-        
-        if (['activities', 'sport'].includes(type) || id.includes('activities_') || id.includes('sport_')) {
-            if (type === 'sport' || parts[2] === 'sport' || id.includes('_sport_')) return 'sportarten';
-            return 'spiele';
+        // Logical check: matches Supabase table name OR common logical name
+        const isActivity = id.includes(TABLE_NAMES.ACTIVITIES) || 
+                          id.includes(TABLE_NAMES.SPORT_VENUES) ||
+                          id.includes('spiele') || 
+                          id.includes('sport');
+
+        if (isActivity) {
+            if (id.includes(TABLE_NAMES.SPORT_VENUES) || id.includes('sportarten') || id.includes('sport')) return CATEGORIES.SPORTARTEN;
+            return CATEGORIES.SPIELE;
         }
 
-        if (['people', 'inventory', 'events', 'ort', 'calendar'].includes(type)) {
-            return 'organisation';
+        if (id.includes(TABLE_NAMES.PEOPLE) || id.includes(TABLE_NAMES.INVENTORY) || id.includes(TABLE_NAMES.EVENTS) || id.includes('calendar')) {
+            return CATEGORIES.ORGANISATION;
         }
 
         return null;

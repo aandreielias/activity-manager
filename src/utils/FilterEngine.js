@@ -183,6 +183,10 @@ export class FilterEngine {
                 groupName = rawValue.label || rawValue.title || rawValue.name || JSON.stringify(rawValue);
             } else {
                 groupName = String(rawValue);
+                // Standardize casing for better grouping of mixed data
+                if (groupName.length > 0) {
+                    groupName = groupName.charAt(0).toUpperCase() + groupName.slice(1);
+                }
             }
 
             if (!groups[groupName]) groups[groupName] = [];

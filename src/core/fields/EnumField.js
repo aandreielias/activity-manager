@@ -1,5 +1,6 @@
 import { Field } from './Field.js';
 import { GlobalStateManager } from '../GlobalStateManager.js';
+import { TABLE_NAMES } from '../Constants.js';
 
 export class EnumField extends Field {
     createEditor() {
@@ -32,25 +33,68 @@ export class EnumField extends Field {
         const globalState = GlobalStateManager.getInstance();
         const globalEnumName = this._getEnumNameForColumn(this.colDef.id);
         const globalOptions = globalEnumName ? globalState.getEnumOptions(globalEnumName) : null;
-        const optionsToUse = globalOptions || (this.colDef.options || []);
+        
+        // Use global options if found, otherwise fallback to column options
+        let optionsToUse = globalOptions || (this.colDef.options || []);
+        
+        // Ensure that if we specifically found a global enum name, we don't accidentally fallback
+        // to wrong hardcoded options if the global fetch returns null (though it shouldn't)
+        if (globalEnumName && (!globalOptions || globalOptions.length === 0)) {
+             // If we expect a global enum but don't have it yet, show a loading/fallback
+             if (globalEnumName === 'pe_status_typ') optionsToUse = ['Aktiv', 'Inaktiv'];
+        }
+
+        // Requirement: Team-based filtering for responsibility fields in people table
+        const isResponsibility = this.colDef.id.toLowerCase().includes('verantwortlich') || this.colDef.id.toLowerCase().includes('responsibility');
+        const isPeopleTable = this.tableId && (this.tableId.includes(TABLE_NAMES.PEOPLE) || this.tableId.includes('personen'));
+
+        if (isResponsibility && isPeopleTable && this.row && this.row.data.Team) {
+            const personTeams = String(this.row.data.Team).split(',').map(t => t.trim());
+            const filteredGroups = globalState.getOptionsForTeams(personTeams, 'category');
+
+            // If no teams matched, fallback to all options
+            if (filteredGroups.length > 0) {
+                // If 2 teams, use a two-column layout with a vertical line separator
+                if (filteredGroups.length === 2) {
+                    menu.style.flexDirection = 'row';
+                    menu.style.gap = '0';
+                    
+                    filteredGroups.forEach((group, gIndex) => {
+                        const col = document.createElement('div');
+                        col.style.display = 'flex';
+                        col.style.flexDirection = 'column';
+                        col.style.flex = '1';
+                        
+                        if (gIndex > 0) {
+                            col.style.borderLeft = '1px solid var(--border-color)';
+                        }
+                        
+                        group.options.forEach(option => {
+                            this._createOptionItem(option, originalValue, textSpan, col);
+                        });
+                        menu.appendChild(col);
+                    });
+                } else {
+                    filteredGroups.forEach((group, gIndex) => {
+                        if (gIndex > 0) {
+                            const sep = document.createElement('div');
+                            sep.className = 'enum-dropdown-separator';
+                            sep.style.height = '1px';
+                            sep.style.background = 'var(--border-color)';
+                            sep.style.margin = '4px 8px';
+                            menu.appendChild(sep);
+                        }
+                        group.options.forEach(option => {
+                            this._createOptionItem(option, originalValue, textSpan, menu);
+                        });
+                    });
+                }
+                optionsToUse = [];
+            }
+        }
 
         optionsToUse.forEach(option => {
-            const item = document.createElement('button');
-            item.className = 'enum-dropdown-item';
-            item.type = 'button';
-
-            const isObject = typeof option === 'object' && option !== null;
-            const value = isObject ? option.value : option;
-            const label = isObject ? option.label : option;
-
-            item.dataset.value = value;
-            item.textContent = label;
-            if (value === originalValue) {
-                item.style.color = 'var(--accent)';
-                item.style.fontWeight = '600';
-                textSpan.textContent = label;
-            }
-            menu.appendChild(item);
+            this._createOptionItem(option, originalValue, textSpan, menu);
         });
 
         // Add new option button removed (part of edit mode)
@@ -185,21 +229,53 @@ export class EnumField extends Field {
     _getEnumNameForColumn(colId) {
         const id = colId.toLowerCase();
         if (id === 'status' || id === 'Status') {
-            if (this.tableId === 'tbl_people') return 'status_enum';
-            return 'task_status_enum';
+            const isPeople = this.tableId && (
+                this.tableId.includes(TABLE_NAMES.PEOPLE) || 
+                this.tableId.includes('personen') || 
+                this.tableId.includes('people') ||
+                this.tableId.includes('pe_')
+            );
+            if (isPeople) return 'pe_status_typ';
+            return 'ev_status_enum';
         }
-        if (id === 'role' || id === 'rolle') return 'rolle_enum';
-        if (id === 'location' || id === 'ort') return 'location_enum';
-        if (id === 'category' || id === 'kategorie') return 'activity_category_enum';
-        if (id === 'condition' || id === 'zustand') return 'condition_enum';
+        if (id === 'role' || id === 'rolle') return 'pe_rolle_typ';
+        if (id === 'location' || id === 'ort') return 'st_ort_typ';
+        if (id === 'category' || id === 'kategorie') {
+            if (this.tableId && this.tableId.includes(TABLE_NAMES.INVENTORY)) return 'in_kategorie_typ';
+            return 'ak_kategorie_typ';
+        }
+        if (id === 'condition' || id === 'zustand') return 'in_zustand_typ';
+        if (id.includes('responsibility') || id.includes('verantwortlich') || id.includes('zuständig')) {
+            return 'ak_kategorie_typ';
+        }
         if (id === 'type' || id === 'typ') {
-            // Need table context here or common guess
-            if (this.tableId === 'tbl_inventory') return 'condition_enum';
-            if (this.tableId === 'tbl_people') return 'rolle_enum';
-            if (this.tableId === 'tbl_users' || this.tableId === 'users') return 'rolle_enum';
-            if (this.tableId.includes('sport')) return 'venue_type_enum';
+            if (this.tableId && this.tableId.includes(TABLE_NAMES.INVENTORY)) return 'in_zustand_typ';
+            if (this.tableId && this.tableId.includes(TABLE_NAMES.PEOPLE)) return 'pe_rolle_typ';
+            if (this.tableId && (this.tableId === `tbl_${TABLE_NAMES.USERS}` || this.tableId === TABLE_NAMES.USERS)) return 'pe_rolle_typ';
+            if (this.tableId && (this.tableId.includes('sport') || this.tableId.includes(TABLE_NAMES.SPORT_VENUES))) return 'sp_typ_enum';
         }
-        if (id === 'indoor_outdoor') return 'indoor_outdoor_enum';
+        if (id === 'indoor_outdoor' || id === 'umgebung') return 'st_umgebung_typ';
         return null;
+    }
+
+    _createOptionItem(option, originalValue, textSpan, menu) {
+        const item = document.createElement('button');
+        item.className = 'enum-dropdown-item';
+        item.type = 'button';
+
+        const isObject = typeof option === 'object' && option !== null;
+        const value = isObject ? option.value : option;
+        const label = isObject ? option.label : option;
+
+        item.dataset.value = value;
+        item.textContent = label;
+        const isMatch = String(value).toLowerCase().trim() === String(originalValue).toLowerCase().trim();
+        if (isMatch) {
+            item.style.color = 'var(--accent)';
+            item.style.fontWeight = '600';
+            textSpan.textContent = label;
+        }
+        menu.appendChild(item);
+        return item;
     }
 }

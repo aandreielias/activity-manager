@@ -40,14 +40,22 @@ export class InventoryService {
      * @returns {Object} { status: 'available'|'warning'|'unavailable', message: string }
      */
     static validateAvailability(requestedName, requestedQuantity) {
+        if (!requestedName) return { status: 'available', message: '' };
+        
+        const nameQuery = requestedName.trim().toLowerCase();
         const inventory = GlobalStateManager.getInstance().getInventory();
-        const invRow = inventory.find(r => (r.data?.name || '').toLowerCase() === requestedName.toLowerCase());
+        
+        // Find matching row using either legacy 'name' or 4NF 'in_name'
+        const invRow = inventory.find(r => {
+            const rowName = (r.data?.in_name || r.data?.name || '').trim().toLowerCase();
+            return rowName === nameQuery;
+        });
 
         if (!invRow) {
             return { status: 'unavailable', message: '! Nicht im Inventar' };
         }
 
-        const invQuantity = parseInt(invRow.data?.quantity || 0, 10);
+        const invQuantity = parseInt(invRow.data?.in_menge || invRow.data?.quantity || 0, 10);
         const requestedNum = parseInt(requestedQuantity || 0, 10);
 
         if (!isNaN(requestedNum) && requestedNum > invQuantity) {

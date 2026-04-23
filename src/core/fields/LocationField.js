@@ -5,6 +5,7 @@ import { Dialog } from '../../ui/Dialog.js';
 import { BaseDialog } from '../../ui/BaseDialog.js';
 import { Tooltip } from '../../ui/Tooltip.js';
 import { TooltipGenerator } from '../../utils/TooltipGenerator.js';
+import { TABLE_NAMES } from '../Constants.js';
 
 export class LocationField extends Field {
     constructor(params) {
@@ -14,17 +15,23 @@ export class LocationField extends Field {
 
     updateDisplay() {
         if (!this.contentWrap) return;
-        this.contentWrap.innerHTML = '';
 
         const val = this.value; // Expecting an object { id, title, link, ... } or null
 
-        if (!val || (!val.title && typeof val !== 'string')) {
+        if (!val || (!val.st_titel && !val.title && typeof val !== 'string')) {
             this.contentWrap.textContent = '—';
             return;
         }
 
-        const title = val.title || (typeof val === 'string' ? val : 'Unbenannt');
-        const link = val.link || null;
+        // Handle UUID string (fetch title asynchronously)
+        if (typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
+            this._fetchAndDisplayTitle(val);
+            return;
+        }
+
+        this.contentWrap.innerHTML = '';
+        const title = val.st_titel || val.title || (typeof val === 'string' ? val : 'Unbenannt');
+        const link = val.st_link || val.link || null;
 
         if (link && this._isLink(link)) {
             const trimmed = link.trim();
@@ -41,11 +48,36 @@ export class LocationField extends Field {
         }
 
         // Attach tooltip if we have detailed data (object format) and are not in the master location table
-        if (val && typeof val === 'object' && val.title && this.tableId !== 'tbl_ort' && this.tableId !== 'ort') {
+        const hasTitle = val && typeof val === 'object' && (val.st_titel || val.title);
+        if (hasTitle && this.tableId !== 'tbl_ort' && this.tableId !== 'ort' && this.tableId !== TABLE_NAMES.STANDORTE) {
             const html = TooltipGenerator.generateLocationTooltip(val);
             const condition = () => !this.td?.classList.contains('editing');
             Tooltip.attach(this.contentWrap, html, 400, condition);
             this.contentWrap.style.cursor = 'pointer';
+        }
+    }
+
+    async _fetchAndDisplayTitle(uuid) {
+        if (!this.contentWrap) return;
+        this.contentWrap.textContent = 'Lädt...';
+        
+        try {
+            const res = await SupabaseClient.get(TABLE_NAMES.STANDORTE, `?st_id=eq.${uuid}`);
+            if (res.ok) {
+                const data = await res.json();
+                const ort = data[0];
+                if (ort) {
+                    // Cache the object so subsequent renders don't refetch
+                    this.value = ort;
+                    this.updateDisplay();
+                } else {
+                    this.contentWrap.textContent = uuid; // Fallback
+                }
+            } else {
+                this.contentWrap.textContent = uuid;
+            }
+        } catch (e) {
+            this.contentWrap.textContent = uuid;
         }
     }
 
@@ -55,12 +87,12 @@ export class LocationField extends Field {
 
     async _showLocationDialog() {
         // Fetch all locations for the selector
-        const res = await SupabaseClient.get('ort', '?select=*&order=title.asc');
+        const res = await SupabaseClient.get(TABLE_NAMES.STANDORTE, '?select=*&order=st_titel.asc');
         let orte = [];
         if (res.ok) orte = await res.json();
 
         const inputsMap = {};
-        this.selectedId = this.value?.id || null;
+        this.selectedId = this.value?.st_id || this.value?.id || null;
 
         return BaseDialog.show({
             overlayClassName: 'custom-dialog-overlay',
@@ -155,9 +187,9 @@ export class LocationField extends Field {
                 const renderResults = (query = '') => {
                     resultsList.innerHTML = '';
                     const filtered = orte.filter(o =>
-                        (o.title || '').toLowerCase().includes(query.toLowerCase()) ||
-                        (o.city || '').toLowerCase().includes(query.toLowerCase()) ||
-                        (o.street || '').toLowerCase().includes(query.toLowerCase())
+                        (o.st_titel || o.title || '').toLowerCase().includes(query.toLowerCase()) ||
+                        (o.st_stadt || o.city || '').toLowerCase().includes(query.toLowerCase()) ||
+                        (o.st_strasse || o.street || '').toLowerCase().includes(query.toLowerCase())
                     );
 
                     if (filtered.length === 0 && query) {
@@ -184,18 +216,31 @@ export class LocationField extends Field {
                         btn.style.cursor = 'pointer';
                         btn.style.transition = 'all 0.1s';
 
-                        const addr = [o.street, o.zip_code, o.city].filter(x => x).join(', ');
+                        const addr = [o.st_strasse || o.street, o.st_plz || o.zip_code, o.st_stadt || o.city].filter(x => x).join(', ');
                         btn.innerHTML = `
-                            <span style="font-weight: 500;">${o.title}</span>
+                            <span style="font-weight: 500;">${o.st_titel || o.title}</span>
                             <span style="float: right; color: var(--text-muted); font-size: 11px; margin-left: 12px;">${addr}</span>
                         `;
 
                         btn.onclick = () => {
+                            const mapping = {
+                                title: 'st_titel',
+                                street: 'st_strasse',
+                                zip_code: 'st_plz',
+                                city: 'st_stadt',
+                                notes: 'st_notizen',
+                                address_extra: 'st_adresszusatz',
+                                link: 'st_link'
+                            };
+
                             Object.entries(inputsMap).forEach(([id, input]) => {
-                                input.value = o[id] || '';
+                                // Map schema IDs to DB column names
+                                const dbKey = mapping[id] || (id.startsWith('st_') ? id : `st_${id}`);
+                                const legacyKey = id.replace('st_', '');
+                                input.value = o[dbKey] || o[id] || o[legacyKey] || '';
                             });
-                            this.selectedId = o.id; // Track selected ID
-                            searchInput.value = o.title;
+                            this.selectedId = o.st_id || o.id; // Track selected ID
+                            searchInput.value = o.st_titel || o.title || '';
                             renderResults(); // Clear results list after selection
                         };
                         resultsList.appendChild(btn);
@@ -219,13 +264,13 @@ export class LocationField extends Field {
                 // Find ORT schema
                 const ortConfig = GlobalStateManager.getInstance().getTableConfig('tbl_ort');
                 const schema = ortConfig?.schema || [
-                    { id: 'title', label: 'Titel', type: 'text' },
-                    { id: 'street', label: 'Straße', type: 'text' },
-                    { id: 'address_extra', label: 'Adresszusatz', type: 'text' },
-                    { id: 'zip_code', label: 'PLZ', type: 'text' },
-                    { id: 'city', label: 'Ortschaft', type: 'text' },
-                    { id: 'link', label: 'Link', type: 'text' },
-                    { id: 'notes', label: 'Notiz', type: 'text' }
+                    { id: 'st_titel', label: 'Titel', type: 'text' },
+                    { id: 'st_strasse', label: 'Straße', type: 'text' },
+                    { id: 'st_adresszusatz', label: 'Adresszusatz', type: 'text' },
+                    { id: 'st_plz', label: 'PLZ', type: 'text' },
+                    { id: 'st_stadt', label: 'Ortschaft', type: 'text' },
+                    { id: 'st_link', label: 'Link', type: 'text' },
+                    { id: 'st_notizen', label: 'Notiz', type: 'text' }
                 ];
 
                 const renderFields = () => {
@@ -297,12 +342,23 @@ export class LocationField extends Field {
                 cancelBtn.onclick = cleanup;
 
                 saveBtn.onclick = async () => {
+                    const mapping = {
+                        title: 'st_titel',
+                        street: 'st_strasse',
+                        zip_code: 'st_plz',
+                        city: 'st_stadt',
+                        notes: 'st_notizen',
+                        address_extra: 'st_adresszusatz',
+                        link: 'st_link'
+                    };
+
                     const data = {};
                     Object.entries(inputsMap).forEach(([id, input]) => {
-                        data[id] = input.value.trim();
+                        const dbKey = mapping[id] || (id.startsWith('st_') ? id : `st_${id}`);
+                        data[dbKey] = input.value.trim();
                     });
 
-                    if (!data.title) {
+                    if (!data.st_titel && !data.title) {
                         alert('Der Titel ist erforderlich.');
                         return;
                     }
@@ -317,12 +373,12 @@ export class LocationField extends Field {
 
                         if (this.selectedId) {
                             // Update existing
-                            const res = await SupabaseClient.patch('ort', `?id=eq.${this.selectedId}`, payload);
+                            const res = await SupabaseClient.patch(TABLE_NAMES.STANDORTE, `?st_id=eq.${this.selectedId}`, payload);
                             if (!res.ok) throw new Error('Update failed');
-                            ortResult = { ...payload, id: this.selectedId };
+                            ortResult = { ...payload, st_id: this.selectedId };
                         } else {
                             // Create new
-                            const res = await SupabaseClient.post('ort', payload, { 'Prefer': 'return=representation' });
+                            const res = await SupabaseClient.post(TABLE_NAMES.STANDORTE, payload, { 'Prefer': 'return=representation' });
                             if (!res.ok) throw new Error('Insert failed');
                             const inserted = await res.json();
                             ortResult = inserted[0];

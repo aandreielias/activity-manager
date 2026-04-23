@@ -206,6 +206,7 @@ export class BaseFilterBar {
                     if (['available', 'verfügbar', 'done', 'aktiv'].includes(id)) item.classList.add('status-done', 'styled-status-item');
                     else if (['partial', 'teilweise', 'inprogress', 'in-progress'].includes(id)) item.classList.add('status-in-progress', 'styled-status-item');
                     else if (['none', 'nichtverfügbar', 'todo', 'todo', 'inaktiv'].includes(id)) item.classList.add('status-todo', 'styled-status-item');
+                    else if (['cancelled', 'abgebrochen', 'abgesagt'].includes(id)) item.classList.add('status-cancelled', 'styled-status-item');
                 }
                 if (multiSelect && values.includes(o.id)) item.classList.add('selected');
                 item.onclick = (ev) => {

@@ -5,9 +5,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/rls_implementation.sql" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test_rls.sql" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/validate_rls_readiness.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rls_implementation.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/GlobalStateManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/GlobalStateManager.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Table.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Table.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/TableDataManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableDataManager.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/TableRenderer.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableRenderer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/fields/EnumField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/EnumField.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/DataService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/DataService.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/repositories/BaseRepository.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/repositories/BaseRepository.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/Header.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Header.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/FilterEngine.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/FilterEngine.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_rls.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/validate_rls_readiness.sql" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -131,6 +140,7 @@
       <workItem from="1776084419352" duration="690000" />
       <workItem from="1776755866230" duration="1001000" />
       <workItem from="1776798769036" duration="633000" />
+      <workItem from="1776936386455" duration="617000" />
     </task>
     <servers />
   </component>

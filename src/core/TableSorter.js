@@ -45,6 +45,6 @@ export class TableSorter {
         }
 
         // re-render tbody
-        this.table.renderer.reRenderBody();
+        this.table.renderer.update();
     }
 }

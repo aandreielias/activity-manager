@@ -2,6 +2,7 @@ import { AGame } from './AGame.js';
 import { StandardDeckFactory } from '../cards/StandardDeckFactory.js';
 import { Deck } from '../cards/Deck.js';
 import { Rank } from '../cards/Rank.js';
+import { OUTCOMES } from '../../../core/Constants.js';
 
 /**
  * Blackjack game logic implementation.
@@ -301,34 +302,34 @@ export class Blackjack extends AGame {
             let res = '';
 
             if (pScore > 21) {
-                res = 'BUST';
+                res = OUTCOMES.BUST;
                 this.#stats.losses++;
                 netChips -= this.#bets[idx];
             } else if (pBJ && dBJ) {
-                res = 'PUSH';
+                res = OUTCOMES.PUSH;
                 this.#stats.pushes++;
             } else if (pBJ) {
-                res = 'BLACKJACK';
+                res = OUTCOMES.BLACKJACK;
                 this.#stats.wins++;
                 netChips += this.#bets[idx] * 1.5;
             } else if (dBJ) {
-                res = 'LOSS';
+                res = OUTCOMES.LOSS;
                 this.#stats.losses++;
                 netChips -= this.#bets[idx];
             } else if (dScore > 21) {
-                res = 'WIN';
+                res = OUTCOMES.WIN;
                 this.#stats.wins++;
                 netChips += this.#bets[idx];
             } else if (pScore > dScore) {
-                res = 'WIN';
+                res = OUTCOMES.WIN;
                 this.#stats.wins++;
                 netChips += this.#bets[idx];
             } else if (dScore > pScore) {
-                res = 'LOSS';
+                res = OUTCOMES.LOSS;
                 this.#stats.losses++;
                 netChips -= this.#bets[idx];
             } else {
-                res = 'PUSH';
+                res = OUTCOMES.PUSH;
                 this.#stats.pushes++;
             }
 
@@ -355,7 +356,7 @@ export class Blackjack extends AGame {
 
         // Notify
         if (this.onRoundUpdate) {
-            this.onRoundUpdate(this.#lastResults[0] || 'RESULT', { ...this.#stats, netChips });
+            this.onRoundUpdate(this.#lastResults[0] || OUTCOMES.RESULT, { ...this.#stats, netChips });
         }
     }
 }

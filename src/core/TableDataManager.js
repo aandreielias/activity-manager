@@ -2,6 +2,7 @@ import { Row } from './Row.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
 import { RepositoryFactory } from '../services/repositories/RepositoryFactory.js';
 import { Dialog } from '../ui/Dialog.js';
+import { TABLE_NAMES } from './Constants.js';
 
 export class TableDataManager {
     constructor(table) {
@@ -65,11 +66,11 @@ export class TableDataManager {
 
         // Requirement: Automatic Category Assignment (Spiele)
         const resolved = this._resolveTable();
-        if (this.table.tableConfig?.supa_table === 'activities') {
+        if (this.table.tableConfig?.supa_table === TABLE_NAMES.ACTIVITIES) {
             if (resolved.category) {
                 data.category = resolved.category;
             } else if (this.table.id === 'tbl_spiele') {
-                const options = gs.getEnumOptions('activity_category_enum') || [];
+                const options = gs.getEnumOptions('activity_type_enum') || [];
                 if (options.length > 0) {
                     const selected = await Dialog.select({
                         message: 'Bitte wählen Sie eine Kategorie für das neue Spiel:',
@@ -82,7 +83,7 @@ export class TableDataManager {
         }
 
         // Requirement: Automatic Sport Type Assignment (Sportarten)
-        if (this.table.tableConfig?.supa_table === 'sport_venues') {
+        if (this.table.tableConfig?.supa_table === TABLE_NAMES.SPORT_VENUES) {
             if (resolved.category) {
                 data.sport_type = resolved.category;
             } else if (this.table.id === 'tbl_sportarten') {
@@ -113,7 +114,7 @@ export class TableDataManager {
         });
 
         // Special handling for people table to prevent "Required" warnings immediately
-        if (this.table.id === 'tbl_people' || this.table.tableConfig?.supa_table === 'people') {
+        if (this.table.id === 'tbl_people' || this.table.tableConfig?.supa_table === TABLE_NAMES.PEOPLE) {
             if (!data.vorname) data.vorname = 'Neuer';
             if (!data.nachname) data.nachname = 'Eintrag';
             if (!data.Status) data.Status = 'Aktiv';

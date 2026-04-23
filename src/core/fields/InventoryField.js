@@ -27,7 +27,7 @@ export class InventoryField extends Field {
             tag.style.cursor = 'pointer';
             
             // Attach tooltip for this specific item
-            const invItem = inventory.find(r => (r.data?.name || '').toLowerCase() === item.name.toLowerCase());
+            const invItem = inventory.find(r => (r.data?.in_name || r.data?.name || '').toLowerCase() === item.name.toLowerCase());
             if (invItem) {
                 const html = TooltipGenerator.generateInventoryTooltip(invItem.data);
                 const condition = () => !this.td?.classList.contains('editing');
@@ -89,8 +89,8 @@ export class InventoryField extends Field {
                     row.className = 'picker-row';
                     row.style.gridTemplateColumns = '1fr 100px auto';
 
-                    const invItem = inventory.find(r => (r.data?.name || '').toLowerCase() === item.name.toLowerCase());
-                    const invQuantityAvailable = invItem ? parseInt(invItem.data?.quantity || 0, 10) : 0;
+                    const invItem = inventory.find(r => (r.data?.in_name || r.data?.name || '').toLowerCase() === item.name.toLowerCase());
+                    const invQuantityAvailable = invItem ? parseInt(invItem.data?.in_menge || invItem.data?.quantity || 0, 10) : 0;
                     const isAvailable = !!invItem;
 
                     const nameCol = document.createElement('div');
@@ -198,7 +198,7 @@ export class InventoryField extends Field {
             const refreshSuggestions = (query = '') => {
                 invList.innerHTML = '';
                 const filtered = inventory.filter(row => {
-                    const name = (row.data?.name || '').toLowerCase();
+                    const name = (row.data?.in_name || row.data?.name || '').toLowerCase();
                     return name.includes(query.toLowerCase());
                 });
 
@@ -213,7 +213,7 @@ export class InventoryField extends Field {
                 }
 
                 filtered.forEach(row => {
-                    const name = row.data?.name || 'Unbekannt';
+                    const name = row.data?.in_name || row.data?.name || 'Unbekannt';
                     const btn = document.createElement('button');
                     btn.className = 'suggestion-item';
                     btn.style.textAlign = 'left';
@@ -223,7 +223,7 @@ export class InventoryField extends Field {
                     btn.style.borderRadius = 'var(--radius-sm)';
                     btn.style.background = 'var(--bg)';
                     btn.style.cursor = 'pointer';
-                    btn.innerHTML = `${name} <span style="float:right; color:var(--text-muted); font-size:11px;">(${row.data?.quantity || 0})</span>`;
+                    btn.innerHTML = `${name} <span style="float:right; color:var(--text-muted); font-size:11px;">(${row.data?.in_menge || row.data?.quantity || 0})</span>`;
 
                     btn.onclick = () => {
                         if (!internalSelected.find(i => i.name === name)) {

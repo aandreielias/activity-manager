@@ -1,5 +1,6 @@
 import { Table } from './Table.js';
 import { DataService } from '../services/DataService.js';
+import { TABLE_NAMES, CATEGORIES } from './Constants.js';
 
 /**
  * TableLoader — Loads table configurations and row data from
@@ -23,7 +24,7 @@ export class TableLoader {
 
                 const table = this._createTableInstance(config, data, peopleData);
 
-                if (config.category === 'spiele') {
+                if (config.category === CATEGORIES.SPIELE) {
                     allGames.push(...data);
                 }
 
@@ -60,8 +61,8 @@ export class TableLoader {
         }
 
         // Post-processing to link games to events
-        if (tables['tbl_events'] && tables['tbl_events'].instance) {
-            const gamesCol = tables['tbl_events'].instance.schema.find(c => ['reihenfolge', 'games', 'spiele'].includes(c.id) || c.header === 'Spiele');
+        if (tables[`tbl_${TABLE_NAMES.EVENTS}`] && tables[`tbl_${TABLE_NAMES.EVENTS}`].instance) {
+            const gamesCol = tables[`tbl_${TABLE_NAMES.EVENTS}`].instance.schema.find(c => ['reihenfolge', 'games', 'spiele'].includes(c.id) || c.header === 'Spiele');
             if (gamesCol) {
                 gamesCol.header = 'Reihenfolge';
                 gamesCol.label = 'Reihenfolge';
@@ -83,7 +84,7 @@ export class TableLoader {
             options: col.options || [],
         }));
 
-        if (config.id === 'tbl_inventory' || config.id === 'tbl_people') {
+        if (config.id === `tbl_${TABLE_NAMES.INVENTORY}` || config.id === `tbl_${TABLE_NAMES.PEOPLE}`) {
             schema.forEach(col => {
                 if (col.id === 'photo' || col.id === 'image_url') {
                     col.hidden = true;
@@ -107,7 +108,7 @@ export class TableLoader {
             }
         }
 
-        if ((config.category === 'spiele' || config.id === 'tbl_events') && peopleData?.length > 0) {
+        if ((config.category === CATEGORIES.SPIELE || config.id === `tbl_${TABLE_NAMES.EVENTS}`) && peopleData?.length > 0) {
             const respCol = schema.find(c => c.id === 'responsible');
             if (respCol) {
                 // Filter for available responsible people

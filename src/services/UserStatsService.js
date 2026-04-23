@@ -1,4 +1,5 @@
 import { SupabaseClient } from './SupabaseClient.js';
+import { TABLE_NAMES } from '../core/Constants.js';
 
 /**
  * UserStatsService — CRUD against the relational `user_stats` and `user_category_hits` tables.
@@ -12,13 +13,13 @@ export class UserStatsService {
         if (!userId) return null;
         try {
             // Fetch core stats first
-            const res = await SupabaseClient.get('user_stats', `?user_id=eq.${userId}&select=*`);
+            const res = await SupabaseClient.get(TABLE_NAMES.USER_STATS, `?ns_nu_id=eq.${userId}&select=*`);
             if (!res.ok) return null;
             const stats = (await res.json())[0];
             if (!stats) return null;
 
             // Fetch inventory items separately to avoid join errors (400)
-            const invRes = await SupabaseClient.get('user_inventory_items', `?user_id=eq.${userId}&select=*`);
+            const invRes = await SupabaseClient.get(TABLE_NAMES.USER_INVENTORY_ITEMS, `?ni_nu_id=eq.${userId}&select=*`);
             stats.user_inventory_items = invRes.ok ? await invRes.json() : [];
 
             return stats;
@@ -33,30 +34,28 @@ export class UserStatsService {
      */
     static async getStats() {
         try {
-            const res = await SupabaseClient.get('user_stats', '?select=*,users(username)');
+            const res = await SupabaseClient.get(TABLE_NAMES.USER_STATS, `?select=*,${TABLE_NAMES.USERS}(nu_nutzername)`);
             if (!res.ok) return {};
             const rows = await res.json();
 
-            // Fetch all inventory items in bulk or per user
-            // For now, per user is safer for smaller datasets
             for (const row of rows) {
-                const invRes = await SupabaseClient.get('user_inventory_items', `?user_id=eq.${row.user_id}&select=*`);
+                const invRes = await SupabaseClient.get(TABLE_NAMES.USER_INVENTORY_ITEMS, `?ni_nu_id=eq.${row.ns_nu_id}&select=*`);
                 row.user_inventory_items = invRes.ok ? await invRes.json() : [];
             }
 
             const map = {};
             for (const row of rows) {
-                const username = row.users?.username || 'unknown';
+                const username = row[TABLE_NAMES.USERS]?.nu_nutzername || 'unknown';
 
                 let categoryHits = {};
                 try {
                     const chRes = await SupabaseClient.get(
-                        'user_category_hits',
-                        `?user_id=eq.${row.user_id}&select=*`
+                        TABLE_NAMES.USER_CATEGORY_HITS,
+                        `?nk_nu_id=eq.${row.ns_nu_id}&select=*`
                     );
                     if (chRes.ok) {
                         const chRows = await chRes.json();
-                        chRows.forEach(ch => { categoryHits[ch.category] = ch.hit_count; });
+                        chRows.forEach(ch => { categoryHits[ch.nk_kategorie] = ch.nk_hit_anzahl; });
                     }
                 } catch (_) { /* best effort */ }
 
@@ -78,20 +77,20 @@ export class UserStatsService {
         const chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 0, 500: 0, 1000: 0 };
         
         inventoryItems.forEach(item => {
-            if (item.item_type && item.item_type.startsWith('chip_')) {
-                const val = item.item_type.split('_').pop();
+            if (item.ni_gegenstand_typ && item.ni_gegenstand_typ.startsWith('chip_')) {
+                const val = item.ni_gegenstand_typ.split('_').pop();
                 if (chips[val] !== undefined) {
-                    chips[val] = item.quantity;
+                    chips[val] = item.ni_menge;
                 }
             }
         });
 
         const stats = {
-            userId: row.user_id,
-            lastLogin: row.last_login,
-            entryCount: row.entry_count || 0,
-            lastEntryDate: row.last_entry_date,
-            favoritesCount: row.favorites_count || 0,
+            userId: row.ns_nu_id,
+            lastLogin: row.ns_letzter_login,
+            entryCount: row.ns_eintraege_anzahl || 0,
+            lastEntryDate: row.ns_letzter_eintrag_am,
+            favoritesCount: row.ns_favoriten_anzahl || 0,
             chips: chips,
             categoryHits
         };
@@ -129,21 +128,18 @@ export class UserStatsService {
     static async _ensureStats(userId) {
         if (!userId) return null;
         
-        // 1. Check if it exists (using a simple select without joins)
-        const checkRes = await SupabaseClient.get('user_stats', `?user_id=eq.${userId}&select=user_id`);
+        const checkRes = await SupabaseClient.get(TABLE_NAMES.USER_STATS, `?ns_nu_id=eq.${userId}&select=ns_nu_id`);
         const existing = checkRes.ok ? await checkRes.json() : [];
         
         if (existing.length > 0) {
             return this.getStatsByUserId(userId);
         }
 
-        // 2. Try to create it
-        const res = await SupabaseClient.post('user_stats', { user_id: userId }, { 'Prefer': 'return=representation' });
+        const res = await SupabaseClient.post(TABLE_NAMES.USER_STATS, { ns_nu_id: userId }, { 'Prefer': 'return=representation' });
         if (res.ok) {
             const rows = await res.json();
             return rows[0];
         } else if (res.status === 409) {
-            // Race condition: someone created it between check and post
             return this.getStatsByUserId(userId);
         }
         
@@ -156,38 +152,38 @@ export class UserStatsService {
     static async _updateStats(userId, updates) {
         if (!userId) return;
         await this._ensureStats(userId);
-        return SupabaseClient.patch('user_stats', `?user_id=eq.${userId}`, updates);
+        return SupabaseClient.patch(TABLE_NAMES.USER_STATS, `?ns_nu_id=eq.${userId}`, updates);
     }
 
     // ── Records ───────────────────────────────────────────────
 
     static async recordLogin(userId) {
-        await this._updateStats(userId, { last_login: new Date().toISOString() });
+        await this._updateStats(userId, { ns_letzter_login: new Date().toISOString() });
     }
 
     static async recordEntry(userId, category) {
         const stats = await this._ensureStats(userId);
-        const newCount = (stats?.entry_count || 0) + 1;
+        const newCount = (stats?.ns_eintraege_anzahl || 0) + 1;
 
         await this._updateStats(userId, {
-            entry_count: newCount,
-            last_entry_date: new Date().toISOString(),
+            ns_eintraege_anzahl: newCount,
+            ns_letzter_eintrag_am: new Date().toISOString(),
         });
 
         if (category) {
-            const chRes = await SupabaseClient.get('user_category_hits', `?user_id=eq.${userId}&category=eq.${encodeURIComponent(category)}&select=*`);
+            const chRes = await SupabaseClient.get(TABLE_NAMES.USER_CATEGORY_HITS, `?nk_nu_id=eq.${userId}&nk_kategorie=eq.${encodeURIComponent(category)}&select=*`);
             const existing = chRes.ok ? await chRes.json() : [];
 
             if (existing.length > 0) {
-                await SupabaseClient.patch('user_category_hits', `?user_id=eq.${userId}&category=eq.${encodeURIComponent(category)}`, { hit_count: (existing[0].hit_count || 0) + 1 });
+                await SupabaseClient.patch(TABLE_NAMES.USER_CATEGORY_HITS, `?nk_nu_id=eq.${userId}&nk_kategorie=eq.${encodeURIComponent(category)}`, { nk_hit_anzahl: (existing[0].nk_hit_anzahl || 0) + 1 });
             } else {
-                await SupabaseClient.post('user_category_hits', { user_id: userId, category, hit_count: 1 });
+                await SupabaseClient.post(TABLE_NAMES.USER_CATEGORY_HITS, { nk_nu_id: userId, nk_kategorie: category, nk_hit_anzahl: 1 });
             }
         }
     }
 
     static async recordFavoriteChange(userId, count) {
-        await this._updateStats(userId, { favorites_count: count });
+        await this._updateStats(userId, { ns_favoriten_anzahl: count });
     }
 
     static CHIP_VALUES = [1000, 500, 100, 25, 20, 10, 5, 1];
@@ -223,13 +219,13 @@ export class UserStatsService {
         
         for (const [val, diff] of Object.entries(chipsDiff)) {
             const type = `chip_${val}`;
-            const existing = currentItems.find(i => i.item_type === type);
-            const newQty = Math.max(0, (existing?.quantity || 0) + diff);
+            const existing = currentItems.find(i => i.ni_gegenstand_typ === type);
+            const newQty = Math.max(0, (existing?.ni_menge || 0) + diff);
             
             if (existing) {
-                await SupabaseClient.patch('user_inventory_items', `?id=eq.${existing.id}`, { quantity: newQty });
+                await SupabaseClient.patch(TABLE_NAMES.USER_INVENTORY_ITEMS, `?ni_id=eq.${existing.ni_id}`, { ni_menge: newQty });
             } else {
-                await SupabaseClient.post('user_inventory_items', { user_id: userId, item_type: type, quantity: newQty });
+                await SupabaseClient.post(TABLE_NAMES.USER_INVENTORY_ITEMS, { ni_nu_id: userId, ni_gegenstand_typ: type, ni_menge: newQty });
             }
         }
     }
@@ -242,15 +238,13 @@ export class UserStatsService {
         
         for (const [val, qty] of Object.entries(chipsMap)) {
             const type = `chip_${val}`;
-            // Use UPSERT logic with ON CONFLICT (handled by Supabase 'resolution=merge-duplicates' or just individual checks)
-            // For simplicity and to reuse our pattern:
-            const res = await SupabaseClient.get('user_inventory_items', `?user_id=eq.${userId}&item_type=eq.${type}`);
+            const res = await SupabaseClient.get(TABLE_NAMES.USER_INVENTORY_ITEMS, `?ni_nu_id=eq.${userId}&ni_gegenstand_typ=eq.${type}`);
             const existing = res.ok ? (await res.json())[0] : null;
             
             if (existing) {
-                await SupabaseClient.patch('user_inventory_items', `?id=eq.${existing.id}`, { quantity: qty });
+                await SupabaseClient.patch(TABLE_NAMES.USER_INVENTORY_ITEMS, `?ni_id=eq.${existing.ni_id}`, { ni_menge: qty });
             } else {
-                await SupabaseClient.post('user_inventory_items', { user_id: userId, item_type: type, quantity: qty });
+                await SupabaseClient.post(TABLE_NAMES.USER_INVENTORY_ITEMS, { ni_nu_id: userId, ni_gegenstand_typ: type, ni_menge: qty });
             }
         }
     }
@@ -261,19 +255,16 @@ export class UserStatsService {
     static async resetAllStats(userId) {
         if (!userId) return;
 
-        // 1. Reset user_stats fields
         await this._updateStats(userId, {
-            entry_count: 0,
-            favorites_count: 0,
-            last_entry_date: null
+            ns_eintraege_anzahl: 0,
+            ns_favoriten_anzahl: 0,
+            ns_letzter_eintrag_am: null
         });
 
-        // 2. Clear inventory items (chips)
-        await SupabaseClient.delete('user_inventory_items', `?user_id=eq.${userId}`);
+        await SupabaseClient.delete(TABLE_NAMES.USER_INVENTORY_ITEMS, `?ni_nu_id=eq.${userId}`);
 
-        // 2. Clear category hits
         try {
-            await SupabaseClient.delete('user_category_hits', `?user_id=eq.${userId}`);
+            await SupabaseClient.delete(TABLE_NAMES.USER_CATEGORY_HITS, `?nk_nu_id=eq.${userId}`);
         } catch (e) {
             console.error('[UserStatsService] Failed to clear category hits:', e);
         }

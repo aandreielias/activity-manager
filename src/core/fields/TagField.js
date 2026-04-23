@@ -7,31 +7,40 @@ export class TagField extends Field {
         if (!this.contentWrap) return;
         this.contentWrap.innerHTML = '';
 
-        const rawValue = this.getRawValue();
-        if (rawValue === '—' || !rawValue) {
+        let rawValue = this.getRawValue();
+        if (rawValue === '—' || !rawValue || (Array.isArray(rawValue) && rawValue.length === 0)) {
             this.contentWrap.textContent = '—';
             return;
         }
 
-        const tags = rawValue.split(',').map(t => t.trim()).filter(t => t);
+        // Handle both comma-separated strings and real arrays
+        const tags = Array.isArray(rawValue) ? rawValue : rawValue.split(',').map(t => t.trim()).filter(t => t);
         const gs = GlobalStateManager.getInstance();
         const isTeam = this.colDef.id === 'Team';
+        const isResp = this.colDef.id === 'Verantwortlich für' || this.colDef.id === 'pe_verantwortlich_fuer';
         const teamColors = isTeam ? gs.getAvailableTeams() : [];
 
-        tags.forEach(text => {
+        tags.forEach(val => {
             const tag = document.createElement('span');
             tag.className = 'inventory-tag available';
-            tag.textContent = text;
+            
+            // Resolve ID to Title if it's a responsibility
+            let displayText = val;
+            if (isResp) {
+                const config = gs.getTableConfig(val);
+                if (config) displayText = config.t_titel || config.t_id;
+            }
+            tag.textContent = displayText;
             
             if (isTeam) {
-                const match = teamColors.find(tc => tc.name === text);
+                const match = teamColors.find(tc => tc.name === val);
                 if (match) {
                     tag.style.backgroundColor = match.color;
                 } else {
-                    tag.style.backgroundColor = ColourFactory.getColorForString(text);
+                    tag.style.backgroundColor = ColourFactory.getColorForString(val);
                 }
             } else {
-                tag.style.backgroundColor = ColourFactory.getColorForString(text);
+                tag.style.backgroundColor = ColourFactory.getColorForString(val);
             }
             
             tag.style.color = '#fff';
@@ -47,291 +56,184 @@ export class TagField extends Field {
     }
 
     async _showPicker() {
-        const rawValue = this.getRawValue();
-        const currentTags = rawValue === '—' || !rawValue ? [] : rawValue.split(',').map(t => t.trim()).filter(t => t);
+        let rawValue = this.getRawValue();
+        const currentTags = (Array.isArray(rawValue)) 
+            ? [...rawValue] 
+            : (rawValue === '—' || !rawValue ? [] : rawValue.split(',').map(t => t.trim()).filter(t => t));
 
         const globalState = GlobalStateManager.getInstance();
         let availableTags = this.colDef.availableTags || [];
+        const isResp = this.colDef.id === 'pe_verantwortlich_fuer' || this.colDef.id === 'Verantwortlich für';
 
-        // If no categories are defined, try to find a matching Postgres Enum or specific table list
         if (availableTags.length === 0) {
-            const globalEnums = globalState.getEnumOptionsForColumn(this.colDef.id, this.tableId);
-            if (globalEnums) {
-                availableTags = globalEnums;
-            } else if (this.colDef.id === 'Team') {
-                availableTags = globalState.getAvailableTeams();
+            if (isResp) {
+                availableTags = globalState.getAvailableTablesForPerson(this.rowData).map(t => ({
+                    name: t.t_titel || t.t_id,
+                    id: t.t_id
+                }));
+            } else {
+                const globalEnums = globalState.getEnumOptionsForColumn(this.colDef.id, this.tableId);
+                if (globalEnums) availableTags = globalEnums;
+                else if (this.colDef.id === 'Team') availableTags = globalState.getAvailableTeams();
             }
         }
 
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'picker-overlay';
+        const rect = this.td.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const dropdownMaxHeight = 450;
+        const showUpwards = spaceBelow < 250 && spaceAbove > spaceBelow;
 
-            const dialog = document.createElement('div');
-            dialog.className = 'picker-dialog';
-            dialog.style.maxWidth = '400px';
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100vw';
+        overlay.style.height = '100vh';
+        overlay.style.zIndex = '1000';
 
-            const header = document.createElement('div');
-            header.className = 'picker-header';
-            header.innerHTML = `<h2>${this.colDef.label} bearbeiten</h2>`;
-            dialog.appendChild(header);
+        const dropdown = document.createElement('div');
+        dropdown.className = 'multi-select-dropdown';
+        dropdown.style.position = 'absolute';
+        
+        if (showUpwards) {
+            dropdown.style.bottom = `${window.innerHeight - (rect.top + window.scrollY)}px`;
+        } else {
+            dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        }
+        
+        dropdown.style.left = `${rect.left + window.scrollX}px`;
+        dropdown.style.minWidth = `280px`;
+        dropdown.style.maxHeight = `${dropdownMaxHeight}px`;
+        dropdown.style.overflowY = 'auto';
+        dropdown.style.backgroundColor = '#fff';
+        dropdown.style.border = '1px solid #ddd';
+        dropdown.style.borderRadius = '12px';
+        dropdown.style.boxShadow = '0 15px 35px rgba(0,0,0,0.15)';
+        dropdown.style.padding = '8px 0';
+        dropdown.style.zIndex = '1001';
 
-            const displayLabel = this.colDef.label;
-            let displayLabelPlural = displayLabel;
-            let displayLabelSingular = displayLabel;
-            let addPrefix = 'Neues';
+        let internalSelected = [...currentTags];
 
-            if (displayLabel === 'Spiele') {
-                displayLabelPlural = 'Spiele';
-                displayLabelSingular = 'Spiel';
-                addPrefix = 'Neues';
-            } else if (displayLabel === 'Kategorie' || displayLabel === 'Kategorien') {
-                displayLabelPlural = 'Kategorien';
-                displayLabelSingular = 'Kategorie';
-                addPrefix = 'Neue';
-            } else if (displayLabel === 'Tags') {
-                displayLabelPlural = 'Tags';
-                displayLabelSingular = 'Tag';
-                addPrefix = 'Neuen';
-            } else if (displayLabel === 'Personen') {
-                displayLabelPlural = 'Personen';
-                displayLabelSingular = 'Person';
-                addPrefix = 'Neue';
+        const renderOptions = () => {
+            dropdown.innerHTML = '';
+            
+            if (availableTags.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.padding = '12px 16px';
+                empty.style.color = '#999';
+                empty.style.fontSize = '14px';
+                empty.textContent = 'Keine Optionen verfügbar';
+                dropdown.appendChild(empty);
+                return;
             }
 
-            const content = document.createElement('div');
-            content.className = 'picker-content';
-            dialog.appendChild(content);
-
-            let internalSelected = [...currentTags];
-
-            const refreshSelected = () => {
-                const existingSection = content.querySelector('.selected-section');
-                if (existingSection) existingSection.remove();
-
-                const section = document.createElement('div');
-                section.className = 'picker-section selected-section';
-
-                const sectionTitle = document.createElement('div');
-                sectionTitle.className = 'picker-section-title';
-                sectionTitle.textContent = `Ausgewählte ${displayLabelPlural}`;
-                section.appendChild(sectionTitle);
-
-                const list = document.createElement('div');
-                list.className = 'picker-list';
-                list.style.flexDirection = 'row';
-                list.style.flexWrap = 'wrap';
-
-                internalSelected.forEach((text, idx) => {
-                    const tagContainer = document.createElement('div');
-                    tagContainer.style.display = 'flex';
-                    tagContainer.style.alignItems = 'center';
-                    tagContainer.style.gap = '4px';
-                    tagContainer.className = 'inventory-tag available';
-                    tagContainer.style.paddingRight = '4px';
-
-                    if (this.colDef.id === 'Team') {
-                        const match = availableTags.find(tc => tc.name === text);
-                        if (match) {
-                            tagContainer.style.backgroundColor = match.color;
-                        } else {
-                            tagContainer.style.backgroundColor = ColourFactory.getColorForString(text);
-                        }
-                    } else {
-                        tagContainer.style.backgroundColor = ColourFactory.getColorForString(text);
-                    }
-                    tagContainer.style.color = '#fff';
-                    tagContainer.style.borderColor = 'transparent';
-
-                    const span = document.createElement('span');
-                    span.textContent = text;
-                    tagContainer.appendChild(span);
-
-                    const removeBtn = document.createElement('span');
-                    removeBtn.innerHTML = '✕';
-                    removeBtn.style.cursor = 'pointer';
-                    removeBtn.style.fontSize = '10px';
-                    removeBtn.style.opacity = '1';
-                    removeBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        internalSelected.splice(idx, 1);
-                        refreshSelected();
-                    };
-                    tagContainer.appendChild(removeBtn);
-
-                    list.appendChild(tagContainer);
+            // Grouping logic for the dropdown display
+            const gs = GlobalStateManager.getInstance();
+            const isResp = this.colDef.id === 'pe_verantwortlich_fuer' || this.colDef.id === 'Verantwortlich für';
+            let processedGroups = [];
+            
+            if (isResp) {
+                const mapping = gs.getTeamTableMappings();
+                const personTeamIds = this.rowData.teamIds || [];
+                
+                processedGroups = mapping.filter(group => {
+                    return (group.tt_tm_id && personTeamIds.includes(group.tt_tm_id)) || 
+                           (this.rowData.Team || '').toLowerCase().includes((group.tt_name || '').toLowerCase());
                 });
+            }
 
-                if (internalSelected.length === 0) {
-                    const empty = document.createElement('div');
-                    empty.textContent = `Keine ${displayLabelPlural} ausgewählt`;
-                    empty.style.color = 'var(--text-muted)';
-                    empty.style.fontSize = '13px';
-                    list.appendChild(empty);
+            // Fallback for simple tags (like Team selection) or if no groups found
+            if (processedGroups.length === 0 && availableTags.length > 0) {
+                const isTeam = this.colDef.id === 'Team';
+                processedGroups.push({ 
+                    tt_titel: '', 
+                    tables: availableTags.map(t => {
+                        const name = typeof t === 'object' ? t.name : t;
+                        const id = typeof t === 'object' ? (t.id || t.name) : t;
+                        return {
+                            t_id: isTeam ? name : id, // Use name for Team column, ID for others
+                            t_titel: name,
+                            name: name
+                        };
+                    })
+                });
+            }
+
+            processedGroups.forEach((group, gIdx) => {
+                // Divider only ONCE between groups
+                if (gIdx > 0) {
+                    const divider = document.createElement('div');
+                    divider.style.height = '1px';
+                    divider.style.background = '#eee';
+                    divider.style.margin = '8px 0';
+                    dropdown.appendChild(divider);
                 }
 
-                section.appendChild(list);
-                content.prepend(section);
-            };
+                group.tables.forEach((table) => {
+                    const text = table.t_titel || table.t_id || table.name;
+                    const value = table.t_id || table.id || table.name;
+                    const isSelected = internalSelected.includes(value);
+                    const groupLabel = group.tt_titel || group.tt_name || '';
 
-            // Suggestions Section
-            let suggSection = null;
-            let suggestionList = null;
-
-            if (availableTags.length > 0) {
-                suggSection = document.createElement('div');
-                suggSection.className = 'picker-section';
-                suggSection.innerHTML = `<div class="picker-section-title">Verfügbare ${displayLabelPlural}</div>`;
-
-                suggestionList = document.createElement('div');
-                suggestionList.className = 'picker-list';
-                suggestionList.style.flexDirection = 'row';
-                suggestionList.style.flexWrap = 'wrap';
-
-                availableTags.forEach(teamObj => {
-                    const text = typeof teamObj === 'object' ? teamObj.name : teamObj;
-                    const color = typeof teamObj === 'object' ? teamObj.color : null;
-
-                    const tag = document.createElement('span');
-                    tag.className = 'inventory-tag available';
-                    tag.style.cursor = 'pointer';
-                    tag.textContent = text;
+                    const item = document.createElement('div');
+                    item.style.padding = '6px 12px'; // Smaller spacing
+                    item.style.cursor = 'pointer';
+                    item.style.fontSize = '12.5px'; // Smaller text
+                    item.style.display = 'flex';
+                    item.style.justifyContent = 'space-between';
+                    item.style.alignItems = 'center';
+                    item.style.gap = '10px';
+                    item.style.transition = 'all 0.1s ease';
                     
-                    if (color) {
-                        tag.style.backgroundColor = color;
-                    } else {
-                        tag.style.backgroundColor = ColourFactory.getColorForString(text);
-                    }
-                    tag.style.color = '#fff';
-                    tag.style.borderColor = 'transparent';
+                    item.style.color = isSelected ? '#007bff' : '#444';
+                    item.style.fontWeight = isSelected ? '600' : '400';
+                    item.style.backgroundColor = isSelected ? 'rgba(0,123,255,0.06)' : 'transparent';
 
-                    tag.onclick = () => {
-                        if (!internalSelected.includes(text)) {
-                            internalSelected.push(text);
-                            refreshSelected();
-                        }
+                    // Label on the left, Group on the right (more visible now)
+                    item.innerHTML = `
+                        <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${text}</span>
+                        <span style="font-size: 10px; color: #999; font-weight: 400; text-transform: uppercase; letter-spacing: 0.3px;">${groupLabel}</span>
+                        ${isSelected ? '<span style="font-size: 10px; color: #007bff; margin-left: 2px;">●</span>' : ''}
+                    `;
+
+                    item.onmouseenter = () => { 
+                        item.style.backgroundColor = isSelected ? 'rgba(0,123,255,0.1)' : '#f8f9fa'; 
                     };
-                    suggestionList.appendChild(tag);
-                });
-                suggSection.appendChild(suggestionList);
-                content.appendChild(suggSection);
-            }
+                    item.onmouseleave = () => { 
+                        item.style.backgroundColor = isSelected ? 'rgba(0,123,255,0.06)' : 'transparent'; 
+                    };
 
-            const filterSuggestions = (val) => {
-                if (!suggestionList) return;
-                const search = val.toLowerCase().trim();
-                const children = suggestionList.children;
-                let foundMatch = false;
-
-                for (let child of children) {
-                    const matches = child.textContent.toLowerCase().includes(search);
-                    child.style.display = matches ? 'flex' : 'none';
-                    if (matches) foundMatch = true;
-                }
-
-                if (suggSection) {
-                    suggSection.style.display = search.length === 0 || foundMatch ? 'block' : 'none';
-                }
-            };
-
-            // Custom Add Section (only if not restricted)
-            if (true) {
-                const addSection = document.createElement('div');
-                addSection.className = 'picker-section';
-                addSection.innerHTML = `<div class="picker-section-title">${addPrefix} ${displayLabelSingular} hinzufügen</div>`;
-
-                const inputGroup = document.createElement('div');
-                inputGroup.style.display = 'flex';
-                inputGroup.style.gap = '8px';
-
-                const input = document.createElement('input');
-                input.className = 'dialog-input';
-                input.style.flex = '1';
-                input.placeholder = `${displayLabelSingular} Name...`;
-                inputGroup.appendChild(input);
-
-                const addBtn = document.createElement('button');
-                addBtn.className = 'picker-btn primary';
-                addBtn.textContent = 'Hinzufügen';
-                inputGroup.appendChild(addBtn);
-
-                addSection.appendChild(inputGroup);
-                content.appendChild(addSection);
-
-                const addTag = async () => {
-                    const val = input.value.trim();
-                    if (val && !internalSelected.includes(val)) {
-                        // If it's the Team column, sync new team to DB
-                        if (this.colDef.id === 'Team') {
-                            const gs = GlobalStateManager.getInstance();
-                            const currentTeams = gs.getAvailableTeams();
-                            if (!currentTeams.find(t => t.name === val)) {
-                                try {
-                                    const { DataService } = await import('../../services/DataService.js');
-                                    const newTeam = await DataService.createTeam(val);
-                                    await gs.loadAvailableTeams();
-                                    availableTags = gs.getAvailableTeams(); // Update local copy for immediate color mapping
-                                } catch (e) {
-                                    console.error('[TagField] Failed to sync new team:', e);
-                                }
-                            }
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        if (isSelected) {
+                            internalSelected = internalSelected.filter(v => v !== value);
+                        } else {
+                            internalSelected.push(value);
                         }
+                        renderOptions();
+                        
+                        this.onChange?.(this.colDef.id, internalSelected);
+                        this.value = internalSelected;
+                        this.updateDisplay();
+                    };
 
-                        internalSelected.push(val);
-                        input.value = '';
-                        filterSuggestions('');
-                        refreshSelected();
-                    }
-                };
-                addBtn.onclick = addTag;
-                input.oninput = (e) => filterSuggestions(e.target.value);
-                input.onkeydown = (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addTag();
-                    }
-                };
-            }
+                    dropdown.appendChild(item);
+                });
+            });
+        };
 
-            refreshSelected();
+        renderOptions();
+        overlay.appendChild(dropdown);
+        document.body.appendChild(overlay);
 
-            // Footer
-            const footer = document.createElement('div');
-            footer.className = 'picker-footer';
+        const close = () => {
+            overlay.remove();
+            document.removeEventListener('keydown', onEsc);
+        };
 
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'picker-btn secondary';
-            cancelBtn.textContent = 'Abbrechen';
-            footer.appendChild(cancelBtn);
-
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'picker-btn primary';
-            saveBtn.textContent = 'Speichern';
-            footer.appendChild(saveBtn);
-
-            dialog.appendChild(footer);
-            overlay.appendChild(dialog);
-            document.body.appendChild(overlay);
-
-            // Esc Key support
-            const onEsc = (e) => {
-                if (e.key === 'Escape') {
-                    overlay.remove();
-                    document.removeEventListener('keydown', onEsc);
-                }
-            };
-            document.addEventListener('keydown', onEsc);
-
-            overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); document.removeEventListener('keydown', onEsc); } };
-            cancelBtn.onclick = () => { overlay.remove(); document.removeEventListener('keydown', onEsc); };
-            saveBtn.onclick = () => {
-                const newVal = internalSelected.join(', ') || '—';
-                this.onChange?.(this.colDef.id, newVal);
-                this.value = newVal;
-                this.updateDisplay();
-                overlay.remove();
-                document.removeEventListener('keydown', onEsc);
-            };
-        });
+        const onEsc = (e) => { if (e.key === 'Escape') close(); };
+        document.addEventListener('keydown', onEsc);
+        overlay.onclick = close;
     }
 }

@@ -13,6 +13,7 @@ import { AuthService } from '../services/AuthService.js';
 import { UIManager } from './UIManager.js';
 import { TableLoader } from './TableLoader.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
+import { TABLE_NAMES, ROLES, GAME_TYPES } from './Constants.js';
 
 /**
  * App - The main application class that orchestrates everything.
@@ -97,7 +98,7 @@ export class App {
 
             if (!configs) {
                 // Priority 2: Legacy app_config JSON
-                const res = await SupabaseClient.get('app_config', '?id=eq.tables_config');
+                const res = await SupabaseClient.get(TABLE_NAMES.APP_CONFIG, '?id=eq.tables_config');
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.length > 0 && data[0].config) {
@@ -127,8 +128,8 @@ export class App {
 
         try {
             // Find the ID for the people table from configs (it might have a prefix now)
-            const peopleConfig = this.tableConfigs.find(c => c.supa_table === 'people');
-            const peopleId = peopleConfig ? peopleConfig.id : 'tbl_people';
+            const peopleConfig = this.tableConfigs.find(c => c.supa_table === TABLE_NAMES.PEOPLE);
+            const peopleId = peopleConfig ? peopleConfig.id : `tbl_${TABLE_NAMES.PEOPLE}`;
             
             this.peopleData = await DataService.loadRows(peopleId);
             await this.globalState.loadAvailableTeams();
@@ -192,9 +193,9 @@ export class App {
 
         // Unified Role/Permission Handling: 
         if (person) {
-            const isInactiveDir = (person.Status || '').toLowerCase() === 'inaktiv';
-            if (isInactiveDir || (authRole || '').toLowerCase() === 'inaktiv') {
-                authRole = 'Inaktiv';
+            const isInactiveDir = (person.Status || '').toLowerCase() === ROLES.INAKTIV.toLowerCase();
+            if (isInactiveDir || (authRole || '').toLowerCase() === ROLES.INAKTIV.toLowerCase()) {
+                authRole = ROLES.INAKTIV;
                 // Initialize default permission object for inactive users
                 perms = {
                     type: 'all',
@@ -209,7 +210,7 @@ export class App {
             teams = rawTeams.split(',').map(t => t.trim()).filter(Boolean);
         }
 
-        this.globalState.setCurrentUser(authUser, authRole || 'User', perms, teams, person?.image_url || null);
+        this.globalState.setCurrentUser(authUser, authRole || ROLES.USER, perms, teams, person?.image_url || null, person?.teamIds || []);
 
         await this.globalState.loadFavorites();
         await this.globalState.loadGlobalEnums();
@@ -246,7 +247,7 @@ export class App {
             return;
         }
 
-        const baseSchema = this.globalState.getTableConfig('tbl_people')?.schema || [];
+        const baseSchema = this.globalState.getTableConfig(`tbl_${TABLE_NAMES.PEOPLE}`)?.schema || [];
         const enrichedSchema = [...baseSchema];
         if (!enrichedSchema.find(c => c.id === 'email')) {
             enrichedSchema.push({ id: 'email', type: 'text', label: 'E-Mail', hidden: false });
@@ -259,7 +260,7 @@ export class App {
             id: currentPersonId,
             data: this.peopleData.find(p => p.id === currentPersonId),
             schema: enrichedSchema,
-            tableId: 'tbl_people',
+            tableId: `tbl_${TABLE_NAMES.PEOPLE}`,
             render: () => {
                 // Refresh header after change
                 const updatedPerson = this.peopleData.find(p => p.id === currentPersonId);
@@ -268,7 +269,8 @@ export class App {
                     this.globalState.getCurrentRole(),
                     this.globalState.getPermissions(),
                     this.globalState.getCurrentTeams(),
-                    updatedPerson.image_url
+                    updatedPerson.image_url,
+                    updatedPerson.teamIds
                 );
                 this.uiManager.header.refreshUserArea(); // Refresh only the user area
             }
@@ -307,16 +309,16 @@ export class App {
                     } else if (entry.instance?.editor) {
                         await entry.instance.editor._saveTable(entry.instance);
                     }
-                } else if (id === 'people_table' || id === 'tbl_people') {
-                    const dirtyRowIds = this.globalState.getDirtyRowIds('tbl_people');
-                    const deletedIds = this.globalState.getDeletedRowIds('tbl_people');
+                } else if (id === 'people_table' || id === `tbl_${TABLE_NAMES.PEOPLE}`) {
+                    const dirtyRowIds = this.globalState.getDirtyRowIds(`tbl_${TABLE_NAMES.PEOPLE}`);
+                    const deletedIds = this.globalState.getDeletedRowIds(`tbl_${TABLE_NAMES.PEOPLE}`);
                     const dirtyRows = (this.peopleData || []).filter(p => dirtyRowIds.includes(p.id)).map(d => ({...d}));
-                    await DataService.saveTable('tbl_people', 'people.json', dirtyRows, deletedIds);
-                    this.globalState.clearDirtyRowIds('tbl_people');
-                    this.globalState.clearDeletedRowIds('tbl_people');
+                    await DataService.saveTable(`tbl_${TABLE_NAMES.PEOPLE}`, 'people.json', dirtyRows, deletedIds);
+                    this.globalState.clearDirtyRowIds(`tbl_${TABLE_NAMES.PEOPLE}`);
+                    this.globalState.clearDeletedRowIds(`tbl_${TABLE_NAMES.PEOPLE}`);
                     
                     // Mark both possible IDs as saved
-                    this.globalState.markTableAsSaved('tbl_people');
+                    this.globalState.markTableAsSaved(`tbl_${TABLE_NAMES.PEOPLE}`);
                     this.globalState.markTableAsSaved('people_table');
                 }
                 this.globalState.markTableAsSaved(id);
@@ -341,7 +343,7 @@ export class App {
     }
 
     async _refreshApp(preserveState = true) {
-        this.peopleData = await DataService.loadRows('tbl_people');
+        this.peopleData = await DataService.loadRows(`tbl_${TABLE_NAMES.PEOPLE}`);
         this.tables = await TableLoader.loadAllTables(this.peopleData, this.tableConfigs);
         await this.uiManager.loadTables(this.tables, this.peopleData, preserveState);
     }

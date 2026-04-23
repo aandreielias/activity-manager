@@ -2,6 +2,7 @@ import '../styles/Header.css';
 import { GlobalStateManager } from '../core/GlobalStateManager.js';
 import { AuditLogsDialog } from './AuditLogsDialog.js';
 import { SUPABASE_CONFIG } from '../config.js';
+import { TABLE_NAMES, CATEGORIES, TABLE_PREFIXES } from '../core/Constants.js';
 
 /**
  * Header - Main application header with navigation and theme toggle (Cleaned).
@@ -15,7 +16,7 @@ export class Header {
         this.onCalendarToggle = null;
         this.tableConfigs = tableConfigs;
         this.tables = tables;
-        this.currentTable = tableConfigs[0]?.id || 'games';
+        this.currentTable = '';
         this.element = null;
         this.personsSplitOpen = false;
         this.inventorySplitOpen = false;
@@ -33,7 +34,7 @@ export class Header {
     }
 
     _getVersion() {
-        return 'v2.12.0';
+        return 'v3.0.0';
     }
 
     render() {
@@ -70,13 +71,7 @@ export class Header {
                 </div>
             </div>
             <nav class="header-nav">
-                ${this._renderCategoryButton('spiele', 'Spiele')}
-                ${this._renderCategoryButton('sportarten', 'Sportarten')}
-                ${this._renderCategoryButton('organisation', 'Organisation', ['people'])}
-                
-                ${this._renderPersonenButton()}
-
-                ${this._renderOtherTables()}
+                ${this._renderDynamicGroups()}
             </nav>
             <div class="header-center">
                 <div class="header-search-container">
@@ -114,82 +109,65 @@ export class Header {
         `;
     }
 
-    _renderPersonenButton() {
+    _renderDynamicGroups() {
         const gs = GlobalStateManager.getInstance();
-        if (!gs.canView('tbl_people')) return ''; // Self-gated check
+        const groups = gs.getNavigationGroups();
 
-        const userTeams = gs.getCurrentTeams();
-        const allTeams = gs.getAvailableTeams();
+        // Specific order requested by user: Spiele, Sportarten, Organisation, Misc
+        const groupOrder = ['spiele', 'sportarten', 'organisation', 'misc'];
+        const sortedGroups = [...groups].sort((a, b) => {
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            const indexA = groupOrder.indexOf(nameA);
+            const indexB = groupOrder.indexOf(nameB);
 
-        // If user is restricted to specific teams, only show those in dropdown
-        const viewableTeams = (userTeams.length > 0 && !gs.isAdmin() && !gs.isSuperAdmin())
-            ? allTeams.filter(t => userTeams.includes(t.name))
-            : allTeams;
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return nameA.localeCompare(nameB);
+        });
 
-        // If user is restricted to exactly ONE team (typical for Supervisors), 
-        // return a simple direct button instead of a complex split dropdown
-        if (viewableTeams.length === 1 && !gs.isAdmin() && !gs.isSuperAdmin()) {
-            const team = viewableTeams[0].name;
+        return sortedGroups.map(group => {
+            const viewableTables = group.tables.filter(t => gs.canView(t.id));
+            if (viewableTables.length === 0) return '';
+
+            // "Misc" group: Render all tables as individual buttons (e.g., "Personen")
+            if ((group.name || '').toLowerCase() === 'misc') {
+                return viewableTables.map(t =>
+                    `<button class="nav-btn ${this.currentTable === t.id ? 'active' : ''}" data-table="${t.id}">${t.title}</button>`
+                ).join('');
+            }
+
+            // Other groups: Render as a single Dropdown per group
+            const standardIds = Array.isArray(group.standardTableIds) ? group.standardTableIds : [];
+            const standardTables = viewableTables.filter(t => standardIds.includes(t.id));
+
+            // Determine the target for the main button
+            // If the group has multiple standards, we use the special 'group-' view
+            // Otherwise, we link to the first standard or first available table
+            const mainTable = standardTables[0] || viewableTables[0];
+            const useGroupView = standardTables.length > 1;
+            const targetTableId = useGroupView ? `group-${group.id}` : mainTable.id;
+
+            const isGroupActive = this.currentTable === `group-${group.id}`;
+            const isChildActive = viewableTables.some(t => t.id === this.currentTable);
+            const isAnyTableActive = isGroupActive || isChildActive;
+
             return `
-                <button class="nav-btn persons-toggle-btn ${this.currentTable === 'tbl_people' ? 'active' : ''}" data-team="${team}" title="Ihre Team-Personen (${team})">
-                    Personen
-                </button>
+                <div class="dropdown-container split-btn-group ${isAnyTableActive ? 'group-active' : ''}">
+                    <button class="nav-btn split-main-btn ${isGroupActive || (isChildActive && this.currentTable === mainTable.id) ? 'active' : ''}" data-table="${targetTableId}">
+                        ${group.name}
+                    </button>
+                    <div class="split-divider"></div>
+                    <button class="nav-btn split-arrow-btn dropdown-btn ${isChildActive && this.currentTable !== mainTable.id ? 'active' : ''}" aria-label="${group.name} Menü öffnen">
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        ${viewableTables.map(t => `<button class="dropdown-item ${this.currentTable === t.id ? 'active' : ''}" data-table="${t.id}">${t.title}</button>`).join('')}
+                    </div>
+                </div>
             `;
-        }
-
-        return `
-            <div class="dropdown-container split-btn-group">
-                <button class="nav-btn split-main-btn persons-toggle-btn ${this.currentTable === 'tbl_people' ? 'active' : ''}" title="Personen-Seitenleiste umschalten">
-                    Personen
-                </button>
-                <div class="split-divider"></div>
-                <button class="nav-btn split-arrow-btn dropdown-btn" aria-label="Team-Auswahl öffnen">
-                    <span class="dropdown-arrow">▼</span>
-                </button>
-                <div class="dropdown-menu">
-                    ${viewableTeams.map(t => `<button class="dropdown-item" data-team="${t.name}">Team ${t.name}</button>`).join('')}
-                </div>
-            </div>
-        `;
-    }
-
-    _renderCategoryButton(categoryName, label, exclusions = []) {
-        const gs = GlobalStateManager.getInstance();
-
-        // Filter internally: Category is responsible for its own access
-        const categoryTables = this.tableConfigs.filter(t =>
-            t.category === categoryName &&
-            !exclusions.some(exc => t.id.includes(exc)) &&
-            gs.canView(t.id) &&
-            !['tbl_spiele', 'tbl_sportarten'].includes(t.id) // Don't include master tables in dropdowns
-        );
-
-        if (categoryTables.length === 0) return '';
-
-        // Master view resolution
-        let mainTableId = `all-${categoryName}`;
-        if (categoryName === 'spiele') mainTableId = 'tbl_spiele';
-        if (categoryName === 'sportarten') mainTableId = 'tbl_sportarten';
-
-        if (categoryTables.length === 1 && !['spiele', 'sportarten'].includes(categoryName)) {
-            const table = categoryTables[0];
-            return `<button class="nav-btn ${this.currentTable === table.id ? 'active' : ''}" data-table="${table.id}">${table.title}</button>`;
-        }
-
-        return `
-            <div class="dropdown-container split-btn-group">
-                <button class="nav-btn split-main-btn" data-table="${mainTableId}">
-                    ${label}
-                </button>
-                <div class="split-divider"></div>
-                <button class="nav-btn split-arrow-btn dropdown-btn" aria-label="${label} Menü öffnen">
-                    <span class="dropdown-arrow">▼</span>
-                </button>
-                <div class="dropdown-menu">
-                    ${categoryTables.map(t => `<button class="dropdown-item" data-table="${t.id}">${t.title}</button>`).join('')}
-                </div>
-            </div>
-        `;
+        }).join('');
     }
 
     _renderSystemStatsButton() {
@@ -204,26 +182,12 @@ export class Header {
 
     _renderCalendarButton() {
         const gs = GlobalStateManager.getInstance();
-        if (!gs.canView('btn_calendar')) return '';
+        if (!gs.canView(`${TABLE_PREFIXES.BUTTON}calendar`)) return '';
         return `
             <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
                 Kalender
             </button>
         `;
-    }
-
-    _renderOtherTables() {
-        const gs = GlobalStateManager.getInstance();
-        const knownCategories = ['spiele', 'sportarten', 'organisation'];
-        const otherTables = this.tableConfigs.filter(t =>
-            !knownCategories.includes(t.category) &&
-            gs.canView(t.id)
-        );
-
-        return otherTables.map((config, idx) => {
-            const isSpieleEmpty = this.tableConfigs.filter(t => t.category === 'spiele' && gs.canView(t.id)).length === 0;
-            return `<button class="nav-btn ${idx === 0 && isSpieleEmpty ? 'active' : ''}" data-table="${config.id}">${config.title}</button>`;
-        }).join('');
     }
 
     _renderUserAvatar() {

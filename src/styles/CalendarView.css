@@ -181,7 +181,10 @@
 .calendar-event-main.status-to-do { background-color: var(--error); }
 .calendar-event-main.status-todo { background-color: var(--error); }
 .calendar-event-main.status-in-progress { background-color: var(--warning); }
+.calendar-event-main.status-inprogress { background-color: var(--warning); }
+.calendar-event-main.status-aktiv { background-color: var(--success); }
 .calendar-event-main.status-done { background-color: var(--success); }
+.calendar-event-main.status-cancelled { background-color: #6b7280; }
 .calendar-event-main.is-past { background-color: var(--accent) !important; }
 
 .calendar-event-name {

@@ -436,16 +436,28 @@ input[type="time"].cell-editor:focus {
   border: 1px solid rgba(210, 15, 15, 0.1);
 }
 
-.status-in-progress {
+.status-inprogress, .status-in-progress {
   background: var(--warning-light);
   color: var(--warning);
   border: 1px solid rgba(245, 158, 11, 0.1);
+}
+
+.status-aktiv, .status-active {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid rgba(52, 168, 83, 0.1);
 }
 
 .status-done {
   background: var(--success-light);
   color: var(--success);
   border: 1px solid rgba(52, 168, 83, 0.1);
+}
+
+.status-cancelled {
+  background: #f3f4f6; /* Gray 100 */
+  color: #6b7280;      /* Gray 500 */
+  border: 1px solid #d1d5db; /* Gray 300 */
 }
 
 .status-cell-done {

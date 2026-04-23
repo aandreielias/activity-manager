@@ -396,7 +396,10 @@ export class TableRenderer {
             // Pre-fill groups from schema options to ensure empty groups are shown
                 if (groupAttr && groupAttr.options) {
                     groupAttr.options.forEach(opt => {
-                        const val = typeof opt === 'object' ? (opt.value !== undefined ? opt.value : opt.label) : opt;
+                        let val = typeof opt === 'object' ? (opt.value !== undefined ? opt.value : opt.label) : opt;
+                        if (typeof val === 'string' && val.length > 0) {
+                            val = val.charAt(0).toUpperCase() + val.slice(1);
+                        }
                         if (groups[val] === undefined) groups[val] = [];
                     });
                 }

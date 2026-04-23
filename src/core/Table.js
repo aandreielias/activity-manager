@@ -18,7 +18,15 @@ export class Table {
     constructor(json) {
         this.id = json.id;
         this.title = json.title;
-        this.schema = json.schema;
+        
+        const gs = GlobalStateManager.getInstance();
+        this.schema = json.schema.map(col => {
+            const globalOptions = gs.getEnumOptionsForColumn(col.id, this.id);
+            if (globalOptions && globalOptions.length > 0) {
+                return { ...col, options: globalOptions };
+            }
+            return col;
+        });
         this.peopleData = json.peopleData;
         this.sourceData = json.sourceData || null;
 

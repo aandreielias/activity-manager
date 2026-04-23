@@ -1,4 +1,5 @@
 import { UserStatsService } from '../../services/UserStatsService.js';
+import { OUTCOMES } from '../../core/Constants.js';
 
 /**
  * ChipManager — Decoupled chip & pot management for all casino games.
@@ -171,7 +172,7 @@ export class ChipManager {
     /**
      * Settle the round.
      * 
-     * @param {'WIN'|'LOSS'|'PUSH'|'BLACKJACK'|'DEALER_FOLD'} outcome
+     * @param {string} outcome - Use OUTCOMES constants
      * @param {Object} options
      * @param {number} [options.multiplier] - override payout multiplier (e.g. 1.5 for BJ)
      * 
@@ -188,10 +189,10 @@ export class ChipManager {
      */
     settle(outcome, options = {}) {
         switch (outcome) {
-            case 'WIN':
-            case 'DEALER_FOLD':
-            case 'BLACKJACK':
-                const profit = outcome === 'BLACKJACK' 
+            case OUTCOMES.WIN:
+            case OUTCOMES.DEALER_FOLD:
+            case OUTCOMES.BLACKJACK:
+                const profit = outcome === OUTCOMES.BLACKJACK 
                     ? Math.floor(this.#playerPot * (options.multiplier || 1.5))
                     : (options.multiplier !== undefined 
                         ? Math.floor(this.#playerPot * options.multiplier)
@@ -206,7 +207,7 @@ export class ChipManager {
                 }
                 break;
 
-            case 'PUSH':
+            case OUTCOMES.PUSH:
                 this.#lastNetChips = 0;
                 // Add original bet back
                 const pushChips = UserStatsService.valueToChips(this.#playerPot);
@@ -215,9 +216,9 @@ export class ChipManager {
                 }
                 break;
 
-            case 'LOSS':
-            case 'BUST':
-            case 'FOLD':
+            case OUTCOMES.LOSS:
+            case OUTCOMES.BUST:
+            case OUTCOMES.FOLD:
                 this.#lastNetChips = -this.#playerPot;
                 // Bet is already gone from #chips because BettingUI calls setChips
                 break;

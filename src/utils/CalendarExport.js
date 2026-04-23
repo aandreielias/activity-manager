@@ -1,6 +1,8 @@
 /**
  * CalendarExport - Utility for generating and downloading .ics files
  */
+import { CATEGORIES } from '../core/Constants.js';
+
 export class CalendarExport {
     static exportEvent(eventData, allTables = {}) {
         const { name, date, time, location, notes, games, responsible } = eventData;
@@ -74,7 +76,7 @@ export class CalendarExport {
                     if (!respId) {
                         for (const tableEntry of Object.values(allTables)) {
                             const table = tableEntry.instance;
-                            if (tableEntry.config?.category === 'spiele' && table?.rows) {
+                            if (tableEntry.config?.category === CATEGORIES.SPIELE && table?.rows) {
                                 const foundRow = table.rows.find(r => r.data?.name === gn || r.data?.title === gn);
                                 if (foundRow && foundRow.data?.responsible) {
                                     respId = foundRow.data.responsible;

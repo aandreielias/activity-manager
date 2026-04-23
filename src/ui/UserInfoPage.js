@@ -5,6 +5,7 @@ import { AuditLogsDialog } from './AuditLogsDialog.js';
 import { AuthService } from '../services/AuthService.js';
 import { PermissionHub } from '../core/PermissionHub.js';
 import { Dialog } from './Dialog.js';
+import { CATEGORIES } from '../core/Constants.js';
 
 
 /**
@@ -96,8 +97,8 @@ export class UserInfoPage {
 
             Object.values(allTables).forEach(tWrap => {
                 if (!tWrap.config || !tWrap.instance) return;
-                if (tWrap.config.category === 'spiele') totalGames += tWrap.instance.rows.length;
-                if (tWrap.config.category === 'sportarten') totalSports += tWrap.instance.rows.length;
+                if (tWrap.config.category === CATEGORIES.SPIELE) totalGames += tWrap.instance.rows.length;
+                if (tWrap.config.category === CATEGORIES.SPORTARTEN) totalSports += tWrap.instance.rows.length;
             });
 
             const totalEntries = Object.values(allTables).reduce((sum, t) => sum + (t.instance?.rows.length || 0), 0);
@@ -413,7 +414,7 @@ export class UserInfoPage {
                 </div>
                 
                 <div class="perm-category-grid">
-                    <div class="perm-category-card" data-cat="spiele">
+                    <div class="perm-category-card" data-cat="${CATEGORIES.SPIELE}">
                         <div class="category-header-row">
                             <div class="category-title-group">
                                 <div class="category-title">Spiele</div>
@@ -421,18 +422,18 @@ export class UserInfoPage {
                             </div>
                             <div class="category-master-control">
                                 <div class="master-label">Master-Freigabe:</div>
-                                ${this._renderPermSlider('cat_spiele', '', '', overwrites, true)}
+                                ${this._renderPermSlider(`cat_${CATEGORIES.SPIELE}`, '', '', overwrites, true)}
                             </div>
                         </div>
                         
                         <div class="category-details-list">
-                            ${tableConfigs.filter(t => t.category === 'spiele').map(t => 
+                            ${tableConfigs.filter(t => t.category === CATEGORIES.SPIELE).map(t => 
                                 this._renderPermSlider(t.id, t.title, `Einzelfreigabe: ${t.title}`, overwrites)
                             ).join('')}
                         </div>
                     </div>
 
-                    <div class="perm-category-card" data-cat="sportarten">
+                    <div class="perm-category-card" data-cat="${CATEGORIES.SPORTARTEN}">
                         <div class="category-header-row">
                             <div class="category-title-group">
                                 <div class="category-title">Sportarten</div>
@@ -440,18 +441,18 @@ export class UserInfoPage {
                             </div>
                             <div class="category-master-control">
                                 <div class="master-label">Master-Freigabe:</div>
-                                ${this._renderPermSlider('cat_sportarten', '', '', overwrites, true)}
+                                ${this._renderPermSlider(`cat_${CATEGORIES.SPORTARTEN}`, '', '', overwrites, true)}
                             </div>
                         </div>
 
                         <div class="category-details-list">
-                            ${tableConfigs.filter(t => t.category === 'sportarten').map(t => 
+                            ${tableConfigs.filter(t => t.category === CATEGORIES.SPORTARTEN).map(t => 
                                 this._renderPermSlider(t.id, t.title, `Einzelfreigabe: ${t.title}`, overwrites)
                             ).join('')}
                         </div>
                     </div>
 
-                    <div class="perm-category-card" data-cat="organisation">
+                    <div class="perm-category-card" data-cat="${CATEGORIES.ORGANISATION}">
                         <div class="category-header-row">
                             <div class="category-title-group">
                                 <div class="category-title">Organisation</div>
@@ -459,12 +460,12 @@ export class UserInfoPage {
                             </div>
                             <div class="category-master-control">
                                 <div class="master-label">Master-Freigabe:</div>
-                                ${this._renderPermSlider('cat_organisation', '', '', overwrites, true)}
+                                ${this._renderPermSlider(`cat_${CATEGORIES.ORGANISATION}`, '', '', overwrites, true)}
                             </div>
                         </div>
 
                         <div class="category-details-list">
-                            ${tableConfigs.filter(t => t.category === 'organisation').map(t => 
+                            ${tableConfigs.filter(t => t.category === CATEGORIES.ORGANISATION).map(t => 
                                 this._renderPermSlider(t.id, t.title, `Einzelfreigabe: ${t.title}`, overwrites)
                             ).join('')}
                         </div>

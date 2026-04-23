@@ -1,5 +1,6 @@
 import { Field } from './Field.js';
 import { GlobalStateManager } from '../GlobalStateManager.js';
+import { TABLE_NAMES, CATEGORIES } from '../Constants.js';
 import { DataService } from '../../services/DataService.js';
 import { SupabaseClient } from '../../services/SupabaseClient.js';
 import { Dialog } from '../../ui/Dialog.js';
@@ -42,7 +43,7 @@ export class EventGamesField extends Field {
             const isAktivitäten = team === 'Aktivitäten';
             
             const gameInfo = isAktivitäten ? this._getGameData(item.name) : null;
-            const status = gameInfo ? gameInfo.data.status : (isAktivitäten ? this._getGameStatus(item.name) : 'To Do');
+            const status = gameInfo ? gameInfo.data.status : (isAktivitäten ? this._getGameStatus(item.name) : 'ToDo');
             let statusClass = isAktivitäten && status ? 'status-' + status.toLowerCase().replace(/\s+/g, '-') : '';
             let isDeleted = false;
 
@@ -107,7 +108,8 @@ export class EventGamesField extends Field {
         const tables = GlobalStateManager.getInstance().getTables();
         if (!tables) return null;
         for (const [id, tableInfo] of Object.entries(tables)) {
-            if (tableInfo.config.category !== 'spiele' && tableInfo.config.category !== 'sportarten') continue;
+            const isActivityTable = id.startsWith('tbl_activities') || id.startsWith('tbl_sport') || id === 'tbl_spiele';
+            if (!isActivityTable) continue;
             const row = tableInfo.instance.rows.find(r => r.data.name === gameName);
             if (row) return { data: row.data, categoryTitle: tableInfo.config.title };
         }
@@ -131,7 +133,26 @@ export class EventGamesField extends Field {
 
         const gs = GlobalStateManager.getInstance();
         const availableTeams = gs.getAvailableTeams();
-        const availableGames = [...(this.colDef.availableTags || [])];
+        const tables = gs.getTables();
+        const availableGames = [];
+        if (tables) {
+            Object.entries(tables).forEach(([tid, info]) => {
+                const isActivityTable = tid.startsWith('tbl_activities') || tid.startsWith('tbl_sport') || tid === 'tbl_spiele';
+                if (isActivityTable && info.instance) {
+                    info.instance.rows.forEach(r => {
+                        const name = r.data.name;
+                        if (name && !availableGames.includes(name)) {
+                            availableGames.push(name);
+                        }
+                    });
+                }
+            });
+        }
+        // Fallback to tags if provided and still empty
+        if (availableGames.length === 0 && this.colDef.availableTags) {
+            availableGames.push(...this.colDef.availableTags);
+        }
+        availableGames.sort((a, b) => a.localeCompare(b));
         
         const activePeople = (this.peopleData || [])
             .filter(p => (p.Status || '').toLowerCase() !== 'inaktiv')
@@ -225,9 +246,9 @@ export class EventGamesField extends Field {
                         itemRow.appendChild(nav);
 
                         const isAktivitäten = (item.team || 'Aktivitäten') === 'Aktivitäten';
-                        const status = isAktivitäten ? this._getGameStatus(item.name) : 'To Do';
+                        const status = isAktivitäten ? this._getGameStatus(item.name) : 'ToDo';
                         const isDeleted = isAktivitäten && !this._getGameCategory(item.name);
-                        const statusClass = isDeleted ? 'status-deleted' : (status ? 'status-' + status.toLowerCase().replace(/\s+/g, '-') : 'status-to-do');
+                        const statusClass = isDeleted ? 'status-deleted' : (status ? 'status-' + status.toLowerCase().replace(/\s+/g, '-') : 'status-todo');
 
                         // Team select
                         const teamSel = document.createElement('select');
@@ -359,10 +380,15 @@ export class EventGamesField extends Field {
                 const handleQuickAdd = async (sVal, searchInput) => {
                     const configs = GlobalStateManager.getInstance().getAllTableConfigs();
                     const cats = configs
-                        .filter(c => c.category === 'spiele' || c.category === 'sportarten')
-                        .map(c => ({ id: c.id, label: c.title, table: c.category === 'sportarten' ? 'sport_venues' : 'activities', dbCat: c.id.replace('tbl_activities_', '').replace('tbl_sport_', '') }));
+                        .filter(c => c.id.startsWith('tbl_activities') || c.id.startsWith('tbl_sport') || c.id === 'tbl_spiele')
+                        .map(c => ({ 
+                            id: c.id, 
+                            label: c.title, 
+                            table: c.t_physische_tabelle || (c.id.startsWith('tbl_sport') ? TABLE_NAMES.SPORT_VENUES : TABLE_NAMES.ACTIVITIES), 
+                            dbCat: c.id.replace('tbl_activities_', '').replace('tbl_sport_', '') 
+                        }));
 
-                    if (cats.length === 0) cats.push({ id: 'sonstige', label: 'Sonstige', table: 'activities', dbCat: 'sonstige' });
+                    if (cats.length === 0) cats.push({ id: 'sonstige', label: 'Sonstige', table: TABLE_NAMES.ACTIVITIES, dbCat: 'sonstige' });
 
                     const overlayDiag = document.createElement('div');
                     overlayDiag.className = 'custom-dialog-overlay';
@@ -385,7 +411,7 @@ export class EventGamesField extends Field {
                         overlayDiag.remove();
                         searchInput.disabled = true;
                         try {
-                            const payload = { name: sVal, status: 'To Do', created_at: new Date().toISOString() };
+                            const payload = { name: sVal, status: 'ToDo', created_at: new Date().toISOString() };
                             if (c.table === 'sport_venues') payload.sport_type = c.dbCat; else payload.category = c.dbCat;
                             const res = await SupabaseClient.post(c.table, payload, { 'Prefer': 'return=representation' });
                             if (!res.ok) throw new Error();
@@ -428,13 +454,14 @@ export class EventGamesField extends Field {
 
     _getGameStatus(gameName) {
         const tables = GlobalStateManager.getInstance().getTables();
-        if (!tables) return 'To Do';
+        if (!tables) return 'ToDo';
         for (const [id, tableInfo] of Object.entries(tables)) {
-            if (tableInfo.config.category !== 'spiele') continue;
+            const isActivityTable = id.startsWith('tbl_activities') || id.startsWith('tbl_sport') || id === 'tbl_spiele';
+            if (!isActivityTable) continue;
             const row = tableInfo.instance.rows.find(r => r.data.name === gameName);
-            if (row) return row.data.status || 'To Do';
+            if (row) return row.data.status || 'ToDo';
         }
-        return 'To Do';
+        return 'ToDo';
     }
 
     _getGameCategory(gameName) {
@@ -444,7 +471,8 @@ export class EventGamesField extends Field {
         const tables = gs.getTables();
         if (!tables) return '';
         for (const [id, tableInfo] of Object.entries(tables)) {
-            if (tableInfo.config.category !== 'spiele') continue;
+            const isActivityTable = id.startsWith('tbl_activities') || id.startsWith('tbl_sport') || id === 'tbl_spiele';
+            if (!isActivityTable) continue;
             const row = tableInfo.instance.rows.find(r => r.data.name === gameName);
             if (row) return tableInfo.config.title;
         }

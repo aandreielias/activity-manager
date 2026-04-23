@@ -12,6 +12,7 @@ import { UserStatsService } from '../services/UserStatsService.js';
 import { FilterEngine } from '../utils/FilterEngine.js';
 import { FilterBar } from '../ui/FilterBar.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
+import { TABLE_NAMES, CATEGORIES, TABLE_PREFIXES } from './Constants.js';
 
 /**
  * UIManager - Handles UI layout, rendering, and user interactions.
@@ -25,7 +26,7 @@ export class UIManager {
         this.tablesContainer = null;
         this.splitSideContainer = null;
         this.resizer = null;
-        this.currentTableId = 'all-spiele';
+        this.currentTableId = '';
         this.personsTable = null;
         this.inactivePersonsTable = null;
         this.inventoryTable = null;
@@ -143,20 +144,28 @@ export class UIManager {
         if (!bar) return;
 
         const gs = GlobalStateManager.getInstance();
-        const tableId = side === 'main' ? this.currentTableId : (this.header.personsSplitOpen ? 'tbl_people' : (this.header.inventorySplitOpen ? 'tbl_inventory' : 'default'));
+        const tableId = side === 'main' ? this.currentTableId : (this.header.personsSplitOpen ? `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}` : (this.header.inventorySplitOpen ? `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}` : 'default'));
         
         bar.state = gs.getGlobalFilterState(side, tableId);
         
         // Resolve schema for the current table
         let schema = [];
-        let targetTableId = tableId;
+        const isAllView = tableId.startsWith('all-');
+        const isGroupView = tableId.startsWith('group-');
 
-        if (tableId.startsWith('all-')) {
-            const category = tableId.replace('all-', '');
-            // Only include tables in this category, and specifically exclude people from the Organisation all-view
-            const configs = this.app.tableConfigs.filter(c => 
-                c.category === category && !(category === 'organisation' && c.supa_table === 'people')
-            );
+        if (isAllView || isGroupView) {
+            let configs = [];
+            if (isAllView) {
+                const category = tableId.replace('all-', '');
+                configs = this.app.tableConfigs.filter(c => 
+                    c.category === category && !(category === CATEGORIES.ORGANISATION && c.supa_table === TABLE_NAMES.PEOPLE)
+                );
+            } else {
+                const groupId = tableId.replace('group-', '');
+                const group = gs.getNavigationGroups().find(g => g.id === groupId);
+                const standardIds = group?.standardTableIds || [];
+                configs = this.app.tableConfigs.filter(c => standardIds.includes(c.id));
+            }
             
             const schemaMap = new Map();
             configs.forEach(config => {
@@ -188,7 +197,7 @@ export class UIManager {
             const isInventory = c.id === 'required_items' || c.id === 'benötigte_gegenstände' || c.label === 'Benötigte Gegenstände' || c.type === 'inventory';
             if (isInventory) {
                 const inventory = gs.getInventory();
-                globalOptions = inventory.map(i => ({ id: i.data?.name || i.name, label: i.data?.name || i.name }));
+                globalOptions = inventory.map(i => ({ id: i.data?.in_name || i.data?.name || i.name, label: i.data?.in_name || i.data?.name || i.name }));
             }
             return {
                 ...c,
@@ -200,14 +209,21 @@ export class UIManager {
 
         // Gather consolidated rows for the global filter bar to enable faceted search
         let consolidatedRows = [];
-        if (tableId === 'tbl_people') consolidatedRows = this.app.peopleData;
-        else if (tableId === 'tbl_inventory') consolidatedRows = this.inventoryTable?.rows || [];
-        else if (tableId.startsWith('all-')) {
-            const category = tableId.replace('all-', '');
-            // Only include tables in this category, and specifically exclude people from the Organisation all-view
-            const configs = this.app.tableConfigs.filter(c => 
-                c.category === category && !(category === 'organisation' && c.supa_table === 'people')
-            );
+        if (tableId === `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`) consolidatedRows = this.app.peopleData;
+        else if (tableId === `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}`) consolidatedRows = this.inventoryTable?.rows || [];
+        else if (isAllView || isGroupView) {
+            let configs = [];
+            if (isAllView) {
+                const category = tableId.replace('all-', '');
+                configs = this.app.tableConfigs.filter(c => 
+                    c.category === category && !(category === CATEGORIES.ORGANISATION && c.supa_table === TABLE_NAMES.PEOPLE)
+                );
+            } else {
+                const groupId = tableId.replace('group-', '');
+                const group = gs.getNavigationGroups().find(g => g.id === groupId);
+                const standardIds = group?.standardTableIds || [];
+                configs = this.app.tableConfigs.filter(c => standardIds.includes(c.id));
+            }
             configs.forEach(config => {
                 const tw = this.tables[config.id];
                 if (tw && tw.instance) consolidatedRows.push(...tw.instance.rows);
@@ -233,9 +249,10 @@ export class UIManager {
         const fragment = document.createDocumentFragment();
         this.app.tableElements = {};
 
-        if (tables['tbl_inventory']) {
-            this.inventoryTable = tables['tbl_inventory'].instance;
-            this.globalState.setInventory(tables['tbl_inventory'].instance.rows);
+        const invTableWrap = Object.values(tables).find(tw => tw.config.t_physische_tabelle === TABLE_NAMES.INVENTORY);
+        if (invTableWrap) {
+            this.inventoryTable = invTableWrap.instance;
+            this.globalState.setInventory(invTableWrap.instance.rows);
             // After setting inventory, we MUST refresh schemas of all tables that might have inventory filters
             Object.values(this.tables).forEach(tw => {
                 if (tw.instance && tw.instance.renderer && tw.instance.renderer.filterBar) {
@@ -245,12 +262,14 @@ export class UIManager {
         }
 
 
-        if (tables['tbl_events']) {
+        const eventTableWrap = Object.values(tables).find(tw => tw.config.t_physische_tabelle === TABLE_NAMES.EVENTS);
+        if (eventTableWrap) {
+            const eventsTableId = eventTableWrap.config.id;
             this.calendarView = new CalendarView({ 
-                eventsTable: tables['tbl_events'].instance,
+                eventsTable: eventTableWrap.instance,
                 allTables: tables 
             });
-            tables['tbl_events'].instance.onDataChange(() => this.calendarView.refresh());
+            eventTableWrap.instance.onDataChange(() => this.calendarView.refresh());
             const wrapper = document.createElement('div');
             wrapper.className = 'table-view-wrapper calendar-view-wrapper';
             wrapper.dataset.tableId = 'calendar';
@@ -259,14 +278,14 @@ export class UIManager {
             fragment.appendChild(wrapper);
             
             this.calendarView.onEventClick = (id) => {
-                this.header.switchTo('tbl_events');
-                this._handleTableSwitch('tbl_events', id);
+                this.header.switchTo(eventsTableId);
+                this._handleTableSwitch(eventsTableId, id);
             };
 
             this.calendarView.onAddEvent = (date) => {
-                const eventsTable = tables['tbl_events'].instance;
-                this.header.switchTo('tbl_events');
-                this._handleTableSwitch('tbl_events');
+                const eventsTable = eventTableWrap.instance;
+                this.header.switchTo(eventsTableId);
+                this._handleTableSwitch(eventsTableId);
                 
                 const defaults = eventsTable.tableConfig?.defaultRowData || {};
                 const newRow = eventsTable.addRow({ 
@@ -287,7 +306,7 @@ export class UIManager {
 
             this.calendarView.onGameClick = (name) => {
                 for (const [tableId, tableInfo] of Object.entries(this.tables)) {
-                    if (tableInfo.config.category !== 'spiele') continue;
+                    if (tableInfo.config.category !== CATEGORIES.SPIELE) continue;
                     const row = tableInfo.instance.rows.find(r => r.data.name === name);
                     if (row) {
                         this.header.switchTo(tableId);
@@ -306,12 +325,14 @@ export class UIManager {
             wrapper.className = 'table-view-wrapper';
             wrapper.dataset.tableId = tableId;
 
-            if (tableId === 'tbl_spiele') {
+            const supaTable = instance.tableConfig?.supa_table;
+
+            if (supaTable === TABLE_NAMES.ACTIVITIES) {
                 // Force category grouping for the master games table
                 instance.localFilters.groupBy = 'category';
             }
 
-            if (tableId === 'tbl_sportarten') {
+            if (supaTable === TABLE_NAMES.SPORT_VENUES) {
                 // Force grouping by sport type for the master sports table
                 instance.localFilters.groupBy = 'sport_type';
                 
@@ -335,7 +356,7 @@ export class UIManager {
                 }
             }
 
-            if (tableId === 'tbl_people') {
+            if (tableId === `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`) {
                 const gs = GlobalStateManager.getInstance();
                 const teams = gs.getAvailableTeams();
                 let teamData = this._groupPeopleByTeam(peopleData, teams);
@@ -348,7 +369,7 @@ export class UIManager {
                 // Unified Table: All persons grouped by Status
                 const unifiedTable = new Table({
                     ...config,
-                    id: 'tbl_people',
+                    id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`,
                     title: 'Alle Personen',
                     schema: config.schema,
                     rows: peopleData,
@@ -356,7 +377,7 @@ export class UIManager {
                     sourceData: peopleData,
                     tableConfig: { 
                         ...config, 
-                        id: 'tbl_people',
+                        id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`,
                         defaultRowData: { Status: 'Aktiv', role: 'User' } // Core defaults
                     },
                 });
@@ -371,7 +392,7 @@ export class UIManager {
                 Object.entries(teamData).forEach(([teamName, rows]) => {
                     const table = new Table({
                         ...config,
-                        id: 'tbl_people', 
+                        id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`, 
                         title: `Team: ${teamName}`,
                         schema: config.schema,
                         rows: rows,
@@ -379,7 +400,7 @@ export class UIManager {
                         sourceData: peopleData,
                         tableConfig: { 
                             ...config, 
-                            id: 'tbl_people',
+                            id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`,
                             defaultRowData: { 
                                 Team: teamName, 
                                 Status: 'Aktiv', 
@@ -457,19 +478,13 @@ export class UIManager {
             return;
         }
 
-        const teams = gs.getCurrentTeams() || [];
-        let targetView = 'tbl_spiele'; // Default master view
-
-        if (teams.length > 0) {
-            const teamNamesParsed = teams.map(t => t.toLowerCase());
-            
-            if (teamNamesParsed.some(t => t.includes('organisation'))) {
-                targetView = 'all-organisation';
-            } else if (teamNamesParsed.some(t => t.includes('sport'))) {
-                targetView = 'all-sportarten';
-            } else if (teamNamesParsed.some(t => t.includes('aktivität') || t.includes('activity') || t.includes('spiele'))) {
-                targetView = 'tbl_spiele';
-            }
+        // Use the team-standard mapping to find the initial view
+        let targetView = gs.getInitialTableForUser();
+        
+        // Fallback: If no team standard found, try the master games table
+        if (!targetView) {
+            const masterConfig = this.app.tableConfigs.find(c => c.supa_table === TABLE_NAMES.ACTIVITIES);
+            targetView = masterConfig ? masterConfig.id : 'tbl_activities';
         }
 
         this.header.switchTo(targetView);
@@ -583,7 +598,7 @@ export class UIManager {
 
     _handlePersonTeamMainSwitch(team) {
         // Switch main view to people
-        this._updateVisibility('tbl_people', team);
+        this._updateVisibility(`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`, team);
         
         const isMultiTable = false; // Team switch is always a single table view
         if (this.filterBarMain && this.filterBarMain.element) {
@@ -653,11 +668,11 @@ export class UIManager {
     _initSplitViewTables(tables, peopleData) {
         const gs = GlobalStateManager.getInstance();
         
-        if (tables['tbl_inventory'] && gs.canView('tbl_inventory')) {
-            this.inventoryTable = tables['tbl_inventory'].instance;
+        if (tables[`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}`] && gs.canView(`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}`)) {
+            this.inventoryTable = tables[`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}`].instance;
         }
 
-        if (peopleData.length > 0 && gs.canView('tbl_people')) {
+        if (peopleData.length > 0 && gs.canView(`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`)) {
             const gs = GlobalStateManager.getInstance();
             const teams = gs.getAvailableTeams();
             let teamData = this._groupPeopleByTeam(peopleData, teams);
@@ -669,12 +684,12 @@ export class UIManager {
             
             this.personsSplitTeamTables = {};
 
-            const peopleConfig = tables['tbl_people']?.config || { id: 'tbl_people', schema: [] };
+            const peopleConfig = tables[`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`]?.config || { id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`, schema: [] };
 
             // Unified Table for Split View
             const unifiedTable = new Table({
                 ...peopleConfig,
-                id: 'tbl_people',
+                id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`,
                 title: 'Alle Personen',
                 schema: peopleConfig.schema,
                 rows: peopleData,
@@ -682,7 +697,7 @@ export class UIManager {
                 sourceData: peopleData,
                 tableConfig: { 
                     ...peopleConfig, 
-                    id: 'tbl_people',
+                    id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`,
                     defaultRowData: { Status: 'Aktiv', role: 'User' }
                 },
             });
@@ -696,7 +711,7 @@ export class UIManager {
             
             Object.entries(teamData).forEach(([teamName, rows]) => {
                 const table = new Table({
-                    id: 'tbl_people', 
+                    id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`, 
                     title: `Team: ${teamName}`,
                     schema: peopleConfig.schema,
                     rows: rows,
@@ -704,7 +719,7 @@ export class UIManager {
                     sourceData: peopleData,
                     tableConfig: { 
                         ...peopleConfig, 
-                        id: `tbl_people`,
+                        id: `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`,
                         defaultRowData: { 
                             Team: teamName, 
                             Status: 'Aktiv', 
@@ -863,7 +878,7 @@ export class UIManager {
         Object.entries(this.app.tableElements).forEach(([id, el]) => {
             if (el.style.display !== 'block') return;
             
-            if (id === 'tbl_people') {
+            if (id === `tbl_${TABLE_NAMES.PEOPLE}`) {
                 const subTables = [this.personsUnifiedTable, ...Object.values(this.personsTeamTables || {})];
                 subTables.forEach(t => {
                     if (t?.renderer) {
@@ -920,8 +935,8 @@ export class UIManager {
         }
 
         const headerEl = this.header.element;
-        headerEl.querySelector('.persons-toggle-btn')?.classList.toggle('active', tableId === 'tbl_people' || this.header.personsSplitOpen);
-        headerEl.querySelector('.inventory-toggle-btn')?.classList.toggle('active', tableId === 'tbl_inventory' || this.header.inventorySplitOpen);
+        headerEl.querySelector('.persons-toggle-btn')?.classList.toggle('active', tableId === `tbl_${TABLE_NAMES.PEOPLE}` || this.header.personsSplitOpen);
+        headerEl.querySelector('.inventory-toggle-btn')?.classList.toggle('active', tableId === `tbl_${TABLE_NAMES.INVENTORY}` || this.header.inventorySplitOpen);
         headerEl.querySelector('.calendar-toggle-btn')?.classList.toggle('active', tableId === 'calendar' || this.header.calendarSplitOpen);
 
         if (rowId) {
@@ -931,7 +946,7 @@ export class UIManager {
 
     async _exportCategoryPDF(categoryId) {
         try {
-            const usePortrait = ['all-people', 'all-inventory', 'all-stats'].includes(categoryId);
+            const usePortrait = [`all-${TABLE_NAMES.PEOPLE}`, `all-${TABLE_NAMES.INVENTORY}`, 'all-stats'].includes(categoryId);
             const doc = usePortrait 
                 ? new jsPDF({ orientation: 'portrait', format: 'a4' })
                 : new jsPDF({ orientation: 'landscape', format: 'a3' });
@@ -945,39 +960,39 @@ export class UIManager {
                 await this._exportStatsPDF(doc, ignoreCols);
                 window.open(doc.output('bloburl'), '_blank');
                 return;
-            } else if (categoryId === 'all-people') {
+            } else if (categoryId === `all-${TABLE_NAMES.PEOPLE}`) {
                 exportFileName = 'Personen';
-                const peopleWrap = this.tables['tbl_people'];
+                const peopleWrap = this.tables[`tbl_${TABLE_NAMES.PEOPLE}`];
                 if (peopleWrap && peopleWrap.instances) {
                     tablesToExport.push(...peopleWrap.instances);
                 } else {
                     if (this.personsTable) tablesToExport.push(this.personsTable);
                     if (this.inactivePersonsTable) tablesToExport.push(this.inactivePersonsTable);
                 }
-            } else if (categoryId === 'all-inventory') {
+            } else if (categoryId === `all-${TABLE_NAMES.INVENTORY}`) {
                 exportFileName = 'Inventar';
-                const inv = this.tables['tbl_inventory'];
+                const inv = this.tables[`tbl_${TABLE_NAMES.INVENTORY}`];
                 if (inv && inv.instance) tablesToExport.push(inv.instance);
-            } else if (categoryId === 'tbl_spiele' || categoryId === 'all-spiele') {
+            } else if (categoryId === `tbl_${TABLE_NAMES.ACTIVITIES}` || categoryId === `all-${CATEGORIES.SPIELE}`) {
                 exportFileName = 'Spiele';
-                const master = this.tables['tbl_spiele'];
+                const master = this.tables[`tbl_${TABLE_NAMES.ACTIVITIES}`];
                 if (master && master.instance) {
                     tablesToExport.push(master.instance);
                 } else {
                     // Fallback to individual tables if master is missing
-                    const configs = this.app.tableConfigs.filter(c => c.category === 'spiele' && c.id !== 'tbl_spiele');
+                    const configs = this.app.tableConfigs.filter(c => c.category === CATEGORIES.SPIELE && c.id !== `tbl_${TABLE_NAMES.ACTIVITIES}`);
                     configs.forEach(config => {
                         const tableWrap = this.tables[config.id];
                         if (tableWrap && tableWrap.instance) tablesToExport.push(tableWrap.instance);
                     });
                 }
-            } else if (categoryId === 'tbl_sportarten' || categoryId === 'all-sportarten') {
+            } else if (categoryId === `tbl_${TABLE_NAMES.SPORT_VENUES}` || categoryId === `all-${CATEGORIES.SPORTARTEN}`) {
                 exportFileName = 'Sportarten';
-                const master = this.tables['tbl_sportarten'];
+                const master = this.tables[`tbl_${TABLE_NAMES.SPORT_VENUES}`];
                 if (master && master.instance) {
                     tablesToExport.push(master.instance);
                 } else {
-                    const configs = this.app.tableConfigs.filter(c => c.category === 'sportarten' && c.id !== 'tbl_sportarten');
+                    const configs = this.app.tableConfigs.filter(c => c.category === CATEGORIES.SPORTARTEN && c.id !== `tbl_${TABLE_NAMES.SPORT_VENUES}`);
                     configs.forEach(config => {
                         const tableWrap = this.tables[config.id];
                         if (tableWrap && tableWrap.instance) tablesToExport.push(tableWrap.instance);
@@ -986,13 +1001,13 @@ export class UIManager {
             } else if (categoryId.startsWith('all-')) {
                 const category = categoryId.replace('all-', '');
                 // Better label resolution
-                const categoryLabel = (category === 'sportarten' ? 'Sportarten' : 
-                                      (category === 'organisation' ? 'Organisation' : 
+                const categoryLabel = (category === CATEGORIES.SPORTARTEN ? 'Sportarten' : 
+                                      (category === CATEGORIES.ORGANISATION ? 'Organisation' : 
                                        category.charAt(0).toUpperCase() + category.slice(1)));
                 
                 exportFileName = categoryLabel;
                 const configs = this.app.tableConfigs.filter(c => 
-                    c.category === category && c.id !== 'tbl_spiele' && !(category === 'organisation' && c.supa_table === 'people')
+                    c.category === category && c.id !== `tbl_${TABLE_NAMES.ACTIVITIES}` && !(category === CATEGORIES.ORGANISATION && c.supa_table === TABLE_NAMES.PEOPLE)
                 );
                 configs.forEach(config => {
                     const tableWrap = this.tables[config.id];
@@ -1102,7 +1117,7 @@ export class UIManager {
                     doc.setTextColor(0);
                 }
 
-                const isInventory = tableInstance.id === 'tbl_inventory';
+                const isInventory = tableInstance.id === `tbl_${TABLE_NAMES.INVENTORY}`;
                 let exportSchema = tableInstance.schema.filter(col => {
                     if (ignoreCols.includes(col.label) || ignoreCols.includes(col.id)) return false;
                     return true;
@@ -1198,8 +1213,8 @@ export class UIManager {
         Object.values(allTables).forEach(tWrap => {
             if (!tWrap.config || !tWrap.instance) return;
             const rows = tWrap.instance.rows;
-            if (tWrap.config.category === 'spiele') totalGames += rows.length;
-            if (tWrap.config.category === 'sportarten') totalSports += rows.length;
+            if (tWrap.config.category === CATEGORIES.SPIELE) totalGames += rows.length;
+            if (tWrap.config.category === CATEGORIES.SPORTARTEN) totalSports += rows.length;
             rows.forEach(row => {
                 const s = String(row.data.Status || row.data.status || '').toLowerCase().replace(/\s+/g, '-');
                 if (s === 'to-do' || s === 'todo') globalTodo++;
@@ -1227,18 +1242,23 @@ export class UIManager {
             
             // Category logic
             if (tableId === 'all-spiele') {
-                isVisible = (this.app.tableConfigs.find(c => c.id === id)?.category === 'spiele' && id !== 'tbl_spiele');
+                isVisible = (this.app.tableConfigs.find(c => c.id === id)?.category === CATEGORIES.SPIELE && id !== `tbl_${TABLE_NAMES.ACTIVITIES}`);
             } else if (tableId === 'all-sportarten') {
-                isVisible = (this.app.tableConfigs.find(c => c.id === id)?.category === 'sportarten' && id !== 'tbl_sportarten');
-            } else if (tableId === 'all-organisation') {
+                isVisible = (this.app.tableConfigs.find(c => c.id === id)?.category === CATEGORIES.SPORTARTEN && id !== `tbl_${TABLE_NAMES.SPORT_VENUES}`);
+            } else if (tableId === `all-${CATEGORIES.ORGANISATION}`) {
                 const config = this.app.tableConfigs.find(c => c.id === id);
-                isVisible = (config?.category === 'organisation' && config?.supa_table !== 'people');
+                isVisible = (config?.category === CATEGORIES.ORGANISATION && config?.supa_table !== TABLE_NAMES.PEOPLE);
+            } else if (tableId.startsWith('group-')) {
+                const groupId = tableId.replace('group-', '');
+                const gs = GlobalStateManager.getInstance();
+                const group = gs.getNavigationGroups().find(g => g.id === groupId);
+                isVisible = (group?.standardTableIds || []).includes(id);
             }
 
             el.style.display = isVisible ? 'block' : 'none';
 
             // Special handling for People sub-tables
-            if (id === 'tbl_people' && isVisible) {
+            if (id === `tbl_${TABLE_NAMES.PEOPLE}` && isVisible) {
                 const subTables = el.querySelectorAll('.table-wrapper');
                 subTables.forEach(t => {
                     t.style.display = (t.dataset.team === targetTeam) ? 'block' : 'none';
@@ -1272,7 +1292,7 @@ export class UIManager {
         if (!gameName) return;
         const tables = this.globalState.getTables();
         for (const [id, tableInfo] of Object.entries(tables)) {
-            if (tableInfo.config.category !== 'spiele') continue;
+            if (tableInfo.config.category !== CATEGORIES.SPIELE) continue;
             const row = tableInfo.instance.rows.find(r => (r.data.name || '').toLowerCase() === gameName.toLowerCase());
             if (row) {
                 document.querySelectorAll('.picker-overlay, .custom-dialog-overlay').forEach(el => el.remove());

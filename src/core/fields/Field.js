@@ -1,6 +1,7 @@
 import { GlobalStateManager } from '../GlobalStateManager.js';
 import { Tooltip } from '../../ui/Tooltip.js';
 import { TooltipGenerator } from '../../utils/TooltipGenerator.js';
+import { CATEGORIES } from '../Constants.js';
 
 export class Field {
     constructor({ rowId, rowData, colDef, value, peopleData, tableId, onChange, onEditStart, onTab }) {
@@ -98,7 +99,7 @@ export class Field {
 
         // 4. Check for Game match
         for (const [id, tableInfo] of Object.entries(tables)) {
-            if (tableInfo.config.category !== 'spiele' && tableInfo.config.category !== 'sportarten') continue;
+            if (tableInfo.config.category !== CATEGORIES.SPIELE && tableInfo.config.category !== CATEGORIES.SPORTARTEN) continue;
             if (this.tableId === id) continue; // Skip if this is the game's own table
 
             const game = tableInfo.instance.rows.find(r => 

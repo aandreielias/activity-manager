@@ -396,7 +396,14 @@
     margin: 4px 0; /* Keep it subtle vertically */
 }
 
-/* On active, the background of nav-btn fills in, so the white gap between them shows clearly */
+/* On active, provide a subtle background for the group but don't force blue text on all buttons */
+.split-btn-group.group-active {
+    background: var(--bg-secondary);
+}
+
+.split-btn-group.group-active .split-divider {
+    background-color: var(--border-light);
+}
 
 .split-arrow-btn {
     border-top-left-radius: 0 !important;

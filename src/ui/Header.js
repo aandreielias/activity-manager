@@ -2,11 +2,10 @@ import '../styles/Header.css';
 import { GlobalStateManager } from '../core/GlobalStateManager.js';
 import { AuditLogsDialog } from './AuditLogsDialog.js';
 import { SUPABASE_CONFIG } from '../config.js';
-import { TABLE_NAMES, CATEGORIES, TABLE_PREFIXES } from '../core/Constants.js';
+import { TABLE_NAMES, CATEGORIES, TABLE_PREFIXES, RIGHTS } from '../core/Constants.js';
 
 /**
- * Header - Main application header with navigation and theme toggle (Cleaned).
- * All Edit Mode and administrative creation tools have been removed.
+ * Header - Main application header with navigation and theme toggle.
  */
 export class Header {
     constructor({ appName = 'Activity Manager', onThemeToggle, onTableSwitch, tableConfigs = [], tables = {} }) {
@@ -34,7 +33,7 @@ export class Header {
     }
 
     _getVersion() {
-        return 'v3.0.0';
+        return 'v3.1.0';
     }
 
     render() {
@@ -59,6 +58,22 @@ export class Header {
         if (btn) {
             btn.title = isDark ? 'Lichtmodus umschalten' : 'Dunkelmodus umschalten';
         }
+    }
+
+    _hasServiceRight(serviceId) {
+        const gs = GlobalStateManager.getInstance();
+        const level = parseInt(gs.getRight(serviceId)) || 0;
+        return level > 0;
+    }
+
+    _renderSystemStatsButton() {
+        if (!this._hasServiceRight('service_stats')) return '';
+        return `<button class="nav-btn user-info-btn" title="System Statistiken">Stats</button>`;
+    }
+
+    _renderCalendarButton() {
+        if (!this._hasServiceRight('service_calendar')) return '';
+        return `<button class="nav-btn calendar-toggle-btn" title="Kalender anzeigen">Kalender</button>`;
     }
 
     _getHeaderHTML() {
@@ -128,7 +143,8 @@ export class Header {
         });
 
         return sortedGroups.map(group => {
-            const viewableTables = group.tables.filter(t => gs.canView(t.id));
+            // Filter tables based on permissions
+            const viewableTables = group.tables.filter(t => gs.getRight(t.id) > RIGHTS.NONE);
             if (viewableTables.length === 0) return '';
 
             // "Misc" group: Render all tables as individual buttons (e.g., "Personen")
@@ -170,25 +186,7 @@ export class Header {
         }).join('');
     }
 
-    _renderSystemStatsButton() {
-        const gs = GlobalStateManager.getInstance();
-        if (!gs.canSeeStats()) return '';
-        return `
-            <button class="nav-btn user-info-btn" title="System-Stats">
-                Stats
-            </button>
-        `;
-    }
 
-    _renderCalendarButton() {
-        const gs = GlobalStateManager.getInstance();
-        if (!gs.canView(`${TABLE_PREFIXES.BUTTON}calendar`)) return '';
-        return `
-            <button class="nav-btn calendar-toggle-btn" title="Kalender öffnen">
-                Kalender
-            </button>
-        `;
-    }
 
     _renderUserAvatar() {
         const gs = GlobalStateManager.getInstance();
@@ -469,8 +467,6 @@ export class Header {
         const globalState = GlobalStateManager.getInstance();
 
         Object.entries(this.tables).forEach(([tableId, data]) => {
-            if (!globalState.canView(tableId)) return;
-
             const { instance, instances, config } = data;
             const targetInstances = instances || [instance];
             const tableTitle = config.title;
@@ -482,8 +478,7 @@ export class Header {
                     Object.entries(row.data).forEach(([colId, value]) => {
                         if (value === null || value === undefined) return;
 
-                        // COLUMN SECURITY: Don't search restricted columns
-                        if (!globalState.canView(`col_${tableId}.${colId}`)) return;
+
 
                         const strValue = String(value).toLowerCase();
                         const colDef = inst.schema.find(c => c.id === colId);

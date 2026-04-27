@@ -1,6 +1,7 @@
 import { FieldFactory } from './fields/FieldFactory.js';
 import { Dialog } from '../ui/Dialog.js';
 import { GlobalStateManager } from './GlobalStateManager.js';
+import { RIGHTS } from './Constants.js';
 import { contextMenu } from '../ui/ContextMenu.js';
 import { CalendarExport } from '../utils/CalendarExport.js';
 import { Tooltip } from '../ui/Tooltip.js';
@@ -51,6 +52,7 @@ export class Row {
                 value: this.data[col.id],
                 peopleData: this.peopleData,
                 tableId: this.tableId,
+                readOnly: GlobalStateManager.getInstance().getRight(this.tableId, col.id) < RIGHTS.WRITE,
                 onChange: (fieldId, newVal) => {
                     this.data[fieldId] = newVal;
                     this.isDirty = true;
@@ -115,11 +117,7 @@ export class Row {
         this.element.appendChild(favTd);
 
         this.schema.forEach(col => {
-            if (col.hidden) return;
-            
-            // COLUMN SECURITY
-            if (!globalState.canView(`col_${this.tableId}.${col.id}`)) return;
-
+            if (col.hidden || globalState.getRight(this.tableId, col.id) === RIGHTS.NONE) return;
             const field = this.fields[col.id];
             this.element.appendChild(field.render());
         });
@@ -136,27 +134,27 @@ export class Row {
 
             const cell = e.target.closest('.data-cell');
             const currentUser = GlobalStateManager.getInstance().getCurrentUser();
-            const canEditTable = GlobalStateManager.getInstance().canEdit(this.tableId);
 
             let onEdit = null;
-            if (cell && canEditTable) {
+            if (cell) {
                 const colId = cell.dataset.colId;
                 if (colId && this.fields[colId] && !cell.classList.contains('editing')) {
-                    onEdit = () => {
-                        this.fields[colId].startEditing();
-                    };
+                    const canWrite = GlobalStateManager.getInstance().getRight(this.tableId, colId) === RIGHTS.WRITE;
+                    if (canWrite) {
+                        onEdit = () => {
+                            this.fields[colId].startEditing();
+                        };
+                    }
                 }
             }
 
-            let onDelete = null;
-            if (canEditTable) {
-                onDelete = () => this.callbacks.onDelete?.(this.id);
-            }
+            const canWriteTable = GlobalStateManager.getInstance().getRight(this.tableId) === RIGHTS.WRITE;
+            let onDelete = canWriteTable ? () => this.callbacks.onDelete?.(this.id) : null;
 
             contextMenu.show(e.clientX, e.clientY, {
                 onDelete: onDelete,
                 onEdit: onEdit,
-                onEditRow: canEditTable ? async () => {
+                onEditRow: async () => {
                     if (this.tableId === 'tbl_inventory') {
                         const { InventoryEditDialog } = await import('../ui/InventoryEditDialog.js');
                         await InventoryEditDialog.show(this);
@@ -167,7 +165,8 @@ export class Row {
                         const { RowEditDialog } = await import('../ui/RowEditDialog.js');
                         await RowEditDialog.show(this);
                     }
-                } : null,
+                },
+                editRowLabel: canWriteTable ? 'Eintrag bearbeiten' : 'Details anzeigen',
                 onToggleFavorite: () => this.toggleFavorite(),
                 isFavorite: GlobalStateManager.getInstance().isFavorite(this.id),
                 onExportToCalendar: this.tableId === 'tbl_events' ? () => CalendarExport.exportEvent(this.data, GlobalStateManager.getInstance().getTables()) : null,

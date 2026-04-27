@@ -46,8 +46,115 @@ export class BettingUI {
                 <!-- Host game will inject action buttons here (Deal, Hit, Stand, etc.) -->
             </div>
         `;
+
+        const table = this.#container.querySelector('#betting-table');
+        const inv = this.#container.querySelector('#chip-inventory');
+        
+        table.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            if (this.#isIdleFn() || this.#alwaysAllowChips) {
+                e.dataTransfer.dropEffect = 'move';
+            }
+        });
+        
+        table.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (this.#isIdleFn() || this.#alwaysAllowChips) {
+                e.dataTransfer.dropEffect = 'move';
+                table.style.boxShadow = 'inset 0 0 60px rgba(255, 255, 255, 0.2)';
+            }
+        });
+        
+        table.addEventListener('dragleave', () => {
+            table.style.boxShadow = '';
+        });
+        
+        table.addEventListener('drop', (e) => {
+            e.preventDefault();
+            table.style.boxShadow = '';
+            if (!this.#isIdleFn() && !this.#alwaysAllowChips) return;
+            
+            const valStr = e.dataTransfer.getData('text/plain');
+            
+            if (valStr === 'move-chip') {
+                const chipId = e.dataTransfer.getData('chip-id');
+                const tChip = document.getElementById(chipId);
+                if (tChip) {
+                    // Offsets are from chip center
+                    const offsetX = parseFloat(e.dataTransfer.getData('offset-x')) || 0;
+                    const offsetY = parseFloat(e.dataTransfer.getData('offset-y')) || 0;
+                    
+                    const tableChips = this.#container.querySelector('#betting-table-chips');
+                    const rect = tableChips.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    
+                    // Chip center should be at (cursor - offset)
+                    const tx = (e.clientX - offsetX) - centerX;
+                    const ty = (e.clientY - offsetY) - centerY;
+                    
+                    const rotMatch = tChip.style.transform.match(/rotate\(([^)]+)\)/);
+                    const rot = rotMatch ? rotMatch[0] : 'rotate(0deg)';
+                    
+                    tChip.style.transition = 'none';
+                    tChip.style.transform = `translate(${tx}px, ${ty}px) ${rot}`;
+                    tChip.offsetHeight;
+                    tChip.style.transition = '';
+                }
+                return;
+            }
+            
+            if (!valStr || !valStr.startsWith('new-chip:')) return;
+            const val = parseInt(valStr.split(':')[1], 10);
+            if (isNaN(val)) return;
+
+            if (this.#chipManager) {
+                const chips = this.#chipManager.getChips();
+                if (chips[val] <= 0) return;
+                chips[val]--;
+                this.#chipManager.setChips(chips);
+            }
+            this.#currentBet += val;
+            this.updateDisplay();
+            this.renderInventory();
+            
+            this.#createTableChip(val, e.clientX, e.clientY);
+        });
+
+        inv.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+
+        inv.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+
+        inv.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const valStr = e.dataTransfer.getData('text/plain');
+            if (valStr === 'move-chip') {
+                const chipId = e.dataTransfer.getData('chip-id');
+                const tChip = document.getElementById(chipId);
+                if (tChip) {
+                    const val = parseInt(tChip.dataset.val, 10);
+                    tChip.remove();
+                    if (this.#chipManager) {
+                        const chips = this.#chipManager.getChips();
+                        chips[val]++;
+                        this.#chipManager.setChips(chips);
+                    }
+                    this.#currentBet -= val;
+                    this.updateDisplay();
+                    this.renderInventory();
+                }
+            }
+        });
+
         return this.#container;
     }
+
     
     setInitialChips(chipData) {
         if (this.#chipManager) {
@@ -95,6 +202,99 @@ export class BettingUI {
         }
     }
 
+    #createTableChip(val, clientX = null, clientY = null) {
+        const tableChips = this.#container.querySelector('#betting-table-chips');
+        if (!tableChips) return null;
+        
+        const tChip = document.createElement('button');
+        tChip.id = 'tchip-' + Math.random().toString(36).substr(2, 9);
+        tChip.className = 'bet-chip';
+        tChip.dataset.val = val;
+        tChip.textContent = val;
+        tChip.draggable = true;
+        
+        // Explicit centering: left:50% + top:50% + negative margin = chip center at container center
+        // Then translate(0,0) = exact center. translate(tx,ty) = offset from center.
+        tChip.style.position = 'absolute';
+        tChip.style.left = '50%';
+        tChip.style.top = '50%';
+        tChip.style.marginLeft = '-25px';
+        tChip.style.marginTop = '-25px';
+        
+        let tx, ty;
+        const rot = Math.random() * 360;
+        
+        if (clientX !== null && clientY !== null) {
+            const rect = tableChips.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            // Place chip center exactly at cursor
+            tx = clientX - centerX;
+            ty = clientY - centerY;
+        } else {
+            const spreadX = tableChips.clientWidth > 0 ? tableChips.clientWidth - 50 : 150;
+            const spreadY = tableChips.clientHeight > 0 ? tableChips.clientHeight - 50 : 80;
+            tx = (Math.random() * spreadX) - (spreadX/2);
+            ty = (Math.random() * spreadY) - (spreadY/2);
+        }
+        
+        tChip.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+        
+        let isDragging = false;
+        
+        tChip.ondragstart = (e) => {
+            isDragging = true;
+            if (!this.#isIdleFn() && !this.#alwaysAllowChips) {
+                e.preventDefault();
+                return;
+            }
+            e.dataTransfer.setData('text/plain', 'move-chip');
+            e.dataTransfer.setData('chip-id', tChip.id);
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Store offset from chip CENTER to cursor
+            const chipRect = tChip.getBoundingClientRect();
+            e.dataTransfer.setData('offset-x', String(e.clientX - (chipRect.left + chipRect.width / 2)));
+            e.dataTransfer.setData('offset-y', String(e.clientY - (chipRect.top + chipRect.height / 2)));
+            
+            setTimeout(() => tChip.style.opacity = '0.01', 0);
+        };
+        
+        tChip.ondragend = (e) => {
+            setTimeout(() => isDragging = false, 100);
+            tChip.style.opacity = '1';
+            if (e.dataTransfer.dropEffect === 'none') {
+                // Dragged outside, remove it
+                tChip.remove();
+                if (this.#chipManager) {
+                    const chips = this.#chipManager.getChips();
+                    chips[val]++;
+                    this.#chipManager.setChips(chips);
+                }
+                this.#currentBet -= val;
+                this.updateDisplay();
+                this.renderInventory();
+            }
+        };
+        
+        tChip.onclick = () => {
+            if (isDragging) return;
+            if (!this.#isIdleFn()) return;
+            tChip.remove();
+            if (this.#chipManager) {
+                const chips = this.#chipManager.getChips();
+                chips[val]++;
+                this.#chipManager.setChips(chips);
+            }
+            this.#currentBet -= val;
+            this.updateDisplay();
+            this.renderInventory();
+        };
+        
+        tableChips.appendChild(tChip);
+        return { tChip, tx, ty, rot };
+    }
+
     renderInventory() {
         const inv = this.#container.querySelector('#chip-inventory');
         if (!inv) return;
@@ -105,11 +305,29 @@ export class BettingUI {
             const item = document.createElement('div');
             item.className = 'chip-container';
             item.innerHTML = `
-                <button class="bet-chip" data-val="${val}" ${count === 0 ? 'disabled' : ''}>${val}</button>
+                <button class="bet-chip" draggable="${count > 0}" data-val="${val}" ${count === 0 ? 'disabled' : ''}>${val}</button>
                 <div class="chip-count">${count}x</div>
             `;
             const btn = item.querySelector('.bet-chip');
+            
+            let isDragging = false;
+            
+            btn.ondragstart = (e) => {
+                isDragging = true;
+                if (!this.#isIdleFn() && !this.#alwaysAllowChips) {
+                    e.preventDefault();
+                    return;
+                }
+                e.dataTransfer.setData('text/plain', 'new-chip:' + val);
+                e.dataTransfer.effectAllowed = 'move';
+            };
+            
+            btn.ondragend = () => {
+                setTimeout(() => isDragging = false, 100);
+            };
+            
             btn.onclick = (e) => {
+                if (isDragging) return;
                 if (!this.#isIdleFn() && !this.#alwaysAllowChips) return;
                 
                 const mouseX = e.clientX;
@@ -124,35 +342,7 @@ export class BettingUI {
                 this.updateDisplay();
                 this.renderInventory();
                 
-                const tableChips = this.#container.querySelector('#betting-table-chips');
-                const tChip = document.createElement('button');
-                tChip.className = 'bet-chip';
-                tChip.dataset.val = val;
-                tChip.textContent = val;
-                
-                tChip.style.position = 'absolute';
-                const spreadX = tableChips.clientWidth > 0 ? tableChips.clientWidth - 50 : 150;
-                const spreadY = tableChips.clientHeight > 0 ? tableChips.clientHeight - 50 : 80;
-                
-                const tx = (Math.random() * spreadX) - (spreadX/2);
-                const ty = (Math.random() * spreadY) - (spreadY/2);
-                const rot = Math.random() * 360;
-                tChip.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
-                
-                tChip.onclick = () => {
-                    if (!this.#isIdleFn()) return;
-                    tChip.remove();
-                    if (this.#chipManager) {
-                        const chips = this.#chipManager.getChips();
-                        chips[val]++;
-                        this.#chipManager.setChips(chips);
-                    }
-                    this.#currentBet -= val;
-                    this.updateDisplay();
-                    this.renderInventory();
-                };
-                
-                tableChips.appendChild(tChip);
+                const { tChip, tx, ty, rot } = this.#createTableChip(val);
                 
                 requestAnimationFrame(() => {
                     const tRect = tChip.getBoundingClientRect();
@@ -201,6 +391,11 @@ export class BettingUI {
         tChip.textContent = chipVal;
 
         tChip.style.position = 'absolute';
+        tChip.style.left = '50%';
+        tChip.style.top = '50%';
+        tChip.style.marginLeft = '-25px';
+        tChip.style.marginTop = '-25px';
+
         const spreadX = tableChips.clientWidth > 0 ? tableChips.clientWidth - 50 : 150;
         const spreadY = tableChips.clientHeight > 0 ? tableChips.clientHeight - 50 : 80;
 

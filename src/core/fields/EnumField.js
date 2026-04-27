@@ -97,7 +97,6 @@ export class EnumField extends Field {
             this._createOptionItem(option, originalValue, textSpan, menu);
         });
 
-        // Add new option button removed (part of edit mode)
 
         if (!textSpan.textContent) {
             textSpan.textContent = '-- Auswählen --';

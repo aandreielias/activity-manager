@@ -65,9 +65,6 @@ export class CalendarView {
                 const row = this.eventsTable.rows.find(r => r.id === eventId);
                 if (!row) return;
 
-                const globalState = GlobalStateManager.getInstance();
-                const canEdit = globalState.canEdit(this.eventsTable.id);
-
                 contextMenu.show(e.clientX, e.clientY, {
                     isFavorite: globalState.isFavorite(row.id),
                     onToggleFavorite: () => {
@@ -75,13 +72,13 @@ export class CalendarView {
                         this._updateUI();
                     },
                     onExportToCalendar: () => CalendarExport.exportEvent(row.data, this.allTables),
-                    onEdit: canEdit ? () => {
+                    onEdit: () => {
                         row.fields.name?.startEditing();
-                    } : null,
-                    onDelete: canEdit ? () => {
+                    },
+                    onDelete: () => {
                         this.eventsTable.removeRow(row.id);
                         this._updateUI();
-                    } : null,
+                    },
                     onShowInfo: () => {
                         const dateStr = row.createdAt ? new Date(row.createdAt).toLocaleString('de-DE') : 'Unbekannt';
                         Dialog.alert({

@@ -479,11 +479,6 @@
     background: var(--accent-light);
 }
 
-.edit-mode-btn.active {
-    background: var(--error-light);
-    color: var(--error);
-    font-weight: 700;
-}
 
 .header-user {
     font-size: 13px;

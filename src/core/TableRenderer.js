@@ -8,6 +8,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FilterBar } from '../ui/FilterBar.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
+import { RIGHTS } from './Constants.js';
 
 /**
  * TableRenderer - Handles rendering and updating the table UI
@@ -20,6 +21,16 @@ export class TableRenderer {
     }
 
     render() {
+        const gs = GlobalStateManager.getInstance();
+        if (gs.getRight(this.table.id) === RIGHTS.NONE) {
+            // Return a hidden placeholder so UIManager doesn't break, 
+            // but the table is effectively non-existent in the UI.
+            const placeholder = document.createElement('div');
+            placeholder.style.display = 'none';
+            placeholder.className = 'table-wrapper-forbidden';
+            return placeholder;
+        }
+
         this.element = document.createElement('div');
         this.element.className = 'table-wrapper';
 
@@ -45,7 +56,6 @@ export class TableRenderer {
         this.element.appendChild(this._renderTableScroll());
         
         // Auto-collapse if empty and unfiltered
-        const gs = GlobalStateManager.getInstance();
         const isFiltered = (this.table.localFilters && this.table.localFilters.active) || gs.isFavoritesFilterActive();
         // Note: Global filters are harder to check here without DOM context, 
         // but update() will run soon after and correct it if needed.
@@ -115,7 +125,7 @@ export class TableRenderer {
         titleGroup.appendChild(icon);
         titleGroup.appendChild(title);
 
-        // Rename Table Button removed (part of edit mode)
+
 
         const metaGroup = document.createElement('div');
         metaGroup.style.display = 'flex';
@@ -128,7 +138,7 @@ export class TableRenderer {
         meta.textContent = `${this.table.rows.length} Zeilen`;
         metaGroup.appendChild(meta);
 
-        // Add Column Button removed (part of edit mode)
+
 
         header.appendChild(titleGroup);
         header.appendChild(metaGroup);
@@ -168,7 +178,20 @@ export class TableRenderer {
         const isMultiTableView = currentViewId === 'all-organisation';
         const isSingleTableView = !isMultiTableView;
 
+        const canWrite = gs.getRight(this.table.id) === RIGHTS.WRITE;
+
         if (isSingleTableView) {
+            const newBtn = document.createElement('button');
+            newBtn.className = 'context-menu-item';
+            newBtn.textContent = 'Neue Zeile';
+            if (!canWrite) {
+                newBtn.style.opacity = '0.5';
+                newBtn.style.cursor = 'not-allowed';
+            } else {
+                newBtn.onclick = () => { this.table.dataManager.addEmptyRow(); menu.remove(); };
+            }
+            menu.appendChild(newBtn);
+
             const exportBtn = document.createElement('button');
             exportBtn.className = 'context-menu-item';
             exportBtn.textContent = 'Als PDF exportieren';
@@ -280,9 +303,6 @@ export class TableRenderer {
 
         this.table.schema.forEach((col, index) => {
             if (col.hidden) return;
-            
-            // COLUMN SECURITY
-            if (!GlobalStateManager.getInstance().canView(`col_${this.table.id}.${col.id}`)) return;
 
             const th = document.createElement('th');
             th.dataset.colId = col.id;
@@ -295,7 +315,7 @@ export class TableRenderer {
             content.appendChild(textSpan);
             th.appendChild(content);
 
-            // Column controls removed (part of edit mode)
+
             const resizer = document.createElement('div');
             resizer.className = 'col-resizer';
             this._setupColumnResizing(th, resizer);
@@ -307,14 +327,7 @@ export class TableRenderer {
         return thead;
     }
 
-    _moveColumn(index, delta) {
-        const newIdx = index + delta;
-        if (newIdx < 0 || newIdx >= this.table.schema.length) return;
-        const item = this.table.schema.splice(index, 1)[0];
-        this.table.schema.splice(newIdx, 0, item);
-        this.render();
-        GlobalStateManager.getInstance().saveTableConfigs();
-    }
+
 
     _setupColumnResizing(th, resizer) {
         let x = 0; let w = 0;
@@ -494,7 +507,9 @@ export class TableRenderer {
     }
 
     _renderAddRowButton(tbody) {
-        if (!GlobalStateManager.getInstance().canEdit(this.table.id)) return;
+        const gs = GlobalStateManager.getInstance();
+        if (gs.getRight(this.table.id) !== RIGHTS.WRITE) return;
+
         const tr = document.createElement('tr');
         tr.className = 'add-row-tr';
         const td = document.createElement('td');

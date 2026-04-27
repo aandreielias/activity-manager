@@ -22,7 +22,8 @@ export const TABLE_NAMES = {
     TEAM_STANDARDS: 'ts_team_standards',
     AUDIT_LOGS: 'al_audit_logs',
     USERS: 'nu_nutzer',
-    USER_PERMISSIONS: 'nb_nutzer_berechtigungen',
+    PERMISSIONS: 'nb_nutzer_berechtigungen',
+
     USER_FAVORITES: 'nf_nutzer_favoriten',
     USER_STATS: 'ns_nutzer_statistiken',
     USER_INVENTORY_ITEMS: 'ni_nutzer_inventar',
@@ -42,13 +43,7 @@ export const CATEGORIES = {
     SYSTEM: 'system'
 };
 
-export const ROLES = {
-    SUPERADMIN: 'Superadmin',
-    ADMIN: 'Admin',
-    SUPERVISOR: 'Supervisor',
-    USER: 'Nutzer',
-    INAKTIV: 'Inaktiv'
-};
+
 
 export const GAME_TYPES = {
     BLACKJACK: 'Blackjack',
@@ -63,4 +58,10 @@ export const OUTCOMES = {
     DEALER_FOLD: 'DEALER_FOLD',
     BUST: 'BUST',
     RESULT: 'RESULT'
+};
+
+export const RIGHTS = {
+    NONE: 0,
+    READ: 1,
+    WRITE: 2
 };

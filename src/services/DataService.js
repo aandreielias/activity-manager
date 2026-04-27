@@ -69,6 +69,7 @@ export class DataService {
                 .sort((a, b) => a.tf_reihenfolge - b.tf_reihenfolge)
                 .map(col => ({
                     id: col.tf_feldname,
+                    field_id: col.tf_id,
                     label: col.tf_label,
                     type: col.tf_datentyp,
                     ui_component: col.tf_ui_komponente,

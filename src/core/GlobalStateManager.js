@@ -1,7 +1,6 @@
 import { SupabaseClient } from '../services/SupabaseClient.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
-import { PermissionHub } from './PermissionHub.js';
-import { TABLE_NAMES, ROLES, TABLE_PREFIXES, CATEGORIES } from './Constants.js';
+import { TABLE_NAMES, TABLE_PREFIXES, CATEGORIES, RIGHTS } from './Constants.js';
 
 /**
  * GlobalStateManager - Standardized state management.
@@ -11,12 +10,10 @@ export class GlobalStateManager {
     static #instance = null;
 
     #currentUser = null;
-    #currentRole = null;
     #currentUserId = null;
     #currentUserImageUrl = null;
     #currentTeams = []; // Array of team names the current user belongs to
     #currentTeamIds = []; // Array of team UUIDs the current user belongs to
-    #permissions = null;
     #favorites = [];
     #inventory = [];
     #enums = {}; // Stores Postgres enums fetched from Supabase
@@ -31,6 +28,7 @@ export class GlobalStateManager {
     #onSelectionChange = null;
 
     #tableConfigs = [];
+    #rightsMap = new Map(); // tableId -> { level, columns: Map }
     #availableTeams = []; // Global list of all available teams in the system
     #teamTableMappings = []; // Groups of tables per team from tt_team_tabellen
     #currentViewId = null; // Currently active main view/category ID
@@ -38,6 +36,7 @@ export class GlobalStateManager {
         main: {}, // tableId -> { active, groupBy, filters }
         split: {} // tableId -> { active, groupBy, filters }
     };
+    #fieldUuidCache = new Map();
 
     constructor() {
         if (GlobalStateManager.#instance) return GlobalStateManager.#instance;
@@ -51,11 +50,9 @@ export class GlobalStateManager {
     setTables(tables) { this.#tables = tables; }
     getTables() { return this.#tables; }
 
-    async saveTableConfigs() {
-        // Edit mode is removed, but we might still want to save configs? 
-        // For now, let's keep it disabled as per "fully remove edit mode".
-        return; 
-    }
+    getTeamTableMappings() { return this.#teamTableMappings; }
+
+
 
     static getInstance() {
         if (!GlobalStateManager.#instance) {
@@ -67,30 +64,23 @@ export class GlobalStateManager {
     setCurrentViewId(id) { this.#currentViewId = id; }
     getCurrentViewId() { return this.#currentViewId; }
 
-    // ── Authentication & Permissions ───────────────────────────
+    // ── Authentication ─────────────────────────────────────────
 
-    setCurrentUser(username, role, permissions = null, teams = [], imageUrl = null, teamIds = []) {
+    setCurrentUser(username, teams = [], imageUrl = null, teamIds = []) {
         this.#currentUser = username;
-        this.#currentRole = role || ROLES.USER;
         this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []);
         this.#currentTeamIds = Array.isArray(teamIds) ? teamIds : [];
-        this.#permissions = permissions || { overwrites: {} };
         this.#currentUserImageUrl = imageUrl;
+        this.#rightsMap.clear(); // Reset on user change
     }
-
-    setCurrentRole(role) { this.#currentRole = role; }
-    setCurrentTeams(teams) { 
-        this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []); 
-    }
-    setPermissions(perms) { this.#permissions = perms; }
-
     setCurrentUserId(id) { this.#currentUserId = id; }
     getCurrentUserId() { return this.#currentUserId; }
     getCurrentUser() { return this.#currentUser; }
-    getCurrentRole() { return this.#currentRole; }
+    setCurrentTeams(teams) { 
+        this.#currentTeams = Array.isArray(teams) ? teams : (typeof teams === 'string' ? teams.split(',').map(t => t.trim()) : []); 
+    }
     getCurrentTeams() { return this.#currentTeams; }
     getCurrentUserImageUrl() { return this.#currentUserImageUrl; }
-    getPermissions() { return this.#permissions; }
 
     /**
      * Determines the initial table to show for the current user.
@@ -132,44 +122,6 @@ export class GlobalStateManager {
         return null;
     }
 
-    getRoleForTeam(teamName) {
-        return ROLES.USER; // Simplified for now
-    }
-
-    isSuperAdmin() { return (this.#currentRole || '').toLowerCase() === ROLES.SUPERADMIN.toLowerCase(); }
-    isAdmin() { return (this.#currentRole || '').toLowerCase() === ROLES.ADMIN.toLowerCase(); }
-
-    getPermissionContext() {
-        return {
-            role: this.#currentRole,
-            teams: this.#currentTeams,
-            perms: this.#permissions
-        };
-    }
-
-    canView(objectId) { 
-        // Anonymous/Login Bypass: Allow reading people list only for the login screen
-        if (!this.#currentUser && objectId === `${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`) return true;
-        
-        return PermissionHub.canRead(this.getPermissionContext(), objectId); 
-    }
-    
-    canEdit(objectId) { 
-        return PermissionHub.canWrite(this.getPermissionContext(), objectId); 
-    }
-
-    canEditColumn(tableId, colId) {
-        if (colId === 'createdBy' || colId === 'createdAt') return false;
-        return PermissionHub.canWrite(this.getPermissionContext(), `col_${tableId}.${colId}`);
-    }
-
-    canSeeStats() { return PermissionHub.canRead(this.getPermissionContext(), `${TABLE_PREFIXES.BUTTON}stats`); }
-    canManagePermissions() { 
-        return (this.isSuperAdmin() || this.isAdmin()); 
-    }
-    canUseEditMode() { return false; }
-    canViewLogs() { return PermissionHub.canRead(this.getPermissionContext(), `${TABLE_PREFIXES.BUTTON}audit_logs`); }
-    canUseEditModeForTable(tableId) { return false; }
 
     async loadFavorites() {
         if (!this.#currentUserId) return;
@@ -182,6 +134,91 @@ export class GlobalStateManager {
         } catch (e) {
             console.error('[GlobalStateManager] Load favorites failed:', e);
         }
+    }
+
+    // ── Permissions ───────────────────────────────────────────
+
+    async loadPermissions() {
+        if (!this.#currentUserId) return;
+        
+        try {
+            // Fetch both user-specific and team-wide permissions
+            const teamFilter = this.#currentTeamIds.length > 0 ? `,nb_tm_id.in.(${this.#currentTeamIds.join(',')})` : '';
+            const query = `?or=(nb_nu_id.eq.${this.#currentUserId}${teamFilter})`;
+            
+            const res = await SupabaseClient.get(TABLE_NAMES.PERMISSIONS, query);
+            if (!res.ok) throw new Error('Failed to fetch permissions');
+
+            const data = await res.json();
+            const newMap = new Map();
+
+            // Sort data by right level ascending so higher levels overwrite during processing
+            data.sort((a, b) => a.nb_right_level - b.nb_right_level);
+
+            data.forEach(p => {
+                const tId = p.nb_t_id;
+                const tfId = p.nb_tf_id;
+                const level = parseInt(p.nb_right_level) || 0;
+
+                if (!newMap.has(tId)) {
+                    newMap.set(tId, { level: 0, columns: new Map() });
+                }
+
+                const entry = newMap.get(tId);
+                if (!tfId) {
+                    entry.level = Math.max(entry.level, level);
+                } else {
+                    entry.columns.set(tfId, Math.max(entry.columns.get(tfId) || 0, level));
+                }
+            });
+
+            this.#rightsMap = newMap;
+            console.log('[Security] Permission Map Rebuilt. Entries:', this.#rightsMap.size);
+            console.log('[Security] User:', this.#currentUserId, 'Map Content:', Array.from(this.#rightsMap.entries()));
+        } catch (e) {
+            console.error('[GlobalStateManager] Load permissions failed:', e);
+        }
+    }
+
+    /**
+     * Resolves the effective right for a table or column.
+     * @param {string} tableId 
+     * @param {string} columnId (Optional)
+     * @returns {number} 0, 1, or 2
+     */
+    getRight(tableId, columnId = null) {
+        // 1. Unauthenticated check
+        if (!this.#currentUserId) {
+            return 0;
+        }
+        
+        // 2. Global Rule check
+        const globalEntry = this.#rightsMap.get('global_all');
+        let effectiveLevel = (globalEntry && typeof globalEntry.level === 'number') ? globalEntry.level : 0;
+
+        // 3. Specific Entity check
+        const entry = this.#rightsMap.get(tableId);
+        if (entry) {
+            effectiveLevel = Math.max(effectiveLevel, entry.level || 0);
+
+            // 4. Column Override check
+            if (columnId) {
+                // Try direct match (string name)
+                let colLevel = entry.columns.get(columnId);
+                
+                // If no match, try UUID lookup
+                if (typeof colLevel !== 'number') {
+                    const uuid = this._getFieldUuid(tableId, columnId);
+                    if (uuid) colLevel = entry.columns.get(uuid);
+                }
+
+                if (typeof colLevel === 'number') {
+                    return colLevel;
+                }
+            }
+        }
+
+        return effectiveLevel;
     }
 
     async loadGlobalEnums() {
@@ -388,22 +425,12 @@ export class GlobalStateManager {
         }));
     }
 
-    async addEnumOption(enumName, newValue) {
-        // Disabled for now as it was part of edit mode
-        return;
-    }
-
     #onFlashMessage = null;
     showFlashMessage(message, type = 'success') {
         if (this.#onFlashMessage) this.#onFlashMessage(message, type);
         else alert(`${type.toUpperCase()}: ${message}`);
     }
     onFlashMessageCallback(cb) { this.#onFlashMessage = cb; }
-
-    async addColumn(tableId, colData) {
-        // Disabled for now as it was part of edit mode
-        return;
-    }
 
     async toggleFavorite(rowId) {
         if (!this.#currentUserId) return;
@@ -462,9 +489,6 @@ export class GlobalStateManager {
     setInventory(data) { this.#inventory = data; }
     getInventory() { return this.#inventory; }
 
-    setEditModeActive(active) { /* Removed */ }
-    isEditModeActive() { return false; }
-
     trackSessionGame(name, categoryLabel) { this.#sessionNewGames.set(name, categoryLabel); }
     getSessionGameCategory(name) { return this.#sessionNewGames.get(name); }
 
@@ -494,5 +518,24 @@ export class GlobalStateManager {
     onSelectionChangeCallback(cb) { this.#onSelectionChange = cb; }
     #notifySelectionChange() {
         if (this.#onSelectionChange) this.#onSelectionChange(this.getTotalSelectedCount());
+    }
+
+    /**
+     * Internal helper to resolve a field name to its physical UUID.
+     * @private
+     */
+    _getFieldUuid(tableId, fieldName) {
+        const cacheKey = `${tableId}:${fieldName}`;
+        if (this.#fieldUuidCache.has(cacheKey)) return this.#fieldUuidCache.get(cacheKey);
+
+        const config = this.getTableConfig(tableId);
+        if (!config || !config.schema) return null;
+
+        const field = config.schema.find(f => f.id === fieldName);
+        if (field && field.field_id) {
+            this.#fieldUuidCache.set(cacheKey, field.field_id);
+            return field.field_id;
+        }
+        return null;
     }
 }

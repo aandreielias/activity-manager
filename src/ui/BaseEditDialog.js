@@ -3,6 +3,7 @@ import { GlobalStateManager } from '../core/GlobalStateManager.js';
 import { SupabaseClient } from '../services/SupabaseClient.js';
 import { SUPABASE_CONFIG } from '../config.js';
 import { FieldFactory } from '../core/fields/FieldFactory.js';
+import { RIGHTS } from '../core/Constants.js';
 import '../styles/BaseEditDialog.css';
 
 /**
@@ -29,9 +30,12 @@ export class BaseEditDialog extends BaseDialog {
         } = options;
 
         const gs = GlobalStateManager.getInstance();
+        const tableId = row.tableId;
+        const tableRight = gs.getRight(tableId);
+        const canWriteTable = tableRight === RIGHTS.WRITE;
+
         const data = { ...row.data };
         const schema = row.schema;
-        const tableId = row.tableId;
         const inputsMap = {};
         let currentImageUrl = imageSource;
         let selectedFile = null;
@@ -132,12 +136,20 @@ export class BaseEditDialog extends BaseDialog {
                     };
 
                     fileInput.onchange = (e) => handleFile(e.target.files[0]);
-                    imagePreview.onclick = () => fileInput.click();
+                    if (canWriteTable) {
+                        imagePreview.onclick = () => fileInput.click();
+                        imagePreview.style.cursor = 'pointer';
+                    } else {
+                        imagePreview.style.cursor = 'default';
+                        imagePreview.title = 'Keine Berechtigung zum Ändern des Bildes';
+                    }
 
                     // Drag & Drop
-                    imagePreview.ondragover = (e) => { e.preventDefault(); imagePreview.style.borderColor = 'var(--accent)'; };
-                    imagePreview.ondragleave = () => { imagePreview.style.borderColor = 'var(--border)'; };
-                    imagePreview.ondrop = (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); };
+                    if (canWriteTable) {
+                        imagePreview.ondragover = (e) => { e.preventDefault(); imagePreview.style.borderColor = 'var(--accent)'; };
+                        imagePreview.ondragleave = () => { imagePreview.style.borderColor = 'var(--border)'; };
+                        imagePreview.ondrop = (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); };
+                    }
 
                     leftCol.appendChild(imagePreview);
                     leftCol.appendChild(fileInput);
@@ -151,7 +163,7 @@ export class BaseEditDialog extends BaseDialog {
                     deleteImgBtn.style.background = 'var(--bg-secondary)';
                     deleteImgBtn.style.border = '1px solid var(--border)';
                     deleteImgBtn.textContent = 'Bild entfernen';
-                    deleteImgBtn.style.display = currentImageUrl ? 'block' : 'none';
+                    deleteImgBtn.style.display = (canWriteTable && currentImageUrl) ? 'block' : 'none';
                     deleteImgBtn.onclick = () => {
                         currentImageUrl = null;
                         selectedFile = null;
@@ -257,6 +269,7 @@ export class BaseEditDialog extends BaseDialog {
                         value: data[col.id],
                         peopleData: row.peopleData || [],
                         tableId: tableId,
+                        readOnly: gs.getRight(tableId, col.id) < RIGHTS.WRITE,
                         onChange: (fieldId, newVal) => {
                             data[fieldId] = newVal;
                         }
@@ -271,7 +284,12 @@ export class BaseEditDialog extends BaseDialog {
                     if (isPickerField) {
                         input = document.createElement('div');
                         input.className = 'dialog-input trigger-field pill-container';
-                        input.style.cursor = 'pointer';
+                        if (canWriteTable && gs.getRight(tableId, col.id) === RIGHTS.WRITE) {
+                            input.style.cursor = 'pointer';
+                        } else {
+                            input.style.cursor = 'default';
+                            input.classList.add('readonly-trigger');
+                        }
                         input.style.minHeight = '42px';
                         input.style.display = 'flex';
                         input.style.alignItems = 'center';
@@ -315,6 +333,8 @@ export class BaseEditDialog extends BaseDialog {
                         updateTriggerDisplay();
 
                         input.onclick = () => {
+                            if (gs.getRight(tableId, col.id) < RIGHTS.WRITE) return;
+                            
                             field.onChange = (fieldId, newVal) => {
                                 data[fieldId] = newVal;
                                 field.value = newVal;
@@ -360,12 +380,20 @@ export class BaseEditDialog extends BaseDialog {
                         input.style.minHeight = '140px';
                         input.style.height = '140px'; 
                         input.value = data[col.id] || '';
+                        if (gs.getRight(tableId, col.id) < RIGHTS.WRITE) {
+                            input.readOnly = true;
+                            input.style.opacity = '0.7';
+                        }
                         input.oninput = (e) => { data[col.id] = e.target.value; };
                     } else if (isName) {
                         // Force normal input for names to ensure 42px height
                         input = document.createElement('input');
                         input.className = 'dialog-input';
                         input.value = data[col.id] === '—' ? '' : (data[col.id] || '');
+                        if (gs.getRight(tableId, col.id) < RIGHTS.WRITE) {
+                            input.readOnly = true;
+                            input.style.opacity = '0.7';
+                        }
                         input.oninput = (e) => { data[col.id] = e.target.value; };
                     } else {
                         input = field.createEditor();
@@ -463,6 +491,9 @@ export class BaseEditDialog extends BaseDialog {
                 const saveBtn = document.createElement('button');
                 saveBtn.className = 'save-btn-header';
                 saveBtn.textContent = 'Änderungen speichern';
+                if (!canWriteTable) {
+                    saveBtn.style.display = 'none';
+                }
                 footer.appendChild(saveBtn);
 
                 dialog.appendChild(footer);

@@ -48,10 +48,10 @@ export class ChipManager {
                 let hasAnyChip = false;
                 
                 stats.user_inventory_items.forEach(item => {
-                    if (item.item_type && item.item_type.startsWith('chip_')) {
-                        const val = item.item_type.split('_').pop();
+                    if (item.ni_gegenstand_typ && item.ni_gegenstand_typ.startsWith('chip_')) {
+                        const val = item.ni_gegenstand_typ.split('_').pop();
                         if (chips[val] !== undefined) {
-                            chips[val] = item.quantity || 0;
+                            chips[val] = item.ni_menge || 0;
                             hasAnyChip = true;
                         }
                     }
@@ -80,11 +80,11 @@ export class ChipManager {
 
             // 3. Fallback to defaults if no chips found in DB at all
             if (!foundChips) {
-                this.#chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 10, 500: 0, 1000: 0 };
+                this.#chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 0, 500: 0, 1000: 0 };
             }
         } else {
             // Default starting chips if no DB record exists yet
-            this.#chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 10, 500: 0, 1000: 0 };
+            this.#chips = { 1: 0, 5: 0, 10: 0, 20: 0, 25: 0, 100: 0, 500: 0, 1000: 0 };
         }
         
         this.#notify();

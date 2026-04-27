@@ -11,7 +11,7 @@ export class LoginDialog {
         // Filter out inactive users immediately and sort alphabetically
         const activePeople = (peopleData || [])
             .filter(p => {
-                const isInactive = (p.Status || '').toLowerCase() === 'inaktiv' || (p.role || '').toLowerCase() === 'inaktiv';
+                const isInactive = (p.Status || '').toLowerCase() === 'inaktiv';
                 return !isInactive;
             })
             .sort((a, b) => {
@@ -170,9 +170,7 @@ export class LoginDialog {
                         resolve({
                             username: user,
                             password: pass,
-                            role: result.role,
                             userId: result.userId,
-                            permissions: result.permissions,
                             personId: result.personId
                         });
                     } catch (e) {

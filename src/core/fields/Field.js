@@ -4,7 +4,7 @@ import { TooltipGenerator } from '../../utils/TooltipGenerator.js';
 import { CATEGORIES } from '../Constants.js';
 
 export class Field {
-    constructor({ rowId, rowData, colDef, value, peopleData, tableId, onChange, onEditStart, onTab }) {
+    constructor({ rowId, rowData, colDef, value, peopleData, tableId, onChange, onEditStart, onTab, readOnly }) {
         this.rowId = rowId;
         this.rowData = rowData;
         this.colDef = colDef;
@@ -14,6 +14,7 @@ export class Field {
         this.onChange = onChange;
         this.onEditStart = onEditStart;
         this.onTab = onTab;
+        this.readOnly = readOnly ?? false;
 
         this.td = null;
         this.contentWrap = null;
@@ -22,6 +23,7 @@ export class Field {
     render() {
         this.td = document.createElement('td');
         this.td.className = 'data-cell';
+        if (this.readOnly) this.td.classList.add('readonly-cell');
         this.td.dataset.colId = this.colDef.id;
         this.td.dataset.type = this.colDef.type || 'text';
 
@@ -158,11 +160,12 @@ export class Field {
 
     onDoubleClick(e) {
         e.stopPropagation();
-        if (this.td.classList.contains('editing')) return;
+        if (this.readOnly || this.td.classList.contains('editing')) return;
         this.startEditing();
     }
 
     startEditing() {
+        if (this.readOnly) return;
         this.td.classList.add('editing');
         this.td.classList.remove('expanded'); // Remove expanded state on double-click/editing
         this.contentWrap.style.display = 'none';

@@ -13,7 +13,7 @@ import { AuthService } from '../services/AuthService.js';
 import { UIManager } from './UIManager.js';
 import { TableLoader } from './TableLoader.js';
 import { ColourFactory } from '../utils/ColourFactory.js';
-import { TABLE_NAMES, ROLES, GAME_TYPES } from './Constants.js';
+import { TABLE_NAMES, GAME_TYPES } from './Constants.js';
 
 /**
  * App - The main application class that orchestrates everything.
@@ -45,12 +45,9 @@ export class App {
             this.uiManager.setupEventListeners();
             this.uiManager.showInitialView();
 
-            // SINGLE SUMMARY LOG
-            console.log(`%c[System] %cBereit. %c${Object.keys(this.tables).length} Tabellen für "${this.globalState.getCurrentUser()}" geladen (%c${this.globalState.getCurrentRole()}%c)`,
+            console.log(`%c[System] %cBereit. %c${Object.keys(this.tables).length} Tabellen für "${this.globalState.getCurrentUser()}" geladen`,
                 'color: #0052cc; font-weight: bold;', 
                 'color: #28a745; font-weight: bold;',
-                'color: #555;',
-                'color: #0052cc; font-weight: bold;',
                 'color: #555;');
 
             // Listen for cross-component data refresh requests
@@ -142,18 +139,14 @@ export class App {
     async _handleAuthentication() {
         let authUser = localStorage.getItem('auth_user');
         let authPass = localStorage.getItem('auth_pass');
-        let authRole = null;
         let userId = null;
-        let perms = null;
         let personId = null; 
 
         if (authUser && authPass) {
             try {
                 const result = await AuthService.authenticate(authUser, authPass);
-                authRole = result.role;
                 userId = result.userId;
-                perms = result.permissions;
-                personId = result.personId; // Capturing the UUID link
+                personId = result.personId;
             } catch (e) {
                 authUser = null;
             }
@@ -163,9 +156,7 @@ export class App {
             const creds = await LoginDialog.show(this.peopleData);
             authUser = creds.username;
             authPass = creds.password;
-            authRole = creds.role;
             userId = creds.userId;
-            perms = creds.permissions;
             personId = creds.personId; 
             localStorage.setItem('auth_user', authUser);
             localStorage.setItem('auth_pass', authPass);
@@ -178,8 +169,6 @@ export class App {
             const userRecord = await AuthService.getUserByUsername(authUser);
             if (userRecord) {
                 this.globalState.setCurrentUserId(userRecord.id);
-                authRole = userRecord.role || authRole;
-                perms = userRecord.permissions || perms;
                 personId = userRecord.person_id;
             }
         }
@@ -191,26 +180,13 @@ export class App {
             
         let teams = [];
 
-        // Unified Role/Permission Handling: 
         if (person) {
-            const isInactiveDir = (person.Status || '').toLowerCase() === ROLES.INAKTIV.toLowerCase();
-            if (isInactiveDir || (authRole || '').toLowerCase() === ROLES.INAKTIV.toLowerCase()) {
-                authRole = ROLES.INAKTIV;
-                // Initialize default permission object for inactive users
-                perms = {
-                    type: 'all',
-                    managementAccess: 'stats_only',
-                    canEditRoles: true,
-                    canUseEditMode: false,
-                    canViewLogs: true
-                };
-            }
-
             const rawTeams = person.Team || '';
             teams = rawTeams.split(',').map(t => t.trim()).filter(Boolean);
         }
 
-        this.globalState.setCurrentUser(authUser, authRole || ROLES.USER, perms, teams, person?.image_url || null, person?.teamIds || []);
+        this.globalState.setCurrentUser(authUser, teams, person?.image_url || null, person?.teamIds || []);
+        await this.globalState.loadPermissions(); // NEW: Load the rights map
 
         await this.globalState.loadFavorites();
         await this.globalState.loadGlobalEnums();
@@ -236,10 +212,6 @@ export class App {
     }
 
     async _handleChangeAvatar() {
-        const personId = this.globalState.getPermissionContext().perms?.personId || this.globalState.getPermissionContext().teams?.personId;
-        // Wait, personId is stored directly in GlobalStateManager too if I added it.
-        // Let's check GlobalStateManager.
-        
         const currentPersonId = this.peopleData.find(p => `${p.vorname || ''} ${p.nachname || ''}`.trim() === this.globalState.getCurrentUser())?.id;
         
         if (!currentPersonId) {
@@ -266,8 +238,6 @@ export class App {
                 const updatedPerson = this.peopleData.find(p => p.id === currentPersonId);
                 this.globalState.setCurrentUser(
                     this.globalState.getCurrentUser(),
-                    this.globalState.getCurrentRole(),
-                    this.globalState.getPermissions(),
                     this.globalState.getCurrentTeams(),
                     updatedPerson.image_url,
                     updatedPerson.teamIds

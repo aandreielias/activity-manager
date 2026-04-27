@@ -977,92 +977,8 @@ button:focus-visible {
   background: var(--bg-hover);
 }
 
-/* Edit Mode Visual Feedback */
-body.edit-mode-active .table-wrapper {
-    border: 2px solid var(--warning);
-    box-shadow: 0 0 20px rgba(255, 165, 0, 0.15);
-    transition: all 0.3s var(--transition);
-}
-
-body.edit-mode-active .table-title::after {
-    content: ' (EDITIERMODUS)';
-    font-size: 10px;
-    color: var(--warning);
-    margin-left: 8px;
-    letter-spacing: 0.1em;
-    font-weight: 700;
-}
-
-body.edit-mode-active .data-table tr:hover {
-    background: var(--warning-light) !important;
-}
-
-body.edit-mode-active .data-cell:hover {
-    outline: 2px solid var(--warning);
-    outline-offset: -2px;
-}
-
-/* Edit Mode Management Actions */
-.edit-mode-action-btn {
-    background: none;
-    border: 1px solid var(--warning);
-    color: var(--warning);
-    border-radius: var(--radius-sm);
-    padding: 2px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.edit-mode-action-btn:hover {
-    background: var(--warning-light);
-}
-
-.table-title-edit-btn {
-    opacity: 0;
-    cursor: pointer;
-    color: var(--warning);
-    font-size: 14px;
-    transition: opacity 0.2s;
-    margin-left: 4px;
-}
-
-.table-wrapper:hover .table-title-edit-btn {
-    opacity: 1;
-}
-
-.add-col-btn {
-    width: 100%;
-    height: 100%;
-    background: var(--warning-light);
-    border: none;
-    color: var(--warning);
-    cursor: pointer;
-    font-size: 18px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, color 0.2s;
-}
-
-.add-col-btn:hover {
-    background: var(--warning);
-    color: white;
-}
-
-/* Rearrange Buttons Styling */
-.col-edit-controls {
-    opacity: 0.4;
-    transition: opacity 0.2s;
-}
-
-th:hover .col-edit-controls {
-    opacity: 1;
-}
-
-.col-nav-btn {
+/* ── Game Reorder Buttons ──────────────────────────── */
+.game-reorder-btn {
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     border-radius: 3px;
@@ -1074,19 +990,13 @@ th:hover .col-edit-controls {
     transition: all 0.2s;
 }
 
-.col-nav-btn:hover {
-    background: var(--warning-light);
-    color: var(--warning);
-    border-color: var(--warning);
+.game-reorder-btn:hover {
+    background: var(--accent-light);
+    color: var(--accent);
+    border-color: var(--accent);
 }
 
-.col-delete-btn:hover {
-    background: #fff5f5 !important;
-    color: #e53e3e !important;
-    border-color: #feb2b2 !important;
-}
-
-/* Flash Banner / Toast Styling */
+/* ── Flash Banner / Toast Styling */
 .flash-banner {
     display: none;
     position: fixed;

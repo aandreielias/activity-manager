@@ -238,9 +238,9 @@ export class EventGamesField extends Field {
                         nav.style.display = 'flex';
                         nav.style.flexDirection = 'column';
                         nav.style.gap = '2px';
-                        const up = document.createElement('button'); up.className = 'col-nav-btn'; up.innerHTML = '▲'; up.disabled = idx === 0;
+                        const up = document.createElement('button'); up.className = 'game-reorder-btn'; up.innerHTML = '▲'; up.disabled = idx === 0;
                         up.onclick = () => { const itm = internalSelected.splice(idx, 1)[0]; internalSelected.splice(idx - 1, 0, itm); refreshSelected(); };
-                        const down = document.createElement('button'); down.className = 'col-nav-btn'; down.innerHTML = '▼'; down.disabled = idx === internalSelected.length - 1;
+                        const down = document.createElement('button'); down.className = 'game-reorder-btn'; down.innerHTML = '▼'; down.disabled = idx === internalSelected.length - 1;
                         down.onclick = () => { const itm = internalSelected.splice(idx, 1)[0]; internalSelected.splice(idx + 1, 0, itm); refreshSelected(); };
                         nav.appendChild(up); nav.appendChild(down);
                         itemRow.appendChild(nav);

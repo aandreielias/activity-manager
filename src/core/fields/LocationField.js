@@ -299,7 +299,6 @@ export class LocationField extends Field {
                         lbl.textContent = col.label;
                         labelRow.appendChild(lbl);
 
-                        // Rearrange controls removed (part of edit mode)
 
                         const input = document.createElement(isTextArea ? 'textarea' : 'input');
                         input.className = 'dialog-input';

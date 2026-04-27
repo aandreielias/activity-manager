@@ -47,7 +47,7 @@ export class ContextMenu {
         }
 
         if (options.onEditRow) {
-            const editRowItem = this._createMenuItem('Eintrag bearbeiten', () => {
+            const editRowItem = this._createMenuItem(options.editRowLabel || 'Eintrag bearbeiten', () => {
                 this.close();
                 options.onEditRow();
             });

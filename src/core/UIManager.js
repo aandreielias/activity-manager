@@ -64,7 +64,6 @@ export class UIManager {
         this.header.onDiscardAll = () => this.app._handleDiscardAll();
         this.header.onFavoritesToggle = (active) => this._handleFavoritesToggle(active);
         this.header.onCategoryExport = (categoryId) => this._exportCategoryPDF(categoryId);
-        // Removed Edit Mode toggle (part of edit mode)
         this.header.onCalendarToggle = () => this._handleCalendarToggle();
         this.header.onCalendarFull = () => this._handleCalendarFullView();
         this.header.onLogoDoubleClick = () => this.app._launchBlackjack();
@@ -316,11 +315,8 @@ export class UIManager {
                 }
             };
         }
-
         let renderedCount = 0;
         Object.entries(tables).forEach(([tableId, { instance, config }]) => {
-            if (!this.globalState.canView(tableId)) return;
-
             const wrapper = document.createElement('div');
             wrapper.className = 'table-view-wrapper';
             wrapper.dataset.tableId = tableId;
@@ -435,8 +431,8 @@ export class UIManager {
             noAccess.className = 'no-access-message';
             noAccess.innerHTML = `
                 <div class="no-access-content">
-                    <h2>Kein Zugriff</h2>
-                    <p>Sie haben derzeit keine Berechtigung, Daten in diesem Bereich einzusehen.</p>
+                    <h2>Keine Daten</h2>
+                    <p>Es sind keine Daten für diesen Bereich verfügbar.</p>
                 </div>
             `;
             this.tablesContainer.replaceChildren(noAccess);
@@ -464,12 +460,12 @@ export class UIManager {
     showInitialView() {
         const gs = GlobalStateManager.getInstance();
         
-        // SECURITY CHECK: If no items in header, show "No Access" screen
+        // SECURITY CHECK: If no items in header, show "No Data" screen
         if (!this.header.hasVisibleItems()) {
             this.mainContent.innerHTML = `
                 <div class="no-access-screen anim-fade-in" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; color: var(--text-muted);">
-                    <h2 style="color: var(--text-color); margin-bottom: 12px;">Kein Zugriff</h2>
-                    <p style="max-width: 400px; line-height: 1.6;">Sie haben aktuell keine Berechtigungen für Team-Tabellen oder System-Funktionen. Bitte wenden Sie sich an einen Administrator.</p>
+                    <h2 style="color: var(--text-color); margin-bottom: 12px;">Keine Daten</h2>
+                    <p style="max-width: 400px; line-height: 1.6;">Es sind keine Tabellen oder System-Funktionen verfügbar.</p>
                 </div>
             `;
             // Hide side containers if open
@@ -668,16 +664,16 @@ export class UIManager {
     _initSplitViewTables(tables, peopleData) {
         const gs = GlobalStateManager.getInstance();
         
-        if (tables[`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}`] && gs.canView(`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}`)) {
+        if (tables[`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}`]) {
             this.inventoryTable = tables[`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.INVENTORY}`].instance;
         }
 
-        if (peopleData.length > 0 && gs.canView(`${TABLE_PREFIXES.TABLE}${TABLE_NAMES.PEOPLE}`)) {
+        if (peopleData.length > 0) {
             const gs = GlobalStateManager.getInstance();
             const teams = gs.getAvailableTeams();
             let teamData = this._groupPeopleByTeam(peopleData, teams);
             
-            // DATA ISOLATION REMOVED - Everyone sees all teams
+
 
             const container = document.createElement('div');
             container.className = 'people-split-multi-container';
@@ -1463,10 +1459,6 @@ export class UIManager {
     }
 
     async _handleUserInfo() {
-        if (!GlobalStateManager.getInstance().isSuperAdmin()) {
-            alert('Nur SuperAdmins haben Zugriff auf das System-Dashboard.');
-            return;
-        }
         await UserInfoPage.show(this.app.peopleData, this.app.tableConfigs, this.tables);
     }
 
@@ -1474,7 +1466,6 @@ export class UIManager {
         this.tables = await TableLoader.loadAllTables(this.app.peopleData, this.app.tableConfigs);
         const fragment = document.createDocumentFragment();
         Object.entries(this.tables).forEach(([tableId, { instance }]) => {
-            if (!this.globalState.canView(tableId)) return;
             const wrapper = document.createElement('div');
             wrapper.className = 'table-view-wrapper';
             wrapper.dataset.tableId = tableId;

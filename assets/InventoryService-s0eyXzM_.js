@@ -1,1 +1,0 @@
-import{t as e}from"./InventoryService-BwIF_tA5.js";export{e as InventoryService};

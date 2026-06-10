@@ -1,5 +1,6 @@
 import { eventBus } from "../../../events/EventBus";
 import { SearchBar } from "../SearchBar.js";
+import styles from './Header.module.css';
 
 export class Header {
     constructor(container, teams = [], onSelection = null, dataTables = []) {
@@ -12,31 +13,28 @@ export class Header {
 
     render() {
         this.element = document.createElement('header');
-        this.element.className = 'app-header';
+        this.element.className = styles['app-header'];
 
         this.element.innerHTML = `
-            <!-- 1. Logo Bereich -->
-            <div class="header-logo-section">
-                <!-- Platz für [logo] -->
+            <!-- Mobile Left Toggle (Explorer) -->
+            <button class="${styles['mobile-toggle-left']}" style="display: none;">☰</button>
+
+            <div class="${styles['header-section-1']}">
+
             </div>
-            <!-- 2. Tabellenknöpfe -->
-            <nav class="header-nav-section">
-            </nav>
-            <!-- 3. Suchleiste -->
-            <div class="header-search-section">
-                <!-- Platz für [suchleiste] -->
-            </div>
-            <!-- 4. Admin Knöpfe -->
-            <div class="header-admin-section">
-                <!-- Platz für [admin knöpfe] -->
-            </div>
-            <!-- 5. User Menu -->
-            <div class="header-user-section">
-                <!-- Platz für [user menu] -->
-            </div>
+
+            <nav class="${styles['header-section-2']}"></nav>
+
+            <div class="${styles['header-section-3']}"></div>
+
+            <div class="${styles['header-section-4']}"></div>
+
+            <div class="${styles['header-section-5']}"></div>
+
+            <button class="${styles['mobile-toggle-right']}" style="display: none;">⋮</button>
         `;
 
-        const searchSection = this.element.querySelector('.header-search-section');
+        const searchSection = this.element.querySelector('.' + styles['header-section-3']);
         if (searchSection) {
             const searchBar = new SearchBar(() => this.dataTables);
             searchSection.appendChild(searchBar.build());

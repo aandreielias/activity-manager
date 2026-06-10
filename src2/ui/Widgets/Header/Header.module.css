@@ -11,20 +11,20 @@
     z-index: 100;
 }
 
-.header-logo-section {
+.header-section-1 {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.header-nav-section {
+.header-section-2 {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-left: 24px;
 }
 
-.header-search-section {
+.header-section-3 {
     display: flex;
     align-items: center;
     flex: 1;
@@ -32,15 +32,43 @@
     margin: 0 20px;
 }
 
-.header-admin-section {
+.header-section-4 {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.header-user-section {
+.header-section-5 {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-left: 12px;
+}
+
+@media (max-width: 900px) {
+    .app-header {
+        padding: 0 16px;
+    }
+
+    .mobile-toggle-left,
+    .mobile-toggle-right {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: var(--text-primary);
+        cursor: pointer;
+        padding: 4px;
+    }
+
+    .header-nav-section,
+    .header-admin-section {
+        display: none;
+    }
+
+    .header-search-section {
+        margin: 0 12px;
+    }
 }

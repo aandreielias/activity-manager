@@ -1,4 +1,5 @@
 import { eventBus } from '../../../events/EventBus.js';
+import styles from './ExplorerPanel.module.css';
 
 export class ExplorerPanel {
   constructor(container, teams) {
@@ -60,7 +61,7 @@ export class ExplorerPanel {
     if (this.element) return this.element;
 
     this.element = document.createElement('aside');
-    this.element.className = 'ui-panel explorer-panel';
+    this.element.className = `ui-panel ${styles['explorer-panel']}`;
     this.element.innerHTML = `
       <div class="ui-panel-header">
         <div class="ui-panel-title">Explorer</div>

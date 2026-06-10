@@ -1,1 +1,0 @@
-import{t as e}from"./InventoryService-STdsieiY.js";export{e as InventoryService};

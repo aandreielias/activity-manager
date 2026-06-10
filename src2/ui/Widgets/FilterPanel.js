@@ -1,4 +1,5 @@
-import { eventBus } from "../../events/EventBus";
+import { eventBus } from "../../events/EventBus.js";
+import './Widgets.module.css';
 
 export class FilterPanel {
     constructor(table, options = {}) {

@@ -210,7 +210,9 @@ export class FilterEngine {
                 let matchFound = false;
                 let matchedFieldName = null;
 
-                for (const [key, value] of Object.entries(row.data)) {
+                for (const field of table.fields || []) {
+                    const key = field.name;
+                    const value = row.data[key];
                     if (value !== null && value !== undefined && String(value).toLowerCase().includes(lowerSearch)) {
                         matchFound = true;
                         matchedFieldName = key;

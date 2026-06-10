@@ -1,4 +1,5 @@
-import { eventBus } from "../events/EventBus";
+import { eventBus } from "../events/EventBus.js";
+import '../ui/Widgets/Message.module.css';
 
 export class MessageService {
     constructor() {

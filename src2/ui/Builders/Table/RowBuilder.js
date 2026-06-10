@@ -1,5 +1,6 @@
 import { FieldBuilder } from "./FieldBuilder.js";
 import { eventBus } from "../../../events/EventBus.js";
+import './Table.module.css';
 
 export class RowBuilder {
 

@@ -6,6 +6,7 @@ import { Row } from '../../../core/Database/Table/Row.js';
 import { Authenticator } from '../../../core/Database/Authenticator.js';
 import { TableModal } from '../../Widgets/Modal/TableModal.js';
 import { METATABLES } from "../../../core/Constants.js";
+import './Table.module.css';
 
 export class TableBuilder {
     constructor(containerElement, options = {}) {

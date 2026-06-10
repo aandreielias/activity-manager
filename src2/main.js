@@ -22,6 +22,7 @@ import { Authenticator } from './core/Database/Authenticator.js';
 import { LoginModal } from './ui/Widgets/Modal/LoginModal.js';
 import { commandEngine } from './core/CommandEngine.js';
 import { ContextMenuService } from './Services/ContextMenuService.js';
+import { RowBuilder } from './ui/Builders/Table/RowBuilder.js'
 
 async function run() {
   const DATALOADER = new DataLoader();

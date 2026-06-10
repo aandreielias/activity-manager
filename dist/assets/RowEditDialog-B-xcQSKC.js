@@ -1,1 +1,0 @@
-import{t as e}from"./BaseEditDialog-CdFz6cKJ.js";var t=class extends e{static async show(e){let t=e.data.name||e.data.title||e.data.vorname||``;return super.show(e,{title:`Eintrag bearbeiten`,subtitle:t,hasImage:!1})}};export{t as RowEditDialog};

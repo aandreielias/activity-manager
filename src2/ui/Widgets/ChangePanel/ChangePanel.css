@@ -1,0 +1,129 @@
+
+
+.change-panel-actions {
+    display: flex;
+    gap: 8px;
+}
+
+
+
+.change-panel-actions .btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+
+
+.change-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 24px 12px;
+    font-size: var(--font-size-md);
+}
+
+
+
+.change-cell-revert {
+    border-right: none;
+    text-align: center;
+    padding: 8px 4px;
+    width: 40px;
+}
+
+.change-table th:nth-child(1),
+.change-cell-field {
+    width: 35%;
+}
+
+.change-table th:nth-child(2),
+.change-cell-val.val-old {
+    width: 25%;
+}
+
+.change-table th:nth-child(3),
+.change-cell-val.val-new {
+    width: 25%;
+}
+
+.change-table th.col-revert,
+.change-cell-revert {
+    width: 15%;
+}
+
+.change-field-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.change-field-meta {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+.val-empty {
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+.val-old {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.val-new {
+    color: var(--color-success);
+    font-weight: 500;
+}
+
+.btn-revert {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition), color var(--transition);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-revert:hover {
+    color: var(--color-error);
+    background: var(--color-error-bg);
+}
+
+
+
+.btn-revert,
+.btn-save-single {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: var(--font-size-lg);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    transition: all var(--transition);
+}
+
+.btn-revert:hover {
+    color: var(--color-error);
+    background: var(--bg-tertiary);
+}
+
+.btn-save-single:hover {
+    color: var(--color-success);
+    background: var(--bg-tertiary);
+}
+
+.btn-save-single:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}

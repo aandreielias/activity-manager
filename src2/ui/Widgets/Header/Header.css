@@ -1,0 +1,46 @@
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    height: 56px;
+    background: var(--bg-secondary);
+    border-bottom: var(--border-default);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-logo-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-nav-section {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 24px;
+}
+
+.header-search-section {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    justify-content: center;
+    margin: 0 20px;
+}
+
+.header-admin-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-user-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: 12px;
+}

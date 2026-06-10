@@ -5,23 +5,103 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bd590823-c9dc-4618-9033-e87f69ac2627" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/rls_implementation.sql" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/CacheManager.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/Constants.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/Database/Authenticator.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/Database/Connector.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/Database/DataLoader.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/Database/RequestInterceptor.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/Database/Table/Field.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/Database/Table/Row.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/core/Database/Table/Table.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/events/EventBus.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/ui/ChangePanel.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src2/ui/ChangePanel.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/BaseEditDialog-CdFz6cKJ.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/InventoryEditDialog-Bt63PSLH.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/InventoryService-Cw7wh4ou.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/InventoryService-WZ2rFeqI.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/PersonEditDialog-BNGk_JzP.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/RowEditDialog-B-xcQSKC.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/html2canvas-BidpC_qi.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index-DdhyXJsB.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index-cwQbXPmi.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/index.es-DprZYv5u.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/assets/purify.es-aRXo1NJP.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/dist/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scratch/check_nb_schema.cjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/App.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/App.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/GlobalStateManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/GlobalStateManager.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/Table.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Table.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/TableDataManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableDataManager.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/TableRenderer.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/TableRenderer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/UIManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/UIManager.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/fields/EnumField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/EnumField.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/fields/LocationField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/fields/LocationField.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/AuthService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/AuthService.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/services/DataService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/DataService.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/ErrorHandler.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/SupabaseClient.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/SupabaseClient.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/UserStatsService.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/UserStatsService.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/ValidationService.js" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/services/repositories/BaseRepository.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/repositories/BaseRepository.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/ui/Header.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/Header.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/FilterEngine.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/FilterEngine.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test_rls.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/validate_rls_readiness.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/UserInfoPage.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/UserInfoPage.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/ButtonBuilder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/DataFormatter.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/EventManager.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/FormFieldFactory.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/GridLayoutFactory.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/UserContextManager.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/index.js" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotChats">
+    <option name="panelChat">
+      <chat>
+        <option name="activeSessionId" value="5f025d0c-5364-4f9a-9f3e-29d057033042" />
+        <option name="sessions">
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="f8661995-f209-4a48-b4e3-4f0afa756cc8" />
+            <option name="modeId" value="Ask" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="43f67ea1-42f3-4985-9957-1ebb54d3e6df" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="ba8b0c5f-a48f-492e-be52-f34c5d9de094" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="status" value="Stopped" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="5f025d0c-5364-4f9a-9f3e-29d057033042" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+        </option>
+        <option name="type" value="PANEL" />
+      </chat>
+    </option>
   </component>
   <component name="CopilotPersistence">
     <persistenceIdMap>
@@ -33,14 +113,16 @@
   </component>
   <component name="CopilotUserSelectedModel">
     <selectedModels>
-      <entry key="chat-panel" value="Auto" />
       <entry key="agent-panel" value="Auto" />
+      <entry key="chat-panel" value="Auto" />
     </selectedModels>
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="GitHub Workflow" />
+        <option value="JavaScript File" />
+        <option value="CSS File" />
       </list>
     </option>
   </component>
@@ -67,6 +149,20 @@
   &quot;associatedIndex&quot;: 0
 }</component>
   <component name="ProjectId" id="3BO1Pvr6qJ6bi5o7OaZ0zHdyUYy" />
+  <component name="ProjectSessionTemplates">
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Agent" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+          </model>
+        </option>
+        <option name="targetType" value="LOCAL" />
+      </template>
+    </option>
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -83,6 +179,7 @@
     &quot;git-widget-placeholder&quot;: &quot;master&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
     &quot;last_opened_file_path&quot;: &quot;/home/andrei/IdeaProjects/activity-manager/public&quot;,
+    &quot;list.type.of.created.stylesheet&quot;: &quot;CSS&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -97,6 +194,10 @@
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/public" />
     </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src2/core/Database" />
+      <recent name="$PROJECT_DIR$/src2/core/Database/Table" />
+    </key>
   </component>
   <component name="RunManager">
     <configuration default="true" type="JetRunConfigurationType">
@@ -104,6 +205,11 @@
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="activity-manager" />
+      <option name="filePath" />
+      <method v="2" />
     </configuration>
   </component>
   <component name="SharedIndexes">
@@ -141,6 +247,16 @@
       <workItem from="1776755866230" duration="1001000" />
       <workItem from="1776798769036" duration="633000" />
       <workItem from="1776936386455" duration="617000" />
+      <workItem from="1777401541130" duration="96000" />
+      <workItem from="1777401662066" duration="21000" />
+      <workItem from="1778075507657" duration="4919000" />
+      <workItem from="1778140197941" duration="16679000" />
+      <workItem from="1778234234084" duration="10949000" />
+      <workItem from="1778574970082" duration="506000" />
+      <workItem from="1778597527253" duration="5604000" />
+      <workItem from="1779114320258" duration="1772000" />
+      <workItem from="1779126280531" duration="5726000" />
+      <workItem from="1779177527727" duration="10717000" />
     </task>
     <servers />
   </component>

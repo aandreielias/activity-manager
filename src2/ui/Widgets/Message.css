@@ -1,0 +1,96 @@
+.message-container {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.banner {
+    pointer-events: auto;
+    padding: 10px 24px;
+    border-radius: var(--radius);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    min-width: 300px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+
+
+    border: 1.5px solid;
+}
+
+.banner.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.banner-warning {
+    background-color: var(--color-warning-bg);
+    color: #444444;
+    border-color: var(--color-warning);
+}
+
+.banner-error {
+    background-color: var(--color-error-bg);
+    color: #444444;
+    border-color: var(--color-error);
+}
+
+.banner-general {
+    background-color: var(--color-success-bg);
+    color: #444444;
+    border-color: var(--color-success);
+}
+
+.banner:not(.banner-error):not(.banner-warning):not(.banner-general) {
+    background-color: #ffffff;
+    color: #444444;
+    border-color: #9ca3af;
+}
+
+.banner-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.banner-buttons button {
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: var(--font-size-lg);
+    transition: all 0.2s;
+}
+
+.banner-buttons button:first-child {
+    background-color: var(--color-success);
+    color: white;
+    border: 1px solid var(--color-success);
+}
+
+.banner-buttons button:first-child:hover {
+    filter: brightness(0.9);
+}
+
+.banner-buttons button:last-child:not(:first-child) {
+    background-color: transparent;
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning);
+}
+
+.banner-buttons button:last-child:not(:first-child):hover {
+    background-color: var(--color-warning-bg);
+}

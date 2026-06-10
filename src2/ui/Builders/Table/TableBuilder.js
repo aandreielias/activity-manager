@@ -6,7 +6,7 @@ import { Row } from '../../../core/Database/Table/Row.js';
 import { Authenticator } from '../../../core/Database/Authenticator.js';
 import { TableModal } from '../../Widgets/Modal/TableModal.js';
 import { METATABLES } from "../../../core/Constants.js";
-import './Table.module.css';
+
 
 export class TableBuilder {
     constructor(containerElement, options = {}) {
@@ -31,10 +31,8 @@ export class TableBuilder {
                     tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
 
-                    const originalBg = tr.style.background;
-                    tr.style.transition = 'background 0.5s';
-                    tr.style.background = 'var(--color-warning-bg, #fffdf5)';
-                    setTimeout(() => tr.style.background = originalBg, 2000);
+                    tr.classList.add('table-row-highlight');
+                    setTimeout(() => tr.classList.remove('table-row-highlight'), 2000);
 
                     if (fieldName && searchText) {
                         const td = tr.querySelector(`td[data-field-name="${fieldName}"]`);
@@ -50,7 +48,7 @@ export class TableBuilder {
                                 const match = cellText.substring(matchIndex, matchIndex + searchText.length);
                                 const after = cellText.substring(matchIndex + searchText.length);
 
-                                td.innerHTML = `${escapeHtml(before)}<mark style="background: #fef08a; color: #1a202c; padding: 0 2px; border-radius: 2px;">${escapeHtml(match)}</mark>${escapeHtml(after)}`;
+                                td.innerHTML = `${escapeHtml(before)}<mark class="search-highlight">${escapeHtml(match)}</mark>${escapeHtml(after)}`;
                             }
                         }
                     }
@@ -100,7 +98,7 @@ export class TableBuilder {
                 title.textContent = table.titel || table.name;
 
                 if (Authenticator.canManageTable(table.id, table.groupId)) {
-                    title.style.cursor = 'context-menu';
+                    title.classList.add('cursor-context-menu');
 
                     title.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
@@ -135,15 +133,7 @@ export class TableBuilder {
                 wrapper.appendChild(title);
 
                 const pre = document.createElement('pre');
-                pre.style.margin = '16px 20px';
-                pre.style.padding = '16px';
-                pre.style.background = 'var(--bg-tertiary)';
-                pre.style.color = 'var(--text-primary)';
-                pre.style.border = '1px solid var(--border)';
-                pre.style.borderRadius = 'var(--radius)';
-                pre.style.overflowX = 'auto';
-                pre.style.fontSize = '13px';
-                pre.style.fontFamily = 'monospace';
+                pre.classList.add('table-debug-pre');
 
                 const rowDataList = (table.rows || []).map(row => row.data);
 
@@ -208,8 +198,7 @@ export class TableBuilder {
         const filterTd = document.createElement('td');
 
         filterTd.colSpan = colCount;
-        filterTd.style.padding = '0';
-        filterTd.style.border = 'none';
+        filterTd.classList.add('table-filter-td');
 
         const defaultQuery = window.history.state?.defaultQuery;
         const filterPanel = new FilterPanel(table, {
@@ -220,11 +209,7 @@ export class TableBuilder {
 
         const panelContainer = filterPanel.render();
 
-        panelContainer.style.margin = '0';
-        panelContainer.style.borderLeft = 'none';
-        panelContainer.style.borderRight = 'none';
-        panelContainer.style.borderTop = 'none';
-        panelContainer.style.borderRadius = '0';
+        panelContainer.classList.add('table-filter-panel');
 
         filterTd.appendChild(panelContainer);
         filterTr.appendChild(filterTd);
@@ -281,9 +266,7 @@ export class TableBuilder {
 
                         groupTd.colSpan = colCount;
                         groupTd.textContent = groupName;
-                        groupTd.style.fontWeight = 'bold';
-                        groupTd.style.backgroundColor = 'var(--bg-tertiary)';
-                        groupTd.style.padding = '8px 12px';
+                        groupTd.classList.add('table-group-td');
 
                         groupTr.appendChild(groupTd);
                         tbody.appendChild(groupTr);
@@ -308,23 +291,9 @@ export class TableBuilder {
 
             addRowTd.colSpan = colCount;
 
-            addRowTd.style.background = 'var(--bg-secondary)';
-            addRowTd.style.border = 'var(--border-default)';
-            addRowTd.style.padding = '0';
+            addRowTd.classList.add('table-add-row-td');
             addRowTd.innerHTML = `
-            <div style="
-                cursor: pointer; 
-                padding: var(--padding-md) var(--padding-lg); 
-                font-size: var(--font-size-xs); 
-                font-weight: 600; 
-                text-transform: uppercase; 
-                letter-spacing: 0.05em; 
-                color: var(--text-muted); 
-                text-align: center; 
-                transition: background 0.2s, color 0.2s;
-            " 
-            onmouseover="this.style.background='var(--bg-tertiary)'; this.style.color='var(--text-primary)'" 
-            onmouseout="this.style.background='transparent'; this.style.color='var(--text-muted)'">
+            <div class="table-add-row-btn">
                  + Reihe hinzufügen
             </div>
             `;
@@ -383,8 +352,7 @@ export class TableBuilder {
 
         if (this.options.enableSelection) {
             const th = document.createElement('th');
-            th.style.width = '40px';
-            th.style.textAlign = 'center';
+            th.classList.add('table-select-th');
 
             const selectAllCheckbox = document.createElement('input');
             selectAllCheckbox.type = 'checkbox';
@@ -405,7 +373,7 @@ export class TableBuilder {
         table.fields.forEach(field => {
 
             const th = document.createElement('th');
-            th.style.position = 'relative';
+            th.classList.add('table-header-th');
 
             const titleText = document.createElement('span');
             titleText.textContent = field.titel || field.name;

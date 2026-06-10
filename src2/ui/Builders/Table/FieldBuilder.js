@@ -23,7 +23,7 @@ export class FieldBuilder {
 
             if (this.isBooleanType()) {
                 td.addEventListener('click', () => this.toggleBoolean(td));
-                td.style.cursor = 'pointer';
+                td.classList.add('field-pointer');
             } else {
                 td.addEventListener('click', () => this.handleEdit(td));
             }
@@ -240,7 +240,7 @@ export class FieldBuilder {
 
         const placeholder = document.createElement('span');
         placeholder.textContent = currentText;
-        placeholder.style.visibility = 'hidden';
+        placeholder.classList.add('field-placeholder-hidden');
         td.appendChild(placeholder);
 
         const editor = this.createEditorElement(currentValue);

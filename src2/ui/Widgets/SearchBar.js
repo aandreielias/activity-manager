@@ -120,7 +120,7 @@ export class SearchBar {
 
         } else {
             suggestions.forEach(cmd => {
-                const headerHtml = `<span style="font-weight: 800; font-size: 13px; color: var(--color-primary);">Command</span> <span style="font-weight: 500;">• ${cmd.name}</span>`;
+                const headerHtml = `<span class="search-cmd-title">Command</span> <span class="search-cmd-desc">• ${cmd.name}</span>`;
 
                 const descTd = document.createElement('td');
                 descTd.textContent = cmd.description;
@@ -168,7 +168,7 @@ export class SearchBar {
                 const fieldMeta = tableDef?.fields?.find(f => f.name === res.fieldName);
 
                 if (fieldMeta && res.row) {
-                    const headerHtml = `<span style="font-weight: 800; font-size: 13px; color: var(--text-primary);">${res.tableName}</span> <span style="font-weight: 500;">• ID: ${res.rowId} • Feld: ${res.fieldLabel}</span>`;
+                    const headerHtml = `<span class="search-res-title">${res.tableName}</span> <span class="search-res-desc">• ID: ${res.rowId} • Feld: ${res.fieldLabel}</span>`;
 
                     const fieldTd = new FieldBuilder(fieldMeta, res.row).build();
 
@@ -184,7 +184,7 @@ export class SearchBar {
                             const match = cellText.substring(matchIndex, matchIndex + searchText.length);
                             const after = cellText.substring(matchIndex + searchText.length);
 
-                            fieldTd.innerHTML = `${escapeHtml(before)}<mark style="background: #fef08a; color: #1a202c; padding: 0 2px; border-radius: 2px;">${escapeHtml(match)}</mark>${escapeHtml(after)}`;
+                            fieldTd.innerHTML = `${escapeHtml(before)}<mark class="search-highlight">${escapeHtml(match)}</mark>${escapeHtml(after)}`;
                         }
                     }
 
@@ -209,7 +209,7 @@ export class SearchBar {
                     const titleRow = document.createElement('div');
 
                     titleRow.classList.add('search-item-title');
-                    titleRow.innerHTML = `<strong style="font-weight: 800;">${res.tableName}</strong> • ID: ${res.rowId} • Feld: ${res.fieldLabel}`;
+                    titleRow.innerHTML = `<strong class="search-res-strong">${res.tableName}</strong> • ID: ${res.rowId} • Feld: ${res.fieldLabel}`;
 
                     const detailRow = document.createElement('div');
 
@@ -251,23 +251,17 @@ export class SearchBar {
     _createMiniTableItem(headerHtml, contentTd, onClick) {
         const item = document.createElement('div');
         item.classList.add('search-item');
-        item.style.cursor = 'pointer';
+        item.classList.add('search-item-clickable');
 
         const miniTable = document.createElement('table');
         miniTable.classList.add('ui-table');
-        miniTable.style.border = 'var(--border-default)';
-        miniTable.style.borderRadius = 'var(--radius-md)';
-        miniTable.style.overflow = 'hidden';
-        miniTable.style.boxShadow = 'var(--shadow-sm)';
-        miniTable.style.margin = '4px 0';
+        miniTable.classList.add('search-mini-table');
 
         const thead = document.createElement('thead');
         const headerTr = document.createElement('tr');
         const th = document.createElement('th');
 
-        th.style.textTransform = 'none';
-        th.style.letterSpacing = 'normal';
-        th.style.borderRight = 'none';
+        th.classList.add('search-mini-th');
         th.innerHTML = headerHtml;
 
         headerTr.appendChild(th);
@@ -276,9 +270,8 @@ export class SearchBar {
         const tbody = document.createElement('tbody');
         const bodyTr = document.createElement('tr');
 
-        bodyTr.style.borderBottom = 'none';
-        contentTd.classList.add('ui-table-cell', 'table-field');
-        contentTd.style.borderRight = 'none';
+        bodyTr.classList.add('search-mini-tr');
+        contentTd.classList.add('ui-table-cell', 'table-field', 'search-mini-td');
 
         bodyTr.appendChild(contentTd);
         tbody.appendChild(bodyTr);

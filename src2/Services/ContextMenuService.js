@@ -44,22 +44,15 @@ export class ContextMenuService {
 
         const table = document.createElement('table');
         table.classList.add('ui-table');
-        table.style.border = 'var(--border-default)';
-        table.style.borderRadius = 'var(--radius-md)';
-        table.style.overflow = 'hidden';
-        table.style.margin = '0';
-        table.style.width = 'max-content';
-        table.style.minWidth = '180px';
+        table.classList.add('ctx-menu-table');
 
 
         if (title) {
             const thead = document.createElement('thead');
             const headerTr = document.createElement('tr');
             const th = document.createElement('th');
-            th.style.textTransform = 'none';
-            th.style.letterSpacing = 'normal';
-            th.style.borderRight = 'none';
-            th.innerHTML = `<span style="font-weight: 800; font-size: 13px; color: var(--text-primary);">${title}</span>`;
+            th.classList.add('ctx-menu-th');
+            th.innerHTML = `<span class="ctx-menu-title">${title}</span>`;
 
             headerTr.appendChild(th);
             thead.appendChild(headerTr);
@@ -70,24 +63,23 @@ export class ContextMenuService {
 
         items.forEach((item, index) => {
             const tr = document.createElement('tr');
-            tr.style.cursor = 'pointer';
+            tr.classList.add('ctx-menu-tr');
             tr.style.transition = 'background-color 0.15s ease';
 
             if (index === items.length - 1) {
-                tr.style.borderBottom = 'none';
+                tr.classList.add('ctx-menu-tr-last');
             }
 
             tr.addEventListener('mouseenter', () => tr.style.backgroundColor = 'var(--bg-secondary)');
             tr.addEventListener('mouseleave', () => tr.style.backgroundColor = '');
 
             const td = document.createElement('td');
-            td.classList.add('ui-table-cell');
-            td.style.borderRight = 'none';
+            td.classList.add('ui-table-cell', 'ctx-menu-td');
 
-            const iconHtml = item.icon ? `<span style="margin-right: 10px; font-size: 14px;">${item.icon}</span>` : '';
-            const colorStyle = item.color ? `color: ${item.color};` : 'color: var(--text-primary);';
+            const iconHtml = item.icon ? `<span class="ctx-menu-icon">${item.icon}</span>` : '';
+            const colorClass = item.color ? ` style="color: ${item.color};"` : '';
 
-            td.innerHTML = `<div style="display: flex; align-items: center; font-weight: 500; ${colorStyle}">${iconHtml}${item.label}</div>`;
+            td.innerHTML = `<div class="ctx-menu-item"${colorClass}>${iconHtml}${item.label}</div>`;
 
             tr.addEventListener('click', (e) => {
                 e.stopPropagation();

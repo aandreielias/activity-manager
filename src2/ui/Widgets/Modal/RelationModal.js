@@ -8,7 +8,7 @@ export class RelationModal extends TableModal {
         const sourceTableTitle = row.table.titel || row.table.name;
         const fieldTitle = field.titel || field.name;
 
-        super(`Auswahl: <span style="color: var(--accent);">Tb.: ${sourceTableTitle} @ Feld: ${fieldTitle} aus Tb.: ${refTableTitle}</span>`);
+        super(`Auswahl: <span class="modal-accent-text">Tb.: ${sourceTableTitle} @ Feld: ${fieldTitle} aus Tb.: ${refTableTitle}</span>`);
 
         this.field = field;
         this.row = row;
@@ -24,14 +24,14 @@ export class RelationModal extends TableModal {
         const junctionTable = dataLoader.getTable(junctionTableName);
 
         if (!junctionTable) {
-            container.innerHTML = `<div style="padding: 32px; text-align: center; color: var(--text-muted);">Verbindungstabelle '${junctionTableName}' nicht gefunden. Bitte f_referenz prüfen.</div>`;
+            container.innerHTML = `<div class="relation-modal-msg">Verbindungstabelle '${junctionTableName}' nicht gefunden. Bitte f_referenz prüfen.</div>`;
             return;
         }
 
         const sourceRefField = junctionTable.fields.find(f => f.reference === sourceTableName);
 
         if (!sourceRefField) {
-            container.innerHTML = `<div style="padding: 32px; text-align: center; color: var(--text-muted);">Die Tabelle '${junctionTableName}' hat keine gültige f_referenz auf die Quelltabelle '${sourceTableName}'.</div>`;
+            container.innerHTML = `<div class="relation-modal-msg">Die Tabelle '${junctionTableName}' hat keine gültige f_referenz auf die Quelltabelle '${sourceTableName}'.</div>`;
             return;
         }
 

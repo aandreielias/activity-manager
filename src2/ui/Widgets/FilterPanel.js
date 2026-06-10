@@ -1,5 +1,5 @@
 import { eventBus } from "../../events/EventBus.js";
-import './Widgets.module.css';
+
 
 export class FilterPanel {
     constructor(table, options = {}) {
@@ -56,33 +56,20 @@ export class FilterPanel {
     }
 
     _renderControls(container, options) {
-        container.style.flexDirection = 'column';
-        container.style.gap = '16px';
-        container.style.alignItems = 'stretch';
+        container.classList.add('filter-panel-controls');
 
         const topSection = document.createElement('div');
-        topSection.style.display = 'flex';
-        topSection.style.justifyContent = 'space-between';
-        topSection.style.alignItems = 'flex-start';
-        topSection.style.gap = '16px';
-        topSection.style.flexWrap = 'wrap';
+        topSection.classList.add('filter-top-section');
 
         const topRow = document.createElement('div');
-        topRow.style.display = 'flex';
-        topRow.style.alignItems = 'center';
-        topRow.style.gap = '32px';
-        topRow.style.flexWrap = 'wrap';
+        topRow.classList.add('filter-top-row');
 
         const groupSection = document.createElement('div');
-        groupSection.style.display = 'flex';
-        groupSection.style.alignItems = 'center';
-        groupSection.style.gap = '12px';
+        groupSection.classList.add('filter-group-section');
 
         const groupLabel = document.createElement('span');
         groupLabel.textContent = 'Gruppieren:';
-        groupLabel.style.fontWeight = '500';
-        groupLabel.style.fontSize = '13px';
-        groupLabel.style.color = 'var(--text-secondary)';
+        groupLabel.classList.add('filter-label');
 
         const groupSelect = document.createElement('select');
         groupSelect.classList.add('widget-input');
@@ -138,17 +125,13 @@ export class FilterPanel {
         };
 
         const draftSection = document.createElement('div');
-        draftSection.style.display = 'flex';
-        draftSection.style.alignItems = 'center';
-        draftSection.style.gap = '8px';
+        draftSection.classList.add('filter-draft-section');
 
         let draftFilter = { field: '', operator: 'contains', value: '', invert: false };
 
         const filterLabel = document.createElement('span');
         filterLabel.textContent = 'Filtern:';
-        filterLabel.style.fontWeight = '500';
-        filterLabel.style.fontSize = '13px';
-        filterLabel.style.color = 'var(--text-secondary)';
+        filterLabel.classList.add('filter-label');
 
         const fieldSelect = document.createElement('select');
         fieldSelect.classList.add('widget-input');
@@ -176,13 +159,11 @@ export class FilterPanel {
 
         const updateInvert = () => {
             if (draftFilter.invert) {
-                invertBtn.style.background = 'var(--color-error)';
-                invertBtn.style.color = '#fff';
-                invertBtn.style.border = '1px solid var(--color-error)';
+                invertBtn.classList.remove('filter-invert-inactive');
+                invertBtn.classList.add('filter-invert-active');
             } else {
-                invertBtn.style.background = 'transparent';
-                invertBtn.style.color = 'var(--text-secondary)';
-                invertBtn.style.border = '1px solid var(--border)';
+                invertBtn.classList.remove('filter-invert-active');
+                invertBtn.classList.add('filter-invert-inactive');
             }
         };
         updateInvert();
@@ -230,12 +211,7 @@ export class FilterPanel {
         topRow.append(groupSection, draftSection);
 
         const appliedFiltersArea = document.createElement('div');
-        appliedFiltersArea.style.display = 'flex';
-        appliedFiltersArea.style.flexWrap = 'wrap';
-        appliedFiltersArea.style.gap = '8px';
-        appliedFiltersArea.style.borderTop = '1px solid var(--border)';
-        appliedFiltersArea.style.paddingTop = '12px';
-        appliedFiltersArea.style.marginTop = '4px';
+        appliedFiltersArea.classList.add('filter-applied-area');
 
         const renderBadges = () => {
             appliedFiltersArea.innerHTML = '';
@@ -244,15 +220,7 @@ export class FilterPanel {
 
             this.filters.forEach((f, index) => {
                 const badge = document.createElement('div');
-                badge.style.display = 'flex';
-                badge.style.alignItems = 'center';
-                badge.style.gap = '6px';
-                badge.style.padding = '4px 8px';
-                badge.style.background = 'var(--bg-tertiary)';
-                badge.style.border = '1px solid var(--border)';
-                badge.style.borderRadius = 'var(--radius)';
-                badge.style.fontSize = '12px';
-                badge.style.color = 'var(--text-primary)';
+                badge.classList.add('filter-badge');
 
                 const fieldName = options.filterable.find(opt => opt.id === f.field)?.label || f.field;
 
@@ -267,9 +235,7 @@ export class FilterPanel {
 
                 const removeBtn = document.createElement('span');
                 removeBtn.innerHTML = '&#10006;';
-                removeBtn.style.cursor = 'pointer';
-                removeBtn.style.color = 'var(--color-error)';
-                removeBtn.style.marginLeft = '4px';
+                removeBtn.classList.add('filter-badge-remove');
                 removeBtn.addEventListener('click', () => {
                     this.filters.splice(index, 1);
                     renderBadges();
@@ -293,17 +259,13 @@ export class FilterPanel {
             if (this.filters.length === 0) {
                 const emptyMsg = document.createElement('span');
                 emptyMsg.textContent = 'Kein Filter erstellt';
-                emptyMsg.style.color = 'var(--text-secondary)';
-                emptyMsg.style.fontSize = '12px';
+                emptyMsg.classList.add('filter-empty-msg');
                 appliedFiltersArea.appendChild(emptyMsg);
             }
         };
 
         const buttonContainer = document.createElement('div');
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.flexDirection = 'row';
-        buttonContainer.style.gap = '8px';
-        buttonContainer.style.marginLeft = '16px';
+        buttonContainer.classList.add('filter-button-container');
 
         const executeApply = () => {
             if (draftFilter.field && draftFilter.value) {

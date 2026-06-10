@@ -16,15 +16,9 @@ export class TableModal extends BaseModal {
         setTimeout(() => {
             const modalWindow = container.closest('.modal-window');
             if (modalWindow) {
-                modalWindow.style.width = '90vw';
-                modalWindow.style.maxWidth = '1400px';
-                modalWindow.style.maxHeight = '90vh';
-                modalWindow.style.display = 'flex';
-                modalWindow.style.flexDirection = 'column';
+                modalWindow.classList.add('table-modal-window');
             }
-            container.style.padding = '24px';
-            container.style.overflowY = 'auto';
-            container.style.flex = '1';
+            container.classList.add('table-modal-container');
         }, 0);
     }
 

@@ -69,32 +69,30 @@ async function run() {
   const leftToggle = document.querySelector('.mobile-toggle-left');
   const rightToggle = document.querySelector('.mobile-toggle-right');
   const overlay = document.createElement('div');
-
-  // Create an optional dark overlay for the background
   overlay.className = 'mobile-overlay';
-  Object.assign(overlay.style, {
-    position: 'fixed', top: '56px', left: '0', right: '0', bottom: '0',
-    background: 'rgba(0,0,0,0.5)', zIndex: '999', display: 'none'
-  });
   document.body.appendChild(overlay);
+
   const closeDrawers = () => {
     leftSidebar.classList.remove('is-open');
     rightSidebar.classList.remove('is-open');
-    overlay.style.display = 'none';
+    overlay.classList.remove('is-visible');
   };
+  
   overlay.addEventListener('click', closeDrawers);
+  
   if (leftToggle) {
     leftToggle.addEventListener('click', () => {
       const isOpen = leftSidebar.classList.toggle('is-open');
       rightSidebar.classList.remove('is-open');
-      overlay.style.display = isOpen ? 'block' : 'none';
+      overlay.classList.toggle('is-visible', isOpen);
     });
   }
+  
   if (rightToggle) {
     rightToggle.addEventListener('click', () => {
       const isOpen = rightSidebar.classList.toggle('is-open');
       leftSidebar.classList.remove('is-open');
-      overlay.style.display = isOpen ? 'block' : 'none';
+      overlay.classList.toggle('is-visible', isOpen);
     });
   }
 }

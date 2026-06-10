@@ -10,10 +10,5 @@ export default {
     publicDir: 'public',
     build: {
         outDir: 'dist'
-    },
-    css: {
-        modules: {
-            generateScopedName: '[local]'
-        }
     }
 }

@@ -1,6 +1,6 @@
 import { eventBus } from '../../../events/EventBus.js';
 import { FieldBuilder } from '../../Builders/Table/FieldBuilder.js';
-import styles from './ChangePanel.module.css';
+
 
 export class ChangePanel {
   constructor(container) {
@@ -60,7 +60,7 @@ export class ChangePanel {
 
     this.element = document.createElement('aside');
 
-    this.element.className = `ui-panel ${styles['change-panel']}`;
+    this.element.className = `ui-panel change-panel`;
     this.element.innerHTML = `            
             <div class="ui-panel-header">
                 <div class="ui-panel-title">Changes</div>
@@ -171,7 +171,7 @@ export class ChangePanel {
 
         tr.innerHTML = `
               <td class="ui-table-cell change-cell-field" colspan="3">
-                  <div style="font-weight: 600; color: ${color};">${text}</div>
+                  <div class="${isAdd ? 'change-action-add' : 'change-action-delete'}">${text}</div>
                   <div class="change-field-meta">${this._escapeHtml(table)} · row ${rowId}</div>
               </td>
               <td class="ui-table-cell change-cell-revert">

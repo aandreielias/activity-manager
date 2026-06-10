@@ -1,4 +1,4 @@
-import './Modal.module.css';
+
 
 export class BaseModal {
     constructor(title = "Fenster") {

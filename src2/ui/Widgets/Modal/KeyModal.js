@@ -8,7 +8,7 @@ export class KeyModal extends TableModal {
         const sourceTableTitle = row.table.titel || row.table.name;
         const fieldTitle = field.titel || field.name;
 
-        super(`Auswahl: <span style="color: var(--accent);">Tb.: ${sourceTableTitle} @ Feld: ${fieldTitle} aus Tb.: ${refTableTitle}</span>`);
+        super(`Auswahl: <span class="modal-accent-text">Tb.: ${sourceTableTitle} @ Feld: ${fieldTitle} aus Tb.: ${refTableTitle}</span>`);
 
         this.field = field;
         this.row = row;
@@ -22,10 +22,7 @@ export class KeyModal extends TableModal {
 
         if (refTable && refTable.rows.length > 0) {
             const tableWrapper = document.createElement('div');
-            tableWrapper.style.maxHeight = '50vh';
-            tableWrapper.style.overflowY = 'auto';
-            tableWrapper.style.border = 'var(--border-default)';
-            tableWrapper.style.borderRadius = 'var(--radius)';
+            tableWrapper.classList.add('key-modal-table-wrapper');
 
             this.renderTable(tableWrapper, refTable, {
                 isEditable: false,
@@ -47,29 +44,20 @@ export class KeyModal extends TableModal {
 
             const innerContainer = tableWrapper.querySelector('.table-container');
             if (innerContainer) {
-                innerContainer.style.marginBottom = '0';
-                innerContainer.style.border = 'none';
-                innerContainer.style.boxShadow = 'none';
+                innerContainer.classList.add('key-modal-inner-container');
             }
 
             container.appendChild(tableWrapper);
 
             const saveBtn = document.createElement('button');
             saveBtn.textContent = 'Speichern';
-            saveBtn.style.marginTop = '16px';
-            saveBtn.style.padding = 'var(--padding-sm) var(--padding-lg)';
-            saveBtn.style.background = 'var(--accent)';
-            saveBtn.style.color = 'white';
-            saveBtn.style.border = 'none';
-            saveBtn.style.borderRadius = 'var(--radius-md)';
-            saveBtn.style.cursor = 'pointer';
-            saveBtn.style.fontWeight = '600';
+            saveBtn.classList.add('key-modal-save-btn');
 
             saveBtn.addEventListener('click', () => this.saveSelection(tableWrapper));
             container.appendChild(saveBtn);
 
         } else {
-            container.innerHTML = '<p style="color: var(--text-muted);">Keine Referenzdaten gefunden</p>';
+            container.innerHTML = '<p class="modal-empty-text">Keine Referenzdaten gefunden</p>';
         }
     }
 

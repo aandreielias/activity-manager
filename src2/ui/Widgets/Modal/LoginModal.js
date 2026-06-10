@@ -11,10 +11,10 @@ export class LoginModal extends BaseModal {
 
     renderBody(container) {
         container.innerHTML = `
-            <div style="display: flex; flex-direction: column; gap: 12px; padding: 10px;">
-                <input type="text" id="login-user" placeholder="Benutzername" style="padding: 10px; border-radius: var(--radius-sm); border: none; outline: none; background: var(--bg-hover);">
-                <input type="password" id="login-pass" placeholder="Passwort" style="padding: 10px; border-radius: var(--radius-sm); border: none; outline: none; background: var(--bg-hover);">
-                <button id="login-btn" style="padding: 10px; background: var(--accent); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; margin-top: 10px;">Login</button>
+            <div class="login-form-container">
+                <input type="text" id="login-user" placeholder="Benutzername" class="login-input">
+                <input type="password" id="login-pass" placeholder="Passwort" class="login-input">
+                <button id="login-btn" class="login-btn">Login</button>
             </div>
         `;
 

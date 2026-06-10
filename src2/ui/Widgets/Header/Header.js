@@ -1,6 +1,6 @@
 import { eventBus } from "../../../events/EventBus";
 import { SearchBar } from "../SearchBar.js";
-import styles from './Header.module.css';
+
 
 export class Header {
     constructor(container, teams = [], onSelection = null, dataTables = []) {
@@ -13,28 +13,28 @@ export class Header {
 
     render() {
         this.element = document.createElement('header');
-        this.element.className = styles['app-header'];
+        this.element.className = 'app-header';
 
         this.element.innerHTML = `
             <!-- Mobile Left Toggle (Explorer) -->
-            <button class="${styles['mobile-toggle-left']}" style="display: none;">☰</button>
+            <button class="mobile-toggle-left header-mobile-toggle">☰</button>
 
-            <div class="${styles['header-section-1']}">
+            <div class="header-section-1">
 
             </div>
 
-            <nav class="${styles['header-section-2']}"></nav>
+            <nav class="header-section-2"></nav>
 
-            <div class="${styles['header-section-3']}"></div>
+            <div class="header-section-3"></div>
 
-            <div class="${styles['header-section-4']}"></div>
+            <div class="header-section-4"></div>
 
-            <div class="${styles['header-section-5']}"></div>
+            <div class="header-section-5"></div>
 
-            <button class="${styles['mobile-toggle-right']}" style="display: none;">⋮</button>
+            <button class="mobile-toggle-right header-mobile-toggle">⋮</button>
         `;
 
-        const searchSection = this.element.querySelector('.' + styles['header-section-3']);
+        const searchSection = this.element.querySelector('.header-section-3');
         if (searchSection) {
             const searchBar = new SearchBar(() => this.dataTables);
             searchSection.appendChild(searchBar.build());

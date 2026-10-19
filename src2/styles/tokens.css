@@ -45,3 +45,12 @@
     --color-error: #ef4444;
     --color-error-bg: #fffcfc;
 }
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 1200px) {
+    :root {
+        --padding-md: 10px;
+        --padding-lg: 14px;
+        --font-size-lg: 13px;
+    }
+}

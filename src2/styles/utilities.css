@@ -1,4 +1,5 @@
 @media (min-width: 1301px) {
+
     .nav-teams-view,
     .nav-compact-view {
         display: none !important;
@@ -6,6 +7,7 @@
 }
 
 @media (max-width: 1300px) and (min-width: 901px) {
+
     .nav-groups-view,
     .nav-compact-view {
         display: none !important;
@@ -13,9 +15,29 @@
 }
 
 @media (max-width: 900px) {
+
     .nav-groups-view,
     .nav-teams-view {
         display: none !important;
+    }
+}
+
+/* --- Responsive Display Utilities --- */
+.hide-on-mobile {
+    display: flex;
+}
+
+.show-on-mobile {
+    display: none !important;
+}
+
+@media (max-width: 900px) {
+    .hide-on-mobile {
+        display: none !important;
+    }
+
+    .show-on-mobile {
+        display: flex !important;
     }
 }
 

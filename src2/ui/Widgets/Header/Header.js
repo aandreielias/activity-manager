@@ -1,5 +1,6 @@
 import { eventBus } from "../../../events/EventBus";
 import { SearchBar } from "../SearchBar.js";
+import { CalendarModal } from "../Modal/CalendarModal.js";
 
 
 export class Header {
@@ -27,17 +28,27 @@ export class Header {
 
             <div class="header-section-3"></div>
 
-            <div class="header-section-4"></div>
+            <div class="header-section-4">
+                <button class="header-calendar-btn">Kalendar</button>
+            </div>
 
             <div class="header-section-5"></div>
 
-            <button class="mobile-toggle-right header-mobile-toggle">⋮</button>
+            <button class="mobile-toggle-right header-mobile-toggle">⋮</button> 
         `;
 
         const searchSection = this.element.querySelector('.header-section-3');
         if (searchSection) {
             const searchBar = new SearchBar(() => this.dataTables);
             searchSection.appendChild(searchBar.build());
+        }
+
+        const calendarBtn = this.element.querySelector('.header-calendar-btn');
+        if (calendarBtn) {
+            calendarBtn.addEventListener('click', () => {
+                const calendarModal = new CalendarModal(this.dataTables);
+                calendarModal.open();
+            });
         }
 
         if (this.container) {
